@@ -13,7 +13,7 @@
 [![OpenSSF Scorecard](https://raw.githubusercontent.com/ryanduguid/.github/badges/EquityBot/Laconic.svg)](https://scorecard.dev/viewer/?uri=github.com/yungSNAT/Laconic)<br>
 [![release](https://img.shields.io/github/v/release/yungSNAT/Laconic?filter=laconic-check-v*&color=66023C&labelColor=000000&style=flat)](https://github.com/yungSNAT/Laconic/releases?q=laconic-check-v&expanded=true) [![licence: FSL-1.1-ALv2](.github/assets/badges/licence.svg)](LICENSE) [![fork of: i-have-adhd](.github/assets/badges/fork-of.svg)](https://github.com/ayghri/i-have-adhd)
 
-[Install](#install) · [Use](#use) · [What changes](#what-changes) · [Evaluation](#evaluation) · [Checker](#checker) · [Always on](#always-on) · [Development](#development) · [Credits](#credits)
+[Install](#install) · [Use](#use) · [What changes](#what-changes) · [Evaluation](#evaluation) · [Checker](#checker) · [Always on](#always-on) · [Development](#development) · [Credits](#credits) · [Licence](#licence)
 
 </div>
 

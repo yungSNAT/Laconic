@@ -6,7 +6,7 @@
 
 Each example is a seeded fault: the tests plant it in clean prose, and `lint` must flag it exactly once. The human prose figures count findings in 3 Productivity Commission reports released in 2018 and 2021 (205,299 whitespace-separated words of Australian Government prose under CC BY 3.0 AU, in `tools/laconic-check/tests/corpus`). Most of them are house-style differences the Commission's own style allows, such as spaced dashes, words for numbers below 10 and serial commas, rather than errors.
 
-The outside figures come from the 150 human-written news articles in `human_detectors.json` from jenna-russell/human_detectors at commit `afcf03d` (110,723 words of mostly American prose, not stored here because the texts carry no licence). `laconic-tools calibrate` lints them from a local download. Articles with odd prompt ids are the calibration half, for tuning rules; the even half is held out, and the table shows how many of those 75 articles each rule flags. A new advisory rule must flag under 5% of them.
+The outside figures come from the 150 human-written news articles in `human_detectors.json` from jenna-russell/human_detectors at commit `afcf03d` (110,723 words of mostly American prose, not stored here because the texts have no stated licence). `laconic-tools calibrate` lints them from a local download. Articles with odd prompt ids are the calibration half, for tuning rules; the even half is held out, and the table shows how many of those 75 articles each rule flags. A new advisory rule must flag under 5% of them.
 
 To report a finding that should not have been flagged, use the [false-positive form](https://github.com/yungSNAT/Laconic/issues/new?template=false-positive.yml).
 

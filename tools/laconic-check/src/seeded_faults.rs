@@ -30,6 +30,8 @@ const CLEAN: &[&str] = &[
     "Andy wrote to the state senate every week for 6 years.",
     "The patterns credit [humanizer](https://github.com/blader/humanizer) and [the house guide](https://example.com/guide).",
     "Fees were low in the 1980s, but 2020's budget took the rate to 5% and the charge to $27.99 from 21 September.",
+    "Each member gets a healthcare plan.",
+    "The Bureau of Meteorology (BOM) issued 2 warnings.",
     "- **Keep:** a single bold label.",
 ];
 
@@ -109,6 +111,11 @@ const SEEDS: &[(&str, &str, &str)] = &[
     ),
     ("hyphen", "the program", "the open-source program"),
     ("hyphen", "left for the centre", "e-mailed the centre"),
+    (
+        "hyphen-consistency",
+        "a healthcare plan",
+        "a healthcare plan and a health-care card",
+    ),
     ("word-choice", "whilst demand", "while demand"),
     ("word-choice", "amongst small", "among small"),
     ("date", "on 19 October 2026", "on 19th October 2026"),
@@ -130,6 +137,11 @@ const SEEDS: &[(&str, &str, &str)] = &[
     ("time", "at 9:30 am", "at 9.30am"),
     ("time", "at 9:30 am", "at 9:30 a.m."),
     ("latin", "for example the colour", "e.g. the colour"),
+    (
+        "acronym-before-definition",
+        "The Bureau of Meteorology (BOM)",
+        "The BOM forecast came from the Bureau of Meteorology (BOM), which",
+    ),
     (
         "residue",
         "after the go-ahead.",
@@ -216,8 +228,10 @@ const HUMAN_CORPUS_CEILING: usize = 2246;
 /// Advisory findings have their own ceiling: 41 paragraphs put clause dashes in 2 or more
 /// sentences when the corpus was calibrated on 2 November 2026, and the stacked-hedge rule
 /// added 8 human uses on 4 November ('could potentially' 5 times, 'can potentially' twice,
-/// 'may potentially' once).
-const HUMAN_CORPUS_ADVISORY_CEILING: usize = 49;
+/// 'may potentially' once). The document rules added 19 on 8 November: 15 acronyms used
+/// before their definition and 4 compounds written both ways ('re-use', 'co-operation',
+/// 'well-being' and 'socio-economic').
+const HUMAN_CORPUS_ADVISORY_CEILING: usize = 68;
 /// AI-tell findings at calibration, all human uses: 'it is important to note' 3 times,
 /// 'innovative', 'deep dive', 'not just X, but Y' and 'time-frame'.
 const HUMAN_CORPUS_TELL_CEILING: usize = 7;
@@ -438,7 +452,7 @@ fn reference() -> String {
          # laconic-check rules\n\n\
          `laconic-check lint` reports each finding as `file:line:column: rule: message`. Each rule below is headed by its name, so `docs/rules.md#<rule>` links to it. A finding is a reason to look, not proof of a defect. Advisory rules never fail `lint`.\n\n\
          Each example is a seeded fault: the tests plant it in clean prose, and `lint` must flag it exactly once. The human prose figures count findings in 3 Productivity Commission reports released in 2018 and 2021 ({} whitespace-separated words of Australian Government prose under CC BY 3.0 AU, in `tools/laconic-check/tests/corpus`). Most of them are house-style differences the Commission's own style allows, such as spaced dashes, words for numbers below 10 and serial commas, rather than errors.\n\n\
-         The outside figures come from the {} human-written news articles in `human_detectors.json` from jenna-russell/human_detectors at commit `afcf03d` ({} words of mostly American prose, not stored here because the texts have no stated licence). `laconic-tools calibrate` lints them from a local download. Articles with odd prompt ids are the calibration half, for tuning rules; the even half is held out, and the table shows how many of those {} articles each rule flags. A new advisory rule must flag under 5% of them.\n\n\
+         The outside figures come from the {} human-written news articles in `human_detectors.json` from jenna-russell/human_detectors at commit `afcf03d` ({} words of mostly American prose, not stored here because the texts have no stated licence). `laconic-tools calibrate` lints them from a local download. Articles with odd prompt ids are the calibration half, for tuning rules; the even half is held out, and the table shows how many of those {} articles each rule flags. A new advisory rule must flag under 5% of them. Measured and dropped as advisories: sentence-length rhythm, which flagged 3 of the 75 held-out human articles but only 4 of the 75 AI-written ones in the same corpus, so it does not mark the pattern it targets; capitalisation consistency, which flagged 71 of 75; and meaning reversals in edits, which need before-and-after pairs that this corpus lacks.\n\n\
          To report a finding that should not have been flagged, use the [false-positive form]({ISSUE_FORM}false-positive.yml).\n\n\
          | Rule | Fails `lint` | Style Manual section | Human prose, per 1,000 words | Outside articles flagged |\n\
          | --- | --- | --- | --- | --- |",

@@ -13,11 +13,13 @@ serial-comma	32	65	32	70	166
 em-dash	64	228	58	245	1415
 clause-dashes	15	17	16	17	41
 hyphen	0	0	0	0	1
+hyphen-consistency	0	0	0	0	4
 number-word	56	152	57	137	329
 date	7	8	6	10	3
 weekday	0	0	0	0	0
 time	3	3	3	4	1
 latin	0	0	0	0	1
+acronym-before-definition	0	0	0	0	15
 closer	1	1	0	0	0
 stock-phrase	2	2	4	5	5
 stacked-hedge	0	0	0	0	8

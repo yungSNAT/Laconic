@@ -99,6 +99,11 @@ rules! {
         Some("Hyphens"),
         "Unnecessary hyphens in open set phrases and closed compounds, such as 'open-source' and 'e-mail'.",
     ),
+    HyphenConsistency = advisory(
+        "hyphen-consistency",
+        Some("Hyphens"),
+        "A compound written both closed and hyphenated in one document, such as 'healthcare' and 'health-care'. Some such pairs are different words, such as 'resign' and 're-sign'.",
+    ),
     NumberWord = rule(
         "number-word",
         Some("Numbers"),
@@ -123,6 +128,11 @@ rules! {
         "latin",
         Some("Shortened forms"),
         "The Latin abbreviations 'e.g.' and 'i.e.', with or without full stops, where 'for example' and 'that is' are preferred.",
+    ),
+    AcronymBeforeDefinition = advisory(
+        "acronym-before-definition",
+        Some("Shortened forms"),
+        "An acronym of 2 to 6 capitals used before the parenthesised definition that introduces it later in the document, as in 'The BOM said ... the Bureau of Meteorology (BOM)'.",
     ),
     Closer = rule(
         "closer",
@@ -460,6 +470,7 @@ fn ize_is_part_of_word(word: &str) -> bool {
 pub fn lint(text: &str) -> Vec<Finding> {
     let mut findings = Vec::new();
     let mut paragraph = Paragraph::default();
+    let mut document = Document::default();
     let mut fence: Option<&str> = None;
     let mut in_list = false;
     // The indent and length of the current run of bold-label bullets.
@@ -482,7 +493,7 @@ pub fn lint(text: &str) -> Vec<Finding> {
             continue;
         }
         if trimmed.starts_with("```") || trimmed.starts_with("~~~") {
-            paragraph.flush(&mut findings);
+            paragraph.flush(&mut findings, &mut document);
             fence = Some(if trimmed.starts_with("```") {
                 "```"
             } else {
@@ -493,7 +504,7 @@ pub fn lint(text: &str) -> Vec<Finding> {
         if trimmed.is_empty() || trimmed.starts_with('<') || trimmed.starts_with('>') {
             // A blank line ends the paragraph; HTML and block quotations are not
             // original prose.
-            paragraph.flush(&mut findings);
+            paragraph.flush(&mut findings, &mut document);
             continue;
         }
         let list_item = !is_break_line(trimmed) && starts_list_item(trimmed);
@@ -512,7 +523,7 @@ pub fn lint(text: &str) -> Vec<Finding> {
             || is_break_line(trimmed)
             || indented_code;
         if single_line || list_item {
-            paragraph.flush(&mut findings);
+            paragraph.flush(&mut findings, &mut document);
         }
         // Bullets nested under a run leave it open; a sibling without a label ends it.
         if list_item && (labels.1 == 0 || indent <= labels.0) {
@@ -536,10 +547,16 @@ pub fn lint(text: &str) -> Vec<Finding> {
         paragraph.push(raw, line_no);
         // A hard line break (two trailing spaces or a backslash) also ends the run.
         if single_line || raw.ends_with("  ") || raw.trim_end().ends_with('\\') {
-            paragraph.flush(&mut findings);
+            paragraph.flush(&mut findings, &mut document);
         }
     }
-    paragraph.flush(&mut findings);
+    paragraph.flush(&mut findings, &mut document);
+    // Rules that compare paragraphs report once the whole document is read, each after the
+    // findings already on its line.
+    for finding in document.findings() {
+        let at = findings.partition_point(|f| f.line <= finding.line);
+        findings.insert(at, finding);
+    }
     findings
 }
 
@@ -599,12 +616,13 @@ impl Paragraph {
         self.lines.push((line, raw.chars().collect()));
     }
 
-    /// Runs the rules over the joined paragraph and clears it.
-    fn flush(&mut self, findings: &mut Vec<Finding>) {
+    /// Runs the rules over the joined paragraph, records its words in `document` and clears it.
+    fn flush(&mut self, findings: &mut Vec<Finding>, document: &mut Document) {
         if self.lines.is_empty() {
             return;
         }
         let (masked, doubles) = mask(&self.chars);
+        document.collect(&masked, |column| self.at(column));
         let mut found = Vec::new();
         for column in doubles {
             found.push(self.place(Finding {
@@ -626,18 +644,185 @@ impl Paragraph {
         *self = Self::default();
     }
 
-    /// Moves a finding from its joined column to its original line and column.
-    fn place(&self, mut finding: Finding) -> Finding {
-        let index = finding.column.saturating_sub(1);
-        (finding.line, finding.column) = match self.origin.get(index) {
+    /// The original line and column of a 1-based column in the joined paragraph.
+    fn at(&self, column: usize) -> (usize, usize) {
+        let index = column.saturating_sub(1);
+        match self.origin.get(index) {
             Some(&at) => at,
             None => {
                 let (line, column) = self.origin.last().copied().unwrap_or((0, 0));
                 (line, column + index + 1 - self.origin.len())
             }
-        };
+        }
+    }
+
+    /// Moves a finding from its joined column to its original line and column.
+    fn place(&self, mut finding: Finding) -> Finding {
+        (finding.line, finding.column) = self.at(finding.column);
         finding
     }
+}
+
+/// The words and acronyms of a whole document, for the rules that compare one paragraph with
+/// another. Masked text only, so code, links and quotations take no part.
+#[derive(Default)]
+struct Document {
+    /// Each lower-case word's first line and column; a hyphenated word stays whole.
+    words: HashMap<String, (usize, usize)>,
+    /// Each acronym's first definition in parentheses, as in 'Bureau of Meteorology (BOM)'.
+    defined: HashMap<String, (usize, usize)>,
+    /// Each acronym's first use outside a definition.
+    used: HashMap<String, (usize, usize)>,
+}
+
+impl Document {
+    /// Records one masked paragraph; `at` maps a 1-based column to its line and column.
+    fn collect(&mut self, masked: &[char], at: impl Fn(usize) -> (usize, usize)) {
+        let mut k = 0;
+        while k < masked.len() {
+            if !masked[k].is_alphabetic() {
+                k += 1;
+                continue;
+            }
+            // Letters, with single hyphens between letters kept inside the word.
+            let start = k;
+            while k < masked.len()
+                && (masked[k].is_alphabetic()
+                    || (masked[k] == '-' && masked.get(k + 1).is_some_and(|c| c.is_alphabetic())))
+            {
+                k += 1;
+            }
+            // A bare domain or path, such as 'planetark.org/cartridges-4-planet-ark', is an
+            // address, not prose.
+            let token_start = masked[..start]
+                .iter()
+                .rposition(|c| c.is_whitespace())
+                .map_or(0, |p| p + 1);
+            let token_end = masked[k..]
+                .iter()
+                .position(|c| c.is_whitespace())
+                .map_or(masked.len(), |p| k + p);
+            let token = &masked[token_start..token_end];
+            if token.iter().any(|&c| c == '/' || c == '@')
+                || token
+                    .windows(3)
+                    .any(|w| w[0].is_alphanumeric() && w[1] == '.' && w[2].is_alphanumeric())
+            {
+                continue;
+            }
+            let word: String = masked[start..k].iter().collect();
+            let place = at(start + 1);
+            if is_acronym(&word) {
+                let defines = start > 0
+                    && masked[start - 1] == '('
+                    && masked.get(k) == Some(&')')
+                    && spells(&masked[..start - 1], &word);
+                let first = if defines {
+                    &mut self.defined
+                } else {
+                    &mut self.used
+                };
+                first.entry(word.clone()).or_insert(place);
+            }
+            self.words.entry(word.to_lowercase()).or_insert(place);
+        }
+    }
+
+    /// The findings that need the whole document, in line and column order.
+    fn findings(&self) -> Vec<Finding> {
+        let mut found = Vec::new();
+        for (word, &hyphenated) in &self.words {
+            let Some((a, b)) = word.split_once('-') else {
+                continue;
+            };
+            let closed = format!("{a}{b}");
+            // The hyphen rule already reports the forms in HYPHENATED_FORMS.
+            let reported = HYPHENATED_FORMS.iter().any(|(form, _, suffixes)| {
+                word.strip_prefix(*form)
+                    .is_some_and(|rest| suffixes.contains(&rest))
+            });
+            if b.contains('-') || a.chars().count() < 2 || b.chars().count() < 2 || reported {
+                continue;
+            }
+            let Some(&closed_at) = self.words.get(&closed) else {
+                continue;
+            };
+            // Report where the second form first appears.
+            let (at, here, there, there_at) = if hyphenated > closed_at {
+                (hyphenated, word.as_str(), closed.as_str(), closed_at)
+            } else {
+                (closed_at, closed.as_str(), word.as_str(), hyphenated)
+            };
+            found.push(Finding {
+                line: at.0,
+                column: at.1,
+                rule: RuleId::HyphenConsistency,
+                message: format!(
+                    "'{here}' here and '{there}' on line {} (advisory); use one form unless they are different words",
+                    there_at.0
+                ),
+            });
+        }
+        for (acronym, &used) in &self.used {
+            if let Some(&defined) = self.defined.get(acronym)
+                && used < defined
+            {
+                found.push(Finding {
+                    line: used.0,
+                    column: used.1,
+                    rule: RuleId::AcronymBeforeDefinition,
+                    message: format!(
+                        "'{acronym}' is used before its definition on line {} (advisory); define it at first use",
+                        defined.0
+                    ),
+                });
+            }
+        }
+        found.sort_by_key(|f| (f.line, f.column));
+        found
+    }
+}
+
+/// 2 to 6 capital letters, with an optional plural 's': 'BOM', 'NGOs'.
+fn is_acronym(word: &str) -> bool {
+    let capitals = word.strip_suffix('s').unwrap_or(word);
+    (2..=6).contains(&capitals.len()) && capitals.bytes().all(|b| b.is_ascii_uppercase())
+}
+
+/// True when the few words before a parenthesised acronym spell it, as 'Bureau of
+/// Meteorology' spells BOM: its letters appear in order, the first at the start of a word.
+/// Labels such as 'Ayoub G. (MIT)' and 'Reading level (AAA)' do not. After Schwartz and
+/// Hearst's algorithm for finding abbreviation definitions.
+fn spells(before: &[char], acronym: &str) -> bool {
+    let capitals = acronym.strip_suffix('s').unwrap_or(acronym);
+    let text: String = before.iter().collect();
+    let words: Vec<&str> = text.split_whitespace().collect();
+    // The definition lies within min(|A| + 5, 2|A|) words before the parenthesis, after any
+    // earlier use of the acronym itself.
+    let limit = (capitals.len() + 5).min(capitals.len() * 2);
+    let mut window = &words[words.len().saturating_sub(limit)..];
+    if let Some(last) = window.iter().rposition(|w| {
+        let bare = w.trim_matches(|c: char| !c.is_alphanumeric());
+        bare == acronym || bare == capitals
+    }) {
+        window = &window[last + 1..];
+    }
+    let long: Vec<char> = window.join(" ").chars().collect();
+    let short: Vec<char> = capitals.chars().map(|c| c.to_ascii_lowercase()).collect();
+    let mut l = long.len();
+    for (s, &letter) in short.iter().enumerate().rev() {
+        loop {
+            if l == 0 {
+                return false;
+            }
+            l -= 1;
+            let word_start = l == 0 || !long[l - 1].is_alphanumeric();
+            if long[l].to_ascii_lowercase() == letter && (s > 0 || word_start) {
+                break;
+            }
+        }
+    }
+    true
 }
 
 /// Chat-tool leftovers: citation markers and tracking tags in links.
@@ -2131,6 +2316,104 @@ mod tests {
         ] {
             assert!(rules(text).is_empty(), "{text}: {:?}", rules(text));
         }
+    }
+
+    /// Findings of one rule as (line, column, message).
+    fn of(rule: RuleId, text: &str) -> Vec<(usize, usize, String)> {
+        lint(text)
+            .into_iter()
+            .filter(|f| f.rule == rule)
+            .map(|f| (f.line, f.column, f.message))
+            .collect()
+    }
+
+    #[test]
+    fn flags_a_compound_written_closed_and_hyphenated_in_one_document() {
+        let found = |text: &str| of(RuleId::HyphenConsistency, text);
+        assert!(RuleId::HyphenConsistency.rule().advisory);
+        // Across paragraphs, once, where the second form first appears.
+        assert_eq!(
+            found("A healthcare plan.\n\nA health-care card and a health-care fund."),
+            vec![(
+                3,
+                3,
+                "'health-care' here and 'healthcare' on line 1 (advisory); use one form unless they are different words".to_owned()
+            )]
+        );
+        assert_eq!(
+            found("Health-care first.\n\nThen Healthcare.")[0].0,
+            3,
+            "either order, any case"
+        );
+        // The hyphen rule keeps its own forms.
+        assert_eq!(rules("We e-mailed and then emailed."), ["hyphen"]);
+        for clean in [
+            "A health-care card and a health-care fund.",
+            "Long-term plans for the long term.",
+            "An e-book and an ebook.",
+            "An up-to-date list and an upto list.",
+            "The `health-care` key in code and healthcare in prose.",
+            "She said 'health-care' once; we write healthcare.",
+            "Cartridges 4 Planet Ark, planetark.org/programs/cartridges-4-planet-ark.",
+            "Write to planet-ark@example.org or planetark@example.org.",
+            "See docs/health-care for healthcare.",
+            "Follow @health-care for healthcare news.",
+        ] {
+            assert!(found(clean).is_empty(), "{clean}: {:?}", found(clean));
+        }
+    }
+
+    #[test]
+    fn flags_an_acronym_used_before_its_definition() {
+        let found = |text: &str| of(RuleId::AcronymBeforeDefinition, text);
+        assert!(RuleId::AcronymBeforeDefinition.rule().advisory);
+        assert_eq!(
+            found("The BOM issued a warning.\n\nThe Bureau of Meteorology (BOM) said so."),
+            vec![(
+                1,
+                5,
+                "'BOM' is used before its definition on line 3 (advisory); define it at first use"
+                    .to_owned()
+            )]
+        );
+        assert_eq!(
+            found("BOM and BOM. The Bureau of Meteorology (BOM).").len(),
+            1,
+            "one finding however often it is used first"
+        );
+        assert_eq!(
+            found("NGOs met. Non-government organisations (NGOs) met.").len(),
+            1
+        );
+        assert_eq!(
+            found("The ABS counts. The Australian Bureau of Statistics (ABS) counts.").len(),
+            1
+        );
+        for clean in [
+            "The Bureau of Meteorology (BOM) said so. The BOM agreed.",
+            "The BOM agreed.",
+            "DNA (deoxyribonucleic acid) is a molecule.",
+            "The NGO met. Non-government organisations (NGOs) met.",
+            "The `BOM` key, then the Bureau of Meteorology (BOM).",
+            "Plan A. The Australian (A) league.",
+            // A parenthesised label the words before it do not spell is not a definition.
+            "Vale is MIT. The fork is by Ayoub G. (MIT).",
+            "Level AAA applies. Reading level (AAA) is stricter.",
+        ] {
+            assert!(found(clean).is_empty(), "{clean}: {:?}", found(clean));
+        }
+    }
+
+    #[test]
+    fn document_findings_follow_the_findings_on_their_line() {
+        assert_eq!(
+            rules("The BOM color.\n\nThe Bureau of Meteorology (BOM)."),
+            ["us-spelling", "acronym-before-definition"]
+        );
+        assert_eq!(
+            rules("The BOM.\n\nThe color.\n\nThe Bureau of Meteorology (BOM)."),
+            ["acronym-before-definition", "us-spelling"]
+        );
     }
 
     #[test]

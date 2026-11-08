@@ -6,7 +6,7 @@
 
 Each example is a seeded fault: the tests plant it in clean prose, and `lint` must flag it exactly once. The human prose figures count findings in 3 Productivity Commission reports released in 2018 and 2021 (205,299 whitespace-separated words of Australian Government prose under CC BY 3.0 AU, in `tools/laconic-check/tests/corpus`). Most of them are house-style differences the Commission's own style allows, such as spaced dashes, words for numbers below 10 and serial commas, rather than errors.
 
-The outside figures come from the 150 human-written news articles in `human_detectors.json` from jenna-russell/human_detectors at commit `afcf03d` (110,723 words of mostly American prose, not stored here because the texts have no stated licence). `laconic-tools calibrate` lints them from a local download. Articles with odd prompt ids are the calibration half, for tuning rules; the even half is held out, and the table shows how many of those 75 articles each rule flags. A new advisory rule must flag under 5% of them.
+The outside figures come from the 150 human-written news articles in `human_detectors.json` from jenna-russell/human_detectors at commit `afcf03d` (110,723 words of mostly American prose, not stored here because the texts have no stated licence). `laconic-tools calibrate` lints them from a local download. Articles with odd prompt ids are the calibration half, for tuning rules; the even half is held out, and the table shows how many of those 75 articles each rule flags. A new advisory rule must flag under 5% of them. Measured and dropped as advisories: sentence-length rhythm, which flagged 3 of the 75 held-out human articles but only 4 of the 75 AI-written ones in the same corpus, so it does not mark the pattern it targets; capitalisation consistency, which flagged 71 of 75; and meaning reversals in edits, which need before-and-after pairs that this corpus lacks.
 
 To report a finding that should not have been flagged, use the [false-positive form](https://github.com/yungSNAT/Laconic/issues/new?template=false-positive.yml).
 
@@ -20,11 +20,13 @@ To report a finding that should not have been flagged, use the [false-positive f
 | [`em-dash`](#em-dash) | yes | Dashes | 6.89 | 58 of 75 |
 | [`clause-dashes`](#clause-dashes) | no (advisory) | Dashes | 0.20 | 16 of 75 |
 | [`hyphen`](#hyphen) | yes | Hyphens | under 0.01 | 0 of 75 |
+| [`hyphen-consistency`](#hyphen-consistency) | no (advisory) | Hyphens | 0.02 | 0 of 75 |
 | [`number-word`](#number-word) | yes | Numbers | 1.60 | 57 of 75 |
 | [`date`](#date) | yes | Dates and time | 0.01 | 6 of 75 |
 | [`weekday`](#weekday) | yes | Dates and time | 0.00 | 0 of 75 |
 | [`time`](#time) | yes | Dates and time | under 0.01 | 3 of 75 |
 | [`latin`](#latin) | yes | Shortened forms | under 0.01 | 0 of 75 |
+| [`acronym-before-definition`](#acronym-before-definition) | no (advisory) | Shortened forms | 0.07 | 0 of 75 |
 | [`closer`](#closer) | yes | none | 0.00 | 0 of 75 |
 | [`stock-phrase`](#stock-phrase) | yes | none | 0.02 | 4 of 75 |
 | [`stacked-hedge`](#stacked-hedge) | no (advisory) | none | 0.04 | 0 of 75 |
@@ -44,10 +46,10 @@ To report a finding that should not have been flagged, use the [false-positive f
 | [Percentages, quotes and titles](../skills/laconic-prose/references/style-manual-rules.md#percentages-quotes-and-titles) | `double-quotes`, `symbol-space` |
 | [Punctuation](../skills/laconic-prose/references/style-manual-rules.md#punctuation) | `serial-comma` |
 | [Dashes](../skills/laconic-prose/references/style-manual-rules.md#dashes) | `em-dash`, `clause-dashes` |
-| [Hyphens](../skills/laconic-prose/references/style-manual-rules.md#hyphens) | `hyphen` |
+| [Hyphens](../skills/laconic-prose/references/style-manual-rules.md#hyphens) | `hyphen`, `hyphen-consistency` |
 | [Numbers](../skills/laconic-prose/references/style-manual-rules.md#numbers) | `number-word` |
 | [Dates and time](../skills/laconic-prose/references/style-manual-rules.md#dates-and-time) | `date`, `weekday`, `time` |
-| [Shortened forms](../skills/laconic-prose/references/style-manual-rules.md#shortened-forms) | `latin` |
+| [Shortened forms](../skills/laconic-prose/references/style-manual-rules.md#shortened-forms) | `latin`, `acronym-before-definition` |
 
 The rules with no Style Manual section flag writing patterns from [patterns.md](../skills/laconic-prose/references/patterns.md) or chat-tool residue: `closer`, `stock-phrase`, `stacked-hedge`, `bold-label`, `staged-contrast`, `reveal-question`, `residue`.
 
@@ -117,6 +119,14 @@ Fails `lint`: yes. Style Manual: [Hyphens](../skills/laconic-prose/references/st
 
 Examples: `the open-source program`, `e-mailed the centre`.
 
+### hyphen-consistency
+
+A compound written both closed and hyphenated in one document, such as 'healthcare' and 'health-care'. Some such pairs are different words, such as 'resign' and 're-sign'.
+
+Fails `lint`: no (advisory). Style Manual: [Hyphens](../skills/laconic-prose/references/style-manual-rules.md#hyphens). Human prose: 4 findings, 0.02 per 1,000 words. Outside articles: flags 0 of 75 held out (0 findings) and 0 of 75 for calibration.
+
+Example: `a healthcare plan and a health-care card`.
+
 ### number-word
 
 Numbers from 2 to 20 written as words where the Style Manual uses numerals.
@@ -156,6 +166,14 @@ The Latin abbreviations 'e.g.' and 'i.e.', with or without full stops, where 'fo
 Fails `lint`: yes. Style Manual: [Shortened forms](../skills/laconic-prose/references/style-manual-rules.md#shortened-forms). Human prose: 1 finding, under 0.01 per 1,000 words. Outside articles: flags 0 of 75 held out (0 findings) and 0 of 75 for calibration.
 
 Example: `e.g. the colour`.
+
+### acronym-before-definition
+
+An acronym of 2 to 6 capitals used before the parenthesised definition that introduces it later in the document, as in 'The BOM said ... the Bureau of Meteorology (BOM)'.
+
+Fails `lint`: no (advisory). Style Manual: [Shortened forms](../skills/laconic-prose/references/style-manual-rules.md#shortened-forms). Human prose: 15 findings, 0.07 per 1,000 words. Outside articles: flags 0 of 75 held out (0 findings) and 0 of 75 for calibration.
+
+Example: `The BOM forecast came from the Bureau of Meteorology (BOM), which`.
 
 ### closer
 

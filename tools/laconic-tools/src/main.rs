@@ -14,8 +14,11 @@
 //!                                        write the MCP bundle's manifest.json
 //!   laconic-tools package-manifests <version> <dist> <out>
 //!                                        write a release's package manifests
+//!   laconic-tools calibrate [--check] <human_detectors.json>
+//!                                        measure each rule on an outside human corpus
 
 mod au_words;
+mod calibrate;
 #[cfg(test)]
 mod contracts;
 mod packages;
@@ -124,11 +127,14 @@ fn main() -> ExitCode {
         ["package-manifests", version, dist, out] => {
             packages::write_manifests(version, Path::new(dist), Path::new(out))
         }
+        ["calibrate", json] => calibrate::run(&root(), Path::new(json), false),
+        ["calibrate", "--check", json] => calibrate::run(&root(), Path::new(json), true),
         _ => Err(
             "usage: laconic-tools <sync-rules [--check] | check-pi [--runtime pi|omp] \
              | gen-au-words <scowl-pre.txt> <style-manual.txt> \
              | mcpb-manifest <version> <bundle-dir> \
-             | package-manifests <version> <dist> <out>>"
+             | package-manifests <version> <dist> <out> \
+             | calibrate [--check] <human_detectors.json>>"
                 .into(),
         ),
     };

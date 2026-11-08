@@ -30,6 +30,8 @@ const CLEAN: &[&str] = &[
     "Andy wrote to the state senate every week for 6 years.",
     "The patterns credit [humanizer](https://github.com/blader/humanizer) and [the house guide](https://example.com/guide).",
     "Fees were low in the 1980s, but 2020's budget took the rate to 5% and the charge to $27.99 from 21 September.",
+    "Each member gets a healthcare plan.",
+    "The Bureau of Meteorology (BOM) issued 2 warnings.",
     "- **Keep:** a single bold label.",
 ];
 
@@ -109,6 +111,11 @@ const SEEDS: &[(&str, &str, &str)] = &[
     ),
     ("hyphen", "the program", "the open-source program"),
     ("hyphen", "left for the centre", "e-mailed the centre"),
+    (
+        "hyphen-consistency",
+        "a healthcare plan",
+        "a healthcare plan and a health-care card",
+    ),
     ("word-choice", "whilst demand", "while demand"),
     ("word-choice", "amongst small", "among small"),
     ("date", "on 19 October 2026", "on 19th October 2026"),
@@ -130,6 +137,11 @@ const SEEDS: &[(&str, &str, &str)] = &[
     ("time", "at 9:30 am", "at 9.30am"),
     ("time", "at 9:30 am", "at 9:30 a.m."),
     ("latin", "for example the colour", "e.g. the colour"),
+    (
+        "acronym-before-definition",
+        "The Bureau of Meteorology (BOM)",
+        "The BOM forecast came from the Bureau of Meteorology (BOM), which",
+    ),
     (
         "residue",
         "after the go-ahead.",
@@ -216,8 +228,10 @@ const HUMAN_CORPUS_CEILING: usize = 2246;
 /// Advisory findings have their own ceiling: 41 paragraphs put clause dashes in 2 or more
 /// sentences when the corpus was calibrated on 2 November 2026, and the stacked-hedge rule
 /// added 8 human uses on 4 November ('could potentially' 5 times, 'can potentially' twice,
-/// 'may potentially' once).
-const HUMAN_CORPUS_ADVISORY_CEILING: usize = 49;
+/// 'may potentially' once). The document rules added 18 on 8 November: 14 acronyms used
+/// before their definition and 4 compounds written both ways ('re-use', 'co-operation',
+/// 'well-being' and 'socio-economic').
+const HUMAN_CORPUS_ADVISORY_CEILING: usize = 67;
 /// AI-tell findings at calibration, all human uses: 'it is important to note' 3 times,
 /// 'innovative', 'deep dive', 'not just X, but Y' and 'time-frame'.
 const HUMAN_CORPUS_TELL_CEILING: usize = 7;
@@ -293,6 +307,39 @@ const REFERENCE: &str = "docs/rules.md";
 const STYLE_RULES: &str = "skills/laconic-prose/references/style-manual-rules.md";
 const PATTERNS: &str = "skills/laconic-prose/references/patterns.md";
 const ISSUE_FORM: &str = "https://github.com/yungSNAT/Laconic/issues/new?template=";
+const OUTSIDE: &str = "tools/laconic-check/tests/outside-corpus.tsv";
+const CALIBRATE: &str =
+    "cargo run --manifest-path tools/laconic-tools/Cargo.toml -- calibrate <human_detectors.json>";
+/// The row of outside-corpus totals: articles and words per split, then local words.
+const TOTALS: &str = "(articles and words)";
+/// Advisory rules that predate the 5% gate: clause-dashes flags about a fifth of the
+/// held-out articles.
+const GRANDFATHERED: &[&str] = &["clause-dashes"];
+
+/// tests/outside-corpus.tsv by row name. Each row holds calibration articles and findings,
+/// then held-out articles and findings; the totals row holds articles and words in the same
+/// places.
+fn outside() -> BTreeMap<String, [usize; 4]> {
+    read(OUTSIDE)
+        .lines()
+        .filter(|l| !l.starts_with('#'))
+        .skip(1)
+        .map(|line| {
+            let mut cells = line.split('\t');
+            let name = cells.next().unwrap_or_default().to_owned();
+            let counts: Vec<usize> = cells
+                .map(|c| {
+                    c.parse()
+                        .unwrap_or_else(|_| panic!("{OUTSIDE}: bad count in {line:?}"))
+                })
+                .collect();
+            let counts = counts
+                .try_into()
+                .unwrap_or_else(|_| panic!("{OUTSIDE}: expected 4 counts in {line:?}"));
+            (name, counts)
+        })
+        .collect()
+}
 
 fn repo_root() -> &'static Path {
     Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/../.."))
@@ -391,6 +438,9 @@ fn reference() -> String {
         };
         (n, rate)
     };
+    let outside = outside();
+    let totals = outside[TOTALS];
+    let outside_rule = |name: &str| outside.get(name).copied().unwrap_or_default();
     let style_rules = format!("../{STYLE_RULES}");
     let section_link = |s: &str| format!("[{s}]({style_rules}#{})", anchor(s));
     let fails = |advisory: bool| if advisory { "no (advisory)" } else { "yes" };
@@ -402,19 +452,25 @@ fn reference() -> String {
          # laconic-check rules\n\n\
          `laconic-check lint` reports each finding as `file:line:column: rule: message`. Each rule below is headed by its name, so `docs/rules.md#<rule>` links to it. A finding is a reason to look, not proof of a defect. Advisory rules never fail `lint`.\n\n\
          Each example is a seeded fault: the tests plant it in clean prose, and `lint` must flag it exactly once. The human prose figures count findings in 3 Productivity Commission reports released in 2018 and 2021 ({} whitespace-separated words of Australian Government prose under CC BY 3.0 AU, in `tools/laconic-check/tests/corpus`). Most of them are house-style differences the Commission's own style allows, such as spaced dashes, words for numbers below 10 and serial commas, rather than errors.\n\n\
+         The outside figures come from the {} human-written news articles in `human_detectors.json` from jenna-russell/human_detectors at commit `afcf03d` ({} words of mostly American prose, not stored here because the texts have no stated licence). `laconic-tools calibrate` lints them from a local download. Articles with odd prompt ids are the calibration half, for tuning rules; the even half is held out, and the table shows how many of those {} articles each rule flags. A new advisory rule must flag under 5% of them. Measured and dropped as advisories: sentence-length rhythm, which flagged 3 of the 75 held-out human articles but only 4 of the 75 AI-written ones in the same corpus, so it does not mark the pattern it targets; capitalisation consistency, which flagged 71 of 75; and meaning reversals in edits, which need before-and-after pairs that this corpus lacks.\n\n\
          To report a finding that should not have been flagged, use the [false-positive form]({ISSUE_FORM}false-positive.yml).\n\n\
-         | Rule | Fails `lint` | Style Manual section | Human prose, per 1,000 words |\n\
-         | --- | --- | --- | --- |",
-        thousands(words)
+         | Rule | Fails `lint` | Style Manual section | Human prose, per 1,000 words | Outside articles flagged |\n\
+         | --- | --- | --- | --- | --- |",
+        thousands(words),
+        totals[0] + totals[2],
+        thousands(totals[1] + totals[3]),
+        totals[2]
     );
     for rule in RULES {
         let _ = writeln!(
             out,
-            "| [`{0}`](#{0}) | {1} | {2} | {3} |",
+            "| [`{0}`](#{0}) | {1} | {2} | {3} | {4} of {5} |",
             rule.name,
             fails(rule.advisory),
             rule.section.unwrap_or("none"),
-            human(rule.name).1
+            human(rule.name).1,
+            outside_rule(rule.name)[2],
+            totals[2]
         );
     }
     let _ = writeln!(
@@ -449,6 +505,7 @@ fn reference() -> String {
     );
     for rule in RULES {
         let (n, rate) = human(rule.name);
+        let [ca, _, ha, hf] = outside_rule(rule.name);
         let section = rule
             .section
             .map_or("Not a Style Manual rule.".to_owned(), |s| {
@@ -481,16 +538,52 @@ fn reference() -> String {
         }
         let _ = writeln!(
             out,
-            "\n### {}\n\n{}\n\nFails `lint`: {}. {section} Human prose: {} {}, {rate} per 1,000 words.\n\n{}",
+            "\n### {}\n\n{}\n\nFails `lint`: {}. {section} Human prose: {} {}, {rate} per 1,000 words. Outside articles: flags {ha} of {} held out ({hf} {}) and {ca} of {} for calibration.\n\n{}",
             rule.name,
             rule.checks,
             fails(rule.advisory),
             thousands(n),
             if n == 1 { "finding" } else { "findings" },
+            totals[2],
+            if hf == 1 { "finding" } else { "findings" },
+            totals[0],
             examples.join("\n\n")
         );
     }
     out
+}
+
+/// The outside counts must list every rule. laconic-tools' tests check, by the table's
+/// fingerprint, that the counts come from the rules as they are now.
+#[test]
+fn outside_corpus_lists_every_rule() {
+    let outside = outside();
+    let missing: Vec<&str> = std::iter::once(TOTALS)
+        .chain(RULES.iter().map(|r| r.name))
+        .filter(|name| !outside.contains_key(*name))
+        .collect();
+    assert!(
+        missing.is_empty() && outside.len() == RULES.len() + 1,
+        "{OUTSIDE} does not list exactly the rules (missing: {}): run {CALIBRATE}",
+        missing.join(", ")
+    );
+}
+
+#[test]
+fn advisory_rules_flag_under_5_percent_of_held_out_articles() {
+    let outside = outside();
+    let held_out = outside[TOTALS][2];
+    for rule in RULES
+        .iter()
+        .filter(|r| r.advisory && !GRANDFATHERED.contains(&r.name))
+    {
+        let flagged = outside[rule.name][2];
+        assert!(
+            flagged * 20 < held_out,
+            "{} flags {flagged} of {held_out} held-out human articles; an advisory must stay under 5%",
+            rule.name
+        );
+    }
 }
 
 /// docs/rules.md must match the rule table; `LACONIC_WRITE_DOCS=1` rewrites it.

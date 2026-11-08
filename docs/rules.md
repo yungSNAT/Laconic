@@ -6,30 +6,34 @@
 
 Each example is a seeded fault: the tests plant it in clean prose, and `lint` must flag it exactly once. The human prose figures count findings in 3 Productivity Commission reports released in 2018 and 2021 (205,299 whitespace-separated words of Australian Government prose under CC BY 3.0 AU, in `tools/laconic-check/tests/corpus`). Most of them are house-style differences the Commission's own style allows, such as spaced dashes, words for numbers below 10 and serial commas, rather than errors.
 
+The outside figures come from the 150 human-written news articles in `human_detectors.json` from jenna-russell/human_detectors at commit `afcf03d` (110,723 words of mostly American prose, not stored here because the texts have no stated licence). `laconic-tools calibrate` lints them from a local download. Articles with odd prompt ids are the calibration half, for tuning rules; the even half is held out, and the table shows how many of those 75 articles each rule flags. A new advisory rule must flag under 5% of them. Measured and dropped as advisories: sentence-length rhythm, which flagged 3 of the 75 held-out human articles but only 4 of the 75 AI-written ones in the same corpus, so it does not mark the pattern it targets; capitalisation consistency, which flagged 71 of 75; and meaning reversals in edits, which need before-and-after pairs that this corpus lacks.
+
 To report a finding that should not have been flagged, use the [false-positive form](https://github.com/yungSNAT/Laconic/issues/new?template=false-positive.yml).
 
-| Rule | Fails `lint` | Style Manual section | Human prose, per 1,000 words |
-| --- | --- | --- | --- |
-| [`us-spelling`](#us-spelling) | yes | Spelling | 0.12 |
-| [`word-choice`](#word-choice) | yes | Spelling | 1.45 |
-| [`double-quotes`](#double-quotes) | yes | Percentages, quotes and titles | 0.01 |
-| [`symbol-space`](#symbol-space) | yes | Percentages, quotes and titles | 0.00 |
-| [`serial-comma`](#serial-comma) | yes | Punctuation | 0.81 |
-| [`em-dash`](#em-dash) | yes | Dashes | 6.89 |
-| [`clause-dashes`](#clause-dashes) | no (advisory) | Dashes | 0.20 |
-| [`hyphen`](#hyphen) | yes | Hyphens | under 0.01 |
-| [`number-word`](#number-word) | yes | Numbers | 1.60 |
-| [`date`](#date) | yes | Dates and time | 0.01 |
-| [`weekday`](#weekday) | yes | Dates and time | 0.00 |
-| [`time`](#time) | yes | Dates and time | under 0.01 |
-| [`latin`](#latin) | yes | Shortened forms | under 0.01 |
-| [`closer`](#closer) | yes | none | 0.00 |
-| [`stock-phrase`](#stock-phrase) | yes | none | 0.02 |
-| [`stacked-hedge`](#stacked-hedge) | no (advisory) | none | 0.04 |
-| [`bold-label`](#bold-label) | no (advisory) | none | 0.00 |
-| [`staged-contrast`](#staged-contrast) | yes | none | under 0.01 |
-| [`reveal-question`](#reveal-question) | yes | none | 0.00 |
-| [`residue`](#residue) | yes | none | under 0.01 |
+| Rule | Fails `lint` | Style Manual section | Human prose, per 1,000 words | Outside articles flagged |
+| --- | --- | --- | --- | --- |
+| [`us-spelling`](#us-spelling) | yes | Spelling | 0.12 | 71 of 75 |
+| [`word-choice`](#word-choice) | yes | Spelling | 1.45 | 44 of 75 |
+| [`double-quotes`](#double-quotes) | yes | Percentages, quotes and titles | 0.01 | 74 of 75 |
+| [`symbol-space`](#symbol-space) | yes | Percentages, quotes and titles | 0.00 | 0 of 75 |
+| [`serial-comma`](#serial-comma) | yes | Punctuation | 0.81 | 32 of 75 |
+| [`em-dash`](#em-dash) | yes | Dashes | 6.89 | 58 of 75 |
+| [`clause-dashes`](#clause-dashes) | no (advisory) | Dashes | 0.20 | 16 of 75 |
+| [`hyphen`](#hyphen) | yes | Hyphens | under 0.01 | 0 of 75 |
+| [`hyphen-consistency`](#hyphen-consistency) | no (advisory) | Hyphens | 0.02 | 0 of 75 |
+| [`number-word`](#number-word) | yes | Numbers | 1.60 | 57 of 75 |
+| [`date`](#date) | yes | Dates and time | 0.01 | 6 of 75 |
+| [`weekday`](#weekday) | yes | Dates and time | 0.00 | 0 of 75 |
+| [`time`](#time) | yes | Dates and time | under 0.01 | 3 of 75 |
+| [`latin`](#latin) | yes | Shortened forms | under 0.01 | 0 of 75 |
+| [`acronym-before-definition`](#acronym-before-definition) | no (advisory) | Shortened forms | 0.07 | 0 of 75 |
+| [`closer`](#closer) | yes | none | 0.00 | 0 of 75 |
+| [`stock-phrase`](#stock-phrase) | yes | none | 0.02 | 4 of 75 |
+| [`stacked-hedge`](#stacked-hedge) | no (advisory) | none | 0.04 | 0 of 75 |
+| [`bold-label`](#bold-label) | no (advisory) | none | 0.00 | 0 of 75 |
+| [`staged-contrast`](#staged-contrast) | yes | none | under 0.01 | 2 of 75 |
+| [`reveal-question`](#reveal-question) | yes | none | 0.00 | 1 of 75 |
+| [`residue`](#residue) | yes | none | under 0.01 | 0 of 75 |
 
 ## Style Manual coverage
 
@@ -42,10 +46,10 @@ To report a finding that should not have been flagged, use the [false-positive f
 | [Percentages, quotes and titles](../skills/laconic-prose/references/style-manual-rules.md#percentages-quotes-and-titles) | `double-quotes`, `symbol-space` |
 | [Punctuation](../skills/laconic-prose/references/style-manual-rules.md#punctuation) | `serial-comma` |
 | [Dashes](../skills/laconic-prose/references/style-manual-rules.md#dashes) | `em-dash`, `clause-dashes` |
-| [Hyphens](../skills/laconic-prose/references/style-manual-rules.md#hyphens) | `hyphen` |
+| [Hyphens](../skills/laconic-prose/references/style-manual-rules.md#hyphens) | `hyphen`, `hyphen-consistency` |
 | [Numbers](../skills/laconic-prose/references/style-manual-rules.md#numbers) | `number-word` |
 | [Dates and time](../skills/laconic-prose/references/style-manual-rules.md#dates-and-time) | `date`, `weekday`, `time` |
-| [Shortened forms](../skills/laconic-prose/references/style-manual-rules.md#shortened-forms) | `latin` |
+| [Shortened forms](../skills/laconic-prose/references/style-manual-rules.md#shortened-forms) | `latin`, `acronym-before-definition` |
 
 The rules with no Style Manual section flag writing patterns from [patterns.md](../skills/laconic-prose/references/patterns.md) or chat-tool residue: `closer`, `stock-phrase`, `stacked-hedge`, `bold-label`, `staged-contrast`, `reveal-question`, `residue`.
 
@@ -55,7 +59,7 @@ The rules with no Style Manual section flag writing patterns from [patterns.md](
 
 US spellings that have an Australian form, such as 'color', 'organized' and 'skeptical', and 'percent' in prose.
 
-Fails `lint`: yes. Style Manual: [Spelling](../skills/laconic-prose/references/style-manual-rules.md#spelling). Human prose: 24 findings, 0.12 per 1,000 words.
+Fails `lint`: yes. Style Manual: [Spelling](../skills/laconic-prose/references/style-manual-rules.md#spelling). Human prose: 24 findings, 0.12 per 1,000 words. Outside articles: flags 71 of 75 held out (364 findings) and 69 of 75 for calibration.
 
 Examples: `organized`, `color plates`, `the center`, `catalog`, `analyzed`, `the skeptical review`, `Prices rose 12 percent`, `[the house color guide]`.
 
@@ -63,7 +67,7 @@ Examples: `organized`, `color plates`, `the center`, `catalog`, `analyzed`, `the
 
 'while' and 'among' as a conjunction or preposition, where the house rule writes 'whilst' and 'amongst'. Noun uses such as 'a while' pass.
 
-Fails `lint`: yes. Style Manual: [Spelling](../skills/laconic-prose/references/style-manual-rules.md#spelling). Human prose: 297 findings, 1.45 per 1,000 words.
+Fails `lint`: yes. Style Manual: [Spelling](../skills/laconic-prose/references/style-manual-rules.md#spelling). Human prose: 297 findings, 1.45 per 1,000 words. Outside articles: flags 44 of 75 held out (72 findings) and 44 of 75 for calibration.
 
 Examples: `while demand`, `among small`.
 
@@ -71,7 +75,7 @@ Examples: `while demand`, `among small`.
 
 A pair of double quotation marks, straight or curly, around a short span of prose (under 120 characters), where single marks are the default.
 
-Fails `lint`: yes. Style Manual: [Percentages, quotes and titles](../skills/laconic-prose/references/style-manual-rules.md#percentages-quotes-and-titles). Human prose: 2 findings, 0.01 per 1,000 words.
+Fails `lint`: yes. Style Manual: [Percentages, quotes and titles](../skills/laconic-prose/references/style-manual-rules.md#percentages-quotes-and-titles). Human prose: 2 findings, 0.01 per 1,000 words. Outside articles: flags 74 of 75 held out (574 findings) and 72 of 75 for calibration.
 
 Example: `"the licence is current"`.
 
@@ -79,7 +83,7 @@ Example: `"the licence is current"`.
 
 A space before a percentage sign or after a dollar sign, with or without a currency code, as in '5 %', '$ 27.99' or 'A$ 5'.
 
-Fails `lint`: yes. Style Manual: [Percentages, quotes and titles](../skills/laconic-prose/references/style-manual-rules.md#percentages-quotes-and-titles). Human prose: 0 findings, 0.00 per 1,000 words.
+Fails `lint`: yes. Style Manual: [Percentages, quotes and titles](../skills/laconic-prose/references/style-manual-rules.md#percentages-quotes-and-titles). Human prose: 0 findings, 0.00 per 1,000 words. Outside articles: flags 0 of 75 held out (0 findings) and 0 of 75 for calibration.
 
 Examples: `the rate to 5 %`, `the charge to $ 27.99`.
 
@@ -87,7 +91,7 @@ Examples: `the rate to 5 %`, `the charge to $ 27.99`.
 
 A possible comma before the final 'and' or 'or' in a list. Keep it only if it prevents a misreading.
 
-Fails `lint`: yes. Style Manual: [Punctuation](../skills/laconic-prose/references/style-manual-rules.md#punctuation). Human prose: 166 findings, 0.81 per 1,000 words.
+Fails `lint`: yes. Style Manual: [Punctuation](../skills/laconic-prose/references/style-manual-rules.md#punctuation). Human prose: 166 findings, 0.81 per 1,000 words. Outside articles: flags 32 of 75 held out (70 findings) and 32 of 75 for calibration.
 
 Example: `logs, metrics, and traces`.
 
@@ -95,7 +99,7 @@ Example: `logs, metrics, and traces`.
 
 Em dashes in original prose.
 
-Fails `lint`: yes. Style Manual: [Dashes](../skills/laconic-prose/references/style-manual-rules.md#dashes). Human prose: 1,415 findings, 6.89 per 1,000 words.
+Fails `lint`: yes. Style Manual: [Dashes](../skills/laconic-prose/references/style-manual-rules.md#dashes). Human prose: 1,415 findings, 6.89 per 1,000 words. Outside articles: flags 58 of 75 held out (245 findings) and 64 of 75 for calibration.
 
 Example: `after the go-ahead — finally.`.
 
@@ -103,7 +107,7 @@ Example: `after the go-ahead — finally.`.
 
 A paragraph with clause dashes (an em dash, or a spaced en dash, hyphen or double hyphen) in 2 or more sentences, where a pair around one aside counts once.
 
-Fails `lint`: no (advisory). Style Manual: [Dashes](../skills/laconic-prose/references/style-manual-rules.md#dashes). Human prose: 41 findings, 0.20 per 1,000 words.
+Fails `lint`: no (advisory). Style Manual: [Dashes](../skills/laconic-prose/references/style-manual-rules.md#dashes). Human prose: 41 findings, 0.20 per 1,000 words. Outside articles: flags 16 of 75 held out (17 findings) and 15 of 75 for calibration.
 
 Example: `and stayed low - for a while. Supply rose - slowly.`.
 
@@ -111,15 +115,23 @@ Example: `and stayed low - for a while. Supply rose - slowly.`.
 
 Unnecessary hyphens in open set phrases and closed compounds, such as 'open-source' and 'e-mail'.
 
-Fails `lint`: yes. Style Manual: [Hyphens](../skills/laconic-prose/references/style-manual-rules.md#hyphens). Human prose: 1 finding, under 0.01 per 1,000 words.
+Fails `lint`: yes. Style Manual: [Hyphens](../skills/laconic-prose/references/style-manual-rules.md#hyphens). Human prose: 1 finding, under 0.01 per 1,000 words. Outside articles: flags 0 of 75 held out (0 findings) and 0 of 75 for calibration.
 
 Examples: `the open-source program`, `e-mailed the centre`.
+
+### hyphen-consistency
+
+A compound written both closed and hyphenated in one document, such as 'healthcare' and 'health-care'. Some such pairs are different words, such as 'resign' and 're-sign'.
+
+Fails `lint`: no (advisory). Style Manual: [Hyphens](../skills/laconic-prose/references/style-manual-rules.md#hyphens). Human prose: 4 findings, 0.02 per 1,000 words. Outside articles: flags 0 of 75 held out (0 findings) and 0 of 75 for calibration.
+
+Example: `a healthcare plan and a health-care card`.
 
 ### number-word
 
 Numbers from 2 to 20 written as words where the Style Manual uses numerals.
 
-Fails `lint`: yes. Style Manual: [Numbers](../skills/laconic-prose/references/style-manual-rules.md#numbers). Human prose: 329 findings, 1.60 per 1,000 words.
+Fails `lint`: yes. Style Manual: [Numbers](../skills/laconic-prose/references/style-manual-rules.md#numbers). Human prose: 329 findings, 1.60 per 1,000 words. Outside articles: flags 57 of 75 held out (137 findings) and 56 of 75 for calibration.
 
 Example: `organised three workshops`.
 
@@ -127,7 +139,7 @@ Example: `organised three workshops`.
 
 Dates not written as day month year: an ordinal ('19th October'), the month first ('October 19'), a comma before the year and an apostrophe in a decade ('1980's').
 
-Fails `lint`: yes. Style Manual: [Dates and time](../skills/laconic-prose/references/style-manual-rules.md#dates-and-time). Human prose: 3 findings, 0.01 per 1,000 words.
+Fails `lint`: yes. Style Manual: [Dates and time](../skills/laconic-prose/references/style-manual-rules.md#dates-and-time). Human prose: 3 findings, 0.01 per 1,000 words. Outside articles: flags 6 of 75 held out (10 findings) and 7 of 75 for calibration.
 
 Examples: `on 19th October 2026`, `on 19 October, 2026`, `on October 19`, `from the 21st of September`, `in the 1980's`.
 
@@ -135,7 +147,7 @@ Examples: `on 19th October 2026`, `on 19 October, 2026`, `on October 19`, `from 
 
 A weekday that does not match its date, such as 'Wednesday 22 October 2026'.
 
-Fails `lint`: yes. Style Manual: [Dates and time](../skills/laconic-prose/references/style-manual-rules.md#dates-and-time). Human prose: 0 findings, 0.00 per 1,000 words.
+Fails `lint`: yes. Style Manual: [Dates and time](../skills/laconic-prose/references/style-manual-rules.md#dates-and-time). Human prose: 0 findings, 0.00 per 1,000 words. Outside articles: flags 0 of 75 held out (0 findings) and 0 of 75 for calibration.
 
 Example: `on Tuesday 19 October 2026`.
 
@@ -143,7 +155,7 @@ Example: `on Tuesday 19 October 2026`.
 
 Times not written as '9:30 am' or '9 am', such as '9am', '9.30am' and '9:30 a.m.'.
 
-Fails `lint`: yes. Style Manual: [Dates and time](../skills/laconic-prose/references/style-manual-rules.md#dates-and-time). Human prose: 1 finding, under 0.01 per 1,000 words.
+Fails `lint`: yes. Style Manual: [Dates and time](../skills/laconic-prose/references/style-manual-rules.md#dates-and-time). Human prose: 1 finding, under 0.01 per 1,000 words. Outside articles: flags 3 of 75 held out (4 findings) and 3 of 75 for calibration.
 
 Examples: `at 9.30am`, `at 9:30 a.m.`.
 
@@ -151,15 +163,23 @@ Examples: `at 9.30am`, `at 9:30 a.m.`.
 
 The Latin abbreviations 'e.g.' and 'i.e.', with or without full stops, where 'for example' and 'that is' are preferred.
 
-Fails `lint`: yes. Style Manual: [Shortened forms](../skills/laconic-prose/references/style-manual-rules.md#shortened-forms). Human prose: 1 finding, under 0.01 per 1,000 words.
+Fails `lint`: yes. Style Manual: [Shortened forms](../skills/laconic-prose/references/style-manual-rules.md#shortened-forms). Human prose: 1 finding, under 0.01 per 1,000 words. Outside articles: flags 0 of 75 held out (0 findings) and 0 of 75 for calibration.
 
 Example: `e.g. the colour`.
+
+### acronym-before-definition
+
+An acronym of 2 to 6 capitals used before the parenthesised definition that introduces it later in the document, as in 'The BOM said ... the Bureau of Meteorology (BOM)'.
+
+Fails `lint`: no (advisory). Style Manual: [Shortened forms](../skills/laconic-prose/references/style-manual-rules.md#shortened-forms). Human prose: 14 findings, 0.07 per 1,000 words. Outside articles: flags 0 of 75 held out (0 findings) and 0 of 75 for calibration.
+
+Example: `The BOM forecast came from the Bureau of Meteorology (BOM), which`.
 
 ### closer
 
 Chatbot closers such as 'hope this helps', 'let me know if' and 'feel free to'.
 
-Fails `lint`: yes. Not a Style Manual rule. Human prose: 0 findings, 0.00 per 1,000 words.
+Fails `lint`: yes. Not a Style Manual rule. Human prose: 0 findings, 0.00 per 1,000 words. Outside articles: flags 0 of 75 held out (0 findings) and 1 of 75 for calibration.
 
 Example: `to the review. Hope this helps!`.
 
@@ -167,7 +187,7 @@ Example: `to the review. Hope this helps!`.
 
 Stock phrases that rarely carry meaning, such as 'Bottom line:', 'circle back' and 'it's worth noting', and timeless openers such as 'since the dawn of time'.
 
-Fails `lint`: yes. Not a Style Manual rule. Human prose: 5 findings, 0.02 per 1,000 words.
+Fails `lint`: yes. Not a Style Manual rule. Human prose: 5 findings, 0.02 per 1,000 words. Outside articles: flags 4 of 75 held out (5 findings) and 2 of 75 for calibration.
 
 Example: `to the review. Bottom line: it works.`.
 
@@ -175,7 +195,7 @@ Example: `to the review. Bottom line: it works.`.
 
 Stacked hedges such as 'could potentially' and 'may possibly'.
 
-Fails `lint`: no (advisory). Not a Style Manual rule. Human prose: 8 findings, 0.04 per 1,000 words.
+Fails `lint`: no (advisory). Not a Style Manual rule. Human prose: 8 findings, 0.04 per 1,000 words. Outside articles: flags 0 of 75 held out (0 findings) and 0 of 75 for calibration.
 
 Example: `delay could potentially affect`.
 
@@ -183,7 +203,7 @@ Example: `delay could potentially affect`.
 
 3 or more bullets in a row that open with a bold label, such as '**Cause:**'.
 
-Fails `lint`: no (advisory). Not a Style Manual rule. Human prose: 0 findings, 0.00 per 1,000 words.
+Fails `lint`: no (advisory). Not a Style Manual rule. Human prose: 0 findings, 0.00 per 1,000 words. Outside articles: flags 0 of 75 held out (0 findings) and 0 of 75 for calibration.
 
 Example:
 
@@ -197,7 +217,7 @@ Example:
 
 Staged contrasts: 'it's not X, it's Y' and 'not just X but Y'.
 
-Fails `lint`: yes. Not a Style Manual rule. Human prose: 1 finding, under 0.01 per 1,000 words.
+Fails `lint`: yes. Not a Style Manual rule. Human prose: 1 finding, under 0.01 per 1,000 words. Outside articles: flags 2 of 75 held out (2 findings) and 6 of 75 for calibration.
 
 Examples: `It's not a log review, it's a trace review.`, `to the review, not just a quick look but a full audit.`.
 
@@ -205,7 +225,7 @@ Examples: `It's not a log review, it's a trace review.`, `to the review, not jus
 
 Verbless reveal questions, such as 'The result? A 40% cut.'
 
-Fails `lint`: yes. Not a Style Manual rule. Human prose: 0 findings, 0.00 per 1,000 words.
+Fails `lint`: yes. Not a Style Manual rule. Human prose: 0 findings, 0.00 per 1,000 words. Outside articles: flags 1 of 75 held out (1 finding) and 1 of 75 for calibration.
 
 Example: `The result? Two reviewers checked`.
 
@@ -213,7 +233,7 @@ Example: `The result? Two reviewers checked`.
 
 Chat-tool residue: 4 known ChatGPT citation and tracking markers (`oaicite`, `contentReference`, `utm_source=chatgpt` and `utm_source=openai`), including inside links, and selected invisible characters that can hide or reorder text: zero-width characters, bidirectional controls and runs of Unicode tag characters (except the England, Scotland and Wales flags).
 
-Fails `lint`: yes. Not a Style Manual rule. Human prose: 1 finding, under 0.01 per 1,000 words.
+Fails `lint`: yes. Not a Style Manual rule. Human prose: 1 finding, under 0.01 per 1,000 words. Outside articles: flags 0 of 75 held out (0 findings) and 0 of 75 for calibration.
 
 Examples: `after the go-ahead.\u{200b}`, `https://example.com/guide?utm_source=chatgpt.com`.
 

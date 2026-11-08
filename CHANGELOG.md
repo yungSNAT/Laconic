@@ -43,6 +43,8 @@ The manifests still declare plugin 0.5.0, so a build from `main` carries that ve
 ### laconic-check: added
 
 - Advise, without failing `lint`, on stacked hedges such as 'could potentially' and 'may possibly'.
+- `laconic-tools calibrate` counts each rule's findings on 150 human-written articles from jenna-russell/human_detectors, split into calibration and held-out halves. The rule reference shows the held-out rate, and a test keeps each new advisory under 5% of the held-out articles.
+- Advise, without failing `lint`, on a compound written both closed and hyphenated in one document (`hyphen-consistency`) and on an acronym used before the parenthesised definition that introduces it (`acronym-before-definition`). Neither flags any of the 150 outside human articles in the rule reference.
 - Flag a space in '5 %' and '$ 27.99', the decade form '1980's' and the date form '21st of September'.
 - Advise, without failing `lint`, on 3 or more bullets in a row that open with a bold label; `humanise_metrics.py` reports these runs.
 - Attest each release archive's build provenance, and attach an MCP bundle and Scoop, Homebrew, winget and MCP Registry manifests to each release, written by `laconic-tools package-manifests`.

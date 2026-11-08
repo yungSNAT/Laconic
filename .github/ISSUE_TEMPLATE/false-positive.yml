@@ -1,0 +1,41 @@
+name: laconic-check false positive
+description: laconic-check flagged text that is correct Australian English or house style.
+title: "False positive: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Each rule is described under its name in [docs/rules.md](https://github.com/yungSNAT/Laconic/blob/main/docs/rules.md). Remove anything private from the text before you submit.
+  - type: input
+    id: rule
+    attributes:
+      label: Rule
+      description: The rule name in the finding, such as us-spelling.
+    validations:
+      required: true
+  - type: textarea
+    id: text
+    attributes:
+      label: Text
+      description: The smallest text that still gives the finding.
+      render: markdown
+    validations:
+      required: true
+  - type: textarea
+    id: finding
+    attributes:
+      label: Finding
+      description: The line laconic-check printed.
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Why the text is correct
+      description: The Style Manual rule, Macquarie Dictionary entry or house rule that allows it, if you know it.
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: The laconic-check release or commit, such as laconic-check-v0.3.0.

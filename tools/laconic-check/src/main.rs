@@ -17,14 +17,22 @@ use std::process::ExitCode;
 use laconic_check::{lint, mcp, preserve};
 
 fn usage() -> ExitCode {
+    let advisory: Vec<&str> = lint::RULES
+        .iter()
+        .filter(|r| r.advisory)
+        .map(|r| r.name)
+        .collect();
     eprintln!(
         "usage:\n  laconic-check lint [--warn] <file.md | ->...\n  laconic-check preserve [--strict] <original> <edited>\n  laconic-check mcp\n\n\
          lint exits 1 when it finds candidates, unless --warn is given; advisory\n\
-         findings (clause-dashes, stacked-hedge, bold-label) never fail it.\n\
+         findings ({}) never fail it. Each finding names its rule,\n\
+         described under that name in {}\n\
          preserve exits 1 when the edit dropped a protected item. It also lists items the\n\
          edit added, which fail only with --strict (for a rewrite that must add nothing),\n\
          and names to check, which never fail. A clean result does not check meaning.\n\
-         mcp serves lint and preserve as MCP tools over standard input and output."
+         mcp serves lint and preserve as MCP tools over standard input and output.",
+        advisory.join(", "),
+        lint::RULES_URL
     );
     ExitCode::from(2)
 }
@@ -60,7 +68,7 @@ fn main() -> ExitCode {
                 };
                 for f in lint::lint(&text) {
                     println!("{file}:{}:{}: {}: {}", f.line, f.column, f.rule, f.message);
-                    if !lint::ADVISORY.contains(&f.rule) {
+                    if !f.rule.rule().advisory {
                         total += 1;
                     }
                 }

@@ -4,9 +4,13 @@
 //! Seeded-fault evaluation of `lint`, after snifftest's design
 //! (https://github.com/DanRWilloughby/snifftest): a corpus of clean Australian prose,
 //! including legitimate forms that look like faults, must produce no findings, and
-//! planting one known fault in it must produce exactly that rule, once.
+//! planting one known fault in it must produce exactly that rule, once. The rule reference,
+//! `docs/rules.md`, is generated here from the rule table, the seeds and the human corpus.
 
-use crate::lint::{ADVISORY, lint};
+use crate::lint::{RULES, lint};
+use std::collections::BTreeMap;
+use std::fmt::Write;
+use std::path::Path;
 
 /// Clean prose. Each sentence is correct house style; several are near misses.
 const CLEAN: &[&str] = &[
@@ -53,7 +57,11 @@ const SEEDS: &[(&str, &str, &str)] = &[
         "'the licence is current'",
         "\"the licence is current\"",
     ),
-    ("serial-comma", "metrics and traces", "metrics, and traces"),
+    (
+        "serial-comma",
+        "logs, metrics and traces",
+        "logs, metrics, and traces",
+    ),
     (
         "number-word",
         "organised 3 workshops",
@@ -108,6 +116,11 @@ const SEEDS: &[(&str, &str, &str)] = &[
     ("date", "on 19 October 2026", "on October 19"),
     ("date", "from 21 September", "from the 21st of September"),
     ("date", "in the 1980s", "in the 1980's"),
+    (
+        "weekday",
+        "on 19 October 2026",
+        "on Tuesday 19 October 2026",
+    ),
     ("symbol-space", "the rate to 5%", "the rate to 5 %"),
     (
         "symbol-space",
@@ -134,7 +147,7 @@ fn corpus() -> String {
 }
 
 fn rules(text: &str) -> Vec<&'static str> {
-    lint(text).into_iter().map(|f| f.rule).collect()
+    lint(text).into_iter().map(|f| f.rule.name()).collect()
 }
 
 #[test]
@@ -172,6 +185,22 @@ fn every_seeded_fault_is_caught_exactly_once() {
     );
 }
 
+/// docs/rules.md shows each seed's faulty form as an example, so it must flag its rule alone.
+/// An example with invisible characters is printed with escapes and labelled as such.
+#[test]
+fn every_example_flags_its_rule_on_its_own() {
+    let missed: Vec<String> = SEEDS
+        .iter()
+        .filter(|(rule, _, to)| !rules(to).contains(rule))
+        .map(|(rule, _, to)| format!("{rule}: {to:?}"))
+        .collect();
+    assert!(
+        missed.is_empty(),
+        "examples that do not flag their rule alone:\n{}",
+        missed.join("\n")
+    );
+}
+
 /// Human Australian Government prose in tests/corpus: 3 Productivity Commission reports
 /// released in 2018 and 2021, about 198,500 words under CC BY 3.0 AU (sources in its NOTICE).
 const HUMAN_CORPUS: &[&str] = &[
@@ -193,15 +222,22 @@ const HUMAN_CORPUS_ADVISORY_CEILING: usize = 49;
 /// 'innovative', 'deep dive', 'not just X, but Y' and 'time-frame'.
 const HUMAN_CORPUS_TELL_CEILING: usize = 7;
 
+fn human_corpus() -> Vec<String> {
+    HUMAN_CORPUS
+        .iter()
+        .map(|name| {
+            let path = format!("{}/tests/corpus/{name}", env!("CARGO_MANIFEST_DIR"));
+            std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("{path}: {e}"))
+        })
+        .collect()
+}
+
 #[test]
 fn human_corpus_findings_stay_under_the_ceiling() {
-    let (advisory, findings): (Vec<_>, Vec<_>) = HUMAN_CORPUS
+    let (advisory, findings): (Vec<_>, Vec<_>) = human_corpus()
         .iter()
-        .flat_map(|name| {
-            let path = format!("{}/tests/corpus/{name}", env!("CARGO_MANIFEST_DIR"));
-            lint(&std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("{path}: {e}")))
-        })
-        .partition(|f| ADVISORY.contains(&f.rule));
+        .flat_map(|text| lint(text))
+        .partition(|f| f.rule.rule().advisory);
     assert!(
         findings.len() <= HUMAN_CORPUS_CEILING,
         "{} findings on the human corpus, ceiling {HUMAN_CORPUS_CEILING}",
@@ -216,7 +252,7 @@ fn human_corpus_findings_stay_under_the_ceiling() {
         .iter()
         .filter(|f| {
             matches!(
-                f.rule,
+                f.rule.name(),
                 "stock-phrase" | "staged-contrast" | "reveal-question" | "hyphen"
             )
         })
@@ -230,30 +266,287 @@ fn human_corpus_findings_stay_under_the_ceiling() {
 
 #[test]
 fn every_rule_has_a_seed() {
-    for rule in [
-        "us-spelling",
-        "em-dash",
-        "clause-dashes",
-        "double-quotes",
-        "serial-comma",
-        "number-word",
-        "closer",
-        "stock-phrase",
-        "stacked-hedge",
-        "bold-label",
-        "staged-contrast",
-        "reveal-question",
-        "hyphen",
-        "word-choice",
-        "date",
-        "symbol-space",
-        "time",
-        "latin",
-        "residue",
-    ] {
+    for rule in RULES {
         assert!(
-            SEEDS.iter().any(|(r, _, _)| *r == rule),
-            "no seed for {rule}"
+            SEEDS.iter().any(|(r, _, _)| *r == rule.name),
+            "no seed for {}",
+            rule.name
         );
     }
+}
+
+#[test]
+fn rule_names_are_unique_and_every_seed_names_one() {
+    let mut names: Vec<&str> = RULES.iter().map(|r| r.name).collect();
+    names.sort_unstable();
+    names.dedup();
+    assert_eq!(names.len(), RULES.len(), "a rule name is listed twice");
+    for (rule, _, _) in SEEDS {
+        assert!(
+            names.contains(rule),
+            "a seed names an unlisted rule: {rule}"
+        );
+    }
+}
+
+const REFERENCE: &str = "docs/rules.md";
+const STYLE_RULES: &str = "skills/laconic-prose/references/style-manual-rules.md";
+const PATTERNS: &str = "skills/laconic-prose/references/patterns.md";
+const ISSUE_FORM: &str = "https://github.com/yungSNAT/Laconic/issues/new?template=";
+
+fn repo_root() -> &'static Path {
+    Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/../.."))
+}
+
+/// A repository file, with Windows line endings folded.
+fn read(relative: &str) -> String {
+    let path = repo_root().join(relative);
+    std::fs::read_to_string(&path)
+        .unwrap_or_else(|e| panic!("{}: {e}", path.display()))
+        .replace("\r\n", "\n")
+}
+
+/// GitHub's anchor for a Markdown heading: lower case, with spaces as hyphens and other
+/// punctuation removed.
+fn anchor(heading: &str) -> String {
+    heading
+        .to_lowercase()
+        .chars()
+        .filter(|c| c.is_alphanumeric() || matches!(c, ' ' | '-' | '_'))
+        .map(|c| if c == ' ' { '-' } else { c })
+        .collect()
+}
+
+fn headings(text: &str) -> Vec<&str> {
+    text.lines()
+        .filter_map(|l| {
+            l.trim_start_matches('#')
+                .strip_prefix(' ')
+                .filter(|_| l.starts_with('#'))
+        })
+        .collect()
+}
+
+/// The `###` sections under 'Australian English mechanics' in style-manual-rules.md.
+fn style_manual_sections() -> Vec<String> {
+    let text = read(STYLE_RULES);
+    let mechanics = text
+        .split("\n## Australian English mechanics\n")
+        .nth(1)
+        .expect("style-manual-rules.md keeps its mechanics section");
+    let mechanics = mechanics.split("\n## ").next().unwrap_or_default();
+    mechanics
+        .lines()
+        .filter_map(|l| l.strip_prefix("### "))
+        .map(str::to_owned)
+        .collect()
+}
+
+/// A seed with its invisible characters escaped.
+fn shown(example: &str) -> String {
+    example
+        .chars()
+        .map(|c| match c {
+            '\n' => "\n".to_owned(),
+            '\u{200b}'..='\u{200f}'
+            | '\u{202a}'..='\u{202e}'
+            | '\u{2060}'..='\u{2069}'
+            | '\u{feff}'
+            | '\u{e0000}'..='\u{e007f}' => format!("\\u{{{:x}}}", c as u32),
+            c if c.is_control() => format!("\\u{{{:x}}}", c as u32),
+            c => c.to_string(),
+        })
+        .collect()
+}
+
+/// 198512 as '198,512'.
+fn thousands(n: usize) -> String {
+    let digits = n.to_string();
+    let mut out = String::new();
+    for (i, c) in digits.chars().enumerate() {
+        if i > 0 && (digits.len() - i).is_multiple_of(3) {
+            out.push(',');
+        }
+        out.push(c);
+    }
+    out
+}
+
+/// docs/rules.md, built from RULES, SEEDS and the human corpus.
+fn reference() -> String {
+    let corpus = human_corpus();
+    let words: usize = corpus.iter().map(|t| t.split_whitespace().count()).sum();
+    let mut counts: BTreeMap<&str, usize> = BTreeMap::new();
+    for finding in corpus.iter().flat_map(|t| lint(t)) {
+        *counts.entry(finding.rule.name()).or_default() += 1;
+    }
+    let human = |name: &str| {
+        let n = counts.get(name).copied().unwrap_or(0);
+        let rate = n as f64 * 1000.0 / words as f64;
+        // A rare finding would round to 0.00, which reads as none.
+        let rate = if n > 0 && rate < 0.005 {
+            "under 0.01".to_owned()
+        } else {
+            format!("{rate:.2}")
+        };
+        (n, rate)
+    };
+    let style_rules = format!("../{STYLE_RULES}");
+    let section_link = |s: &str| format!("[{s}]({style_rules}#{})", anchor(s));
+    let fails = |advisory: bool| if advisory { "no (advisory)" } else { "yes" };
+
+    let mut out = String::new();
+    let _ = writeln!(
+        out,
+        "<!-- Generated by `cargo test` in tools/laconic-check from the rule table in src/lint.rs, the seeds in src/seeded_faults.rs and the corpus in tests/corpus. To update it, run `LACONIC_WRITE_DOCS=1 cargo test rule_reference_is_current`. -->\n\n\
+         # laconic-check rules\n\n\
+         `laconic-check lint` reports each finding as `file:line:column: rule: message`. Each rule below is headed by its name, so `docs/rules.md#<rule>` links to it. A finding is a reason to look, not proof of a defect. Advisory rules never fail `lint`.\n\n\
+         Each example is a seeded fault: the tests plant it in clean prose, and `lint` must flag it exactly once. The human prose figures count findings in 3 Productivity Commission reports released in 2018 and 2021 ({} whitespace-separated words of Australian Government prose under CC BY 3.0 AU, in `tools/laconic-check/tests/corpus`). Most of them are house-style differences the Commission's own style allows, such as spaced dashes, words for numbers below 10 and serial commas, rather than errors.\n\n\
+         To report a finding that should not have been flagged, use the [false-positive form]({ISSUE_FORM}false-positive.yml).\n\n\
+         | Rule | Fails `lint` | Style Manual section | Human prose, per 1,000 words |\n\
+         | --- | --- | --- | --- |",
+        thousands(words)
+    );
+    for rule in RULES {
+        let _ = writeln!(
+            out,
+            "| [`{0}`](#{0}) | {1} | {2} | {3} |",
+            rule.name,
+            fails(rule.advisory),
+            rule.section.unwrap_or("none"),
+            human(rule.name).1
+        );
+    }
+    let _ = writeln!(
+        out,
+        "\n## Style Manual coverage\n\n\
+         `lint` checks some forms from each section it names in [style-manual-rules.md]({style_rules}). The rest of those sections, and every section marked skill only, is applied by the laconic-prose skill, not the checker.\n\n\
+         | Section | Checked in part by |\n\
+         | --- | --- |"
+    );
+    for section in style_manual_sections() {
+        let rules: Vec<String> = RULES
+            .iter()
+            .filter(|r| r.section == Some(section.as_str()))
+            .map(|r| format!("`{}`", r.name))
+            .collect();
+        let checked = if rules.is_empty() {
+            "skill only".to_owned()
+        } else {
+            rules.join(", ")
+        };
+        let _ = writeln!(out, "| {} | {checked} |", section_link(&section));
+    }
+    let others: Vec<String> = RULES
+        .iter()
+        .filter(|r| r.section.is_none())
+        .map(|r| format!("`{}`", r.name))
+        .collect();
+    let _ = writeln!(
+        out,
+        "\nThe rules with no Style Manual section flag writing patterns from [patterns.md](../{PATTERNS}) or chat-tool residue: {}.\n\n## Rules",
+        others.join(", ")
+    );
+    for rule in RULES {
+        let (n, rate) = human(rule.name);
+        let section = rule
+            .section
+            .map_or("Not a Style Manual rule.".to_owned(), |s| {
+                format!("Style Manual: {}.", section_link(s))
+            });
+        // A seed of several lines, such as a run of bullets, keeps them in a fenced block.
+        let (blocks, inline): (Vec<String>, Vec<String>) = SEEDS
+            .iter()
+            .filter(|(r, _, _)| *r == rule.name)
+            .map(|(_, _, to)| shown(to))
+            .partition(|to| to.contains('\n'));
+        let mut examples: Vec<String> = Vec::new();
+        if !inline.is_empty() {
+            let codes: Vec<String> = inline.iter().map(|to| format!("`{to}`")).collect();
+            let label = if codes.len() == 1 {
+                "Example"
+            } else {
+                "Examples"
+            };
+            examples.push(format!("{label}: {}.", codes.join(", ")));
+        }
+        for block in blocks {
+            examples.push(format!("Example:\n\n```markdown\n{block}\n```"));
+        }
+        if SEEDS
+            .iter()
+            .any(|(r, _, to)| *r == rule.name && shown(to) != *to)
+        {
+            examples.push("Invisible characters appear here as `\\u{...}` escapes, so copying an example does not reproduce them; the tests plant the characters themselves.".to_owned());
+        }
+        let _ = writeln!(
+            out,
+            "\n### {}\n\n{}\n\nFails `lint`: {}. {section} Human prose: {} {}, {rate} per 1,000 words.\n\n{}",
+            rule.name,
+            rule.checks,
+            fails(rule.advisory),
+            thousands(n),
+            if n == 1 { "finding" } else { "findings" },
+            examples.join("\n\n")
+        );
+    }
+    out
+}
+
+/// docs/rules.md must match the rule table; `LACONIC_WRITE_DOCS=1` rewrites it.
+#[test]
+fn rule_reference_is_current() {
+    let expected = reference();
+    if std::env::var_os("LACONIC_WRITE_DOCS").is_some() {
+        std::fs::write(repo_root().join(REFERENCE), &expected).unwrap();
+    }
+    assert!(
+        read(REFERENCE) == expected,
+        "{REFERENCE} is out of date: run `LACONIC_WRITE_DOCS=1 cargo test rule_reference_is_current` in tools/laconic-check"
+    );
+}
+
+#[test]
+fn every_rule_section_is_a_style_manual_heading() {
+    let sections = style_manual_sections();
+    for rule in RULES {
+        if let Some(section) = rule.section {
+            assert!(
+                sections.iter().any(|s| s == section),
+                "{}: no section {section:?} under Australian English mechanics in {STYLE_RULES}",
+                rule.name
+            );
+        }
+    }
+}
+
+#[test]
+fn rule_reference_links_resolve() {
+    let text = read(REFERENCE);
+    let docs = repo_root().join("docs");
+    let mut checked = 0;
+    for target in text.split("](").skip(1).filter_map(|s| s.split(')').next()) {
+        checked += 1;
+        if let Some(form) = target.strip_prefix(ISSUE_FORM) {
+            let path = repo_root().join(".github/ISSUE_TEMPLATE").join(form);
+            assert!(path.is_file(), "{target}: no {}", path.display());
+            continue;
+        }
+        assert!(!target.contains("://"), "unexpected external link {target}");
+        let (file, fragment) = target.split_once('#').unwrap_or((target, ""));
+        let body = if file.is_empty() {
+            text.clone()
+        } else {
+            let path = docs.join(file);
+            std::fs::read_to_string(&path)
+                .unwrap_or_else(|e| panic!("{target}: {}: {e}", path.display()))
+        };
+        if !fragment.is_empty() {
+            assert!(
+                headings(&body).iter().any(|h| anchor(h) == fragment),
+                "{target}: no heading with anchor {fragment}"
+            );
+        }
+    }
+    assert!(checked > RULES.len(), "only {checked} links found");
 }

@@ -215,6 +215,11 @@ fn workflow_actions_are_pinned_to_full_commit_shas() {
     for (name, text) in workflow_files() {
         for captures in uses.captures_iter(&text) {
             let target = &captures[1];
+            // A local action, such as `./` for this repository's action.yml, is pinned by the
+            // commit the workflow runs on.
+            if target.starts_with("./") {
+                continue;
+            }
             assert!(pinned.is_match(target), "{name}: {target}");
         }
     }

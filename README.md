@@ -246,6 +246,28 @@ The Color Purple won the prize.
 | 1 | `lint` found more failing findings than allowed; `preserve` found an item dropped, or one added under `--strict`. |
 | 2 | A usage, project file or read error, or an input or output error in `mcp`. |
 
+To run it with [pre-commit](https://pre-commit.com), put `laconic-check` on the PATH and add its hooks; the commit message hook also needs `pre-commit install --hook-type commit-msg`, and a laconic-check release later than 0.3.0, which lacks `--commit-msg`:
+
+```yaml
+repos:
+  - repo: https://github.com/yungSNAT/Laconic
+    rev: <commit>
+    hooks:
+      - id: laconic-check
+      - id: laconic-check-commit-msg
+```
+
+In GitHub Actions, the composite Action downloads a laconic-check release for the runner (Linux x86_64, Windows x86_64 or macOS on Apple silicon), checks it against the release's SHA-256 file, lints and annotates each finding:
+
+```yaml
+- uses: actions/checkout@v7
+- uses: yungSNAT/Laconic@<commit>
+  with:
+    version: 0.3.0     # the laconic-check release; 0.3.0 by default
+    files: README.md   # default: every Markdown file Git tracks
+    args: --warn       # further lint options
+```
+
 `lint -` reads standard input, so an agent can check a draft without saving it. When `laconic-check` is on the PATH, both skills run it on written deliverables before sending. Its US-to-Australian word list combines a hand-written list with about 2,400 pairs generated from the [English Speller Database](https://github.com/en-wl/wordlist) and reviewed against the Style Manual (`laconic-tools gen-au-words`). Seeded-fault tests plant one known fault per rule into clean prose and require the checker to catch each one exactly once, with no findings on the clean text. A calibration test runs `lint` over 3 Productivity Commission reports released in 2018 and 2021 (about 198,500 words of human prose, CC BY 3.0 AU) and fails if its 2,246 findings, its 68 advisories (41 clause-dash paragraphs, 8 stacked hedges, 15 acronyms used before their definition and 4 compounds written both closed and hyphenated) or the 7 stock phrases, staged contrasts and unnecessary hyphens amongst them rise, which guards against a net increase in findings on human text. An outside run on 5 November 2026 linted the 150 human articles in [jenna-russell/human_detectors](https://github.com/jenna-russell/human_detectors) at commit `afcf03d` (110,723 words of mostly American non-fiction, not stored here): 25.9 findings per 1,000 words, 97% of them house-style differences (double quotation marks, US spellings, em dashes, number words, word choice and serial commas). The AI-tell rules fired 18 times (0.16 per 1,000 words: 8 staged contrasts, 7 stock phrases, 2 reveal questions and 1 chatbot closer), not yet labelled true or false. The articles are plain text, so this run does not test `bold-label`.
 
 `laconic-check mcp` serves `lint` and `preserve` as MCP tools over standard input and output, with nothing else to install:

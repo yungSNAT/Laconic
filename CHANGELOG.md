@@ -51,6 +51,7 @@ The manifests still declare plugin 0.5.0, so a build from `main` carries that ve
 - A rule reference, `docs/rules.md`, generated from one rule table: what each rule flags, examples, its Style Manual section and its rate on human prose, with a Style Manual coverage table. The usage text and the MCP `lint` description link to it, and a false-positive issue form links back.
 - A seed for `weekday`; the seed check now covers every rule in the table, each example flags its rule on its own, and a finding can name only a rule in the table.
 - `lint` options for use as a gate: `--json`, `--disable` and `--only` for rules, `--max-findings`, `--commit-msg` for Git commit messages and `--config`, with a `.laconic-check` project file. A `<!-- laconic-check-disable-next-line rule -->` comment silences the named rules on the next line, and an `unused-suppression` advisory flags one that silences nothing. An unknown option, rule name or count exits 2. README lists the exit statuses.
+- Pre-commit hooks for Markdown files and commit messages, and a composite GitHub Action that downloads a laconic-check release, checks its SHA-256 and annotates each finding.
 
 ### laconic-check: fixed
 

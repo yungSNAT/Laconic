@@ -1,0 +1,15 @@
+# pre-commit hooks for laconic-check. Both run the laconic-check binary on the PATH: install
+# it from a laconic-check-v* release, Scoop or Homebrew first.
+- id: laconic-check
+  name: laconic-check
+  description: Flag Australian English and house-style candidates in Markdown prose.
+  entry: laconic-check lint
+  language: system
+  types: [markdown]
+- id: laconic-check-commit-msg
+  name: laconic-check (commit message)
+  description: Flag Australian English and house-style candidates in the commit message.
+  entry: laconic-check lint --commit-msg
+  language: system
+  stages: [commit-msg]
+  always_run: true

@@ -1,0 +1,29 @@
+name: laconic-check
+description: Flag Australian English and house-style candidates in Markdown prose, with an annotation for each finding.
+inputs:
+  version:
+    description: The laconic-check release to download, such as 0.3.0.
+    required: false
+    default: 0.3.0
+  files:
+    description: Markdown files to lint, separated by spaces or new lines. Defaults to every Markdown file Git tracks.
+    required: false
+    default: ""
+  args:
+    description: Further lint options, such as --warn. Options added after 0.3.0, such as --max-findings, need a later version.
+    required: false
+    default: ""
+runs:
+  using: composite
+  steps:
+    - name: Install laconic-check
+      shell: bash
+      env:
+        VERSION: ${{ inputs.version }}
+      run: bash "$GITHUB_ACTION_PATH/tools/laconic-check/action/install.sh"
+    - name: Lint
+      shell: bash
+      env:
+        LACONIC_FILES: ${{ inputs.files }}
+        LACONIC_ARGS: ${{ inputs.args }}
+      run: bash "$GITHUB_ACTION_PATH/tools/laconic-check/action/lint.sh"

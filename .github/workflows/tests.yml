@@ -46,7 +46,7 @@ jobs:
       - name: Install coverage
         run: python -m pip install --only-binary=":all:" --require-hashes -r .github/ci/requirements-coverage.txt
       - name: Unit tests
-        run: python -m coverage run --source=scripts,tools/laconic-check -m unittest discover -s tests -v
+        run: python -m coverage run --source=scripts -m unittest discover -s tests -v
       - name: Write coverage for Codecov
         run: python -m coverage xml -o coverage-codecov.xml
       - name: Keep the coverage report for the Codecov upload

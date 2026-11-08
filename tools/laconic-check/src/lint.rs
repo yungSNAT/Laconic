@@ -1479,7 +1479,7 @@ fn starts_sentence(chars: &[char], s: usize) -> bool {
 }
 
 /// US forms with their Australian spelling, generated from the English Speller Database
-/// by `gen_au_words.py`, one "us au" pair per line.
+/// by `laconic-tools gen-au-words`, one "us au" pair per line.
 const ESDB_US_WORDS: &str = include_str!("us_words.txt");
 
 fn esdb_us_words() -> &'static HashMap<&'static str, &'static str> {

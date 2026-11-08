@@ -8,7 +8,10 @@
 //!                                        always-on snippet in INSTALL.md
 //!   laconic-tools check-pi [--runtime pi|omp]
 //!                                        smoke-test the Pi or OMP package over RPC
+//!   laconic-tools gen-au-words <scowl-pre.txt> <style-manual.txt>
+//!                                        regenerate laconic-check's US word list
 
+mod au_words;
 mod pi_check;
 
 use std::fs;
@@ -109,9 +112,12 @@ fn main() -> ExitCode {
         ["sync-rules", "--check"] => sync_rules(&root(), true),
         ["check-pi"] => pi_check::run(&root(), "pi"),
         ["check-pi", "--runtime", runtime] => pi_check::run(&root(), runtime),
-        _ => {
-            Err("usage: laconic-tools <sync-rules [--check] | check-pi [--runtime pi|omp]>".into())
-        }
+        ["gen-au-words", esdb, manual] => au_words::run(&root(), esdb, manual),
+        _ => Err(
+            "usage: laconic-tools <sync-rules [--check] | check-pi [--runtime pi|omp] \
+             | gen-au-words <scowl-pre.txt> <style-manual.txt>>"
+                .into(),
+        ),
     };
     match result {
         Ok(message) => {

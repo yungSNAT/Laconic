@@ -10,8 +10,8 @@
 use std::collections::HashMap;
 use std::sync::OnceLock;
 
-/// One lint rule. `docs/rules.md` is generated from this table and the seeded-fault tests,
-/// and every finding must name a rule listed here.
+/// One lint rule. `docs/rules.md` is generated from this table and the seeded-fault tests;
+/// every finding's `RuleId` has an entry here.
 pub struct Rule {
     /// The name every finding carries; also its anchor in `docs/rules.md`.
     pub name: &'static str,
@@ -47,118 +47,145 @@ const QUOTES: Option<&str> = Some("Percentages, quotes and titles");
 const DASHES: Option<&str> = Some("Dashes");
 const DATES: Option<&str> = Some("Dates and time");
 
-pub const RULES: &[Rule] = &[
-    rule(
+/// Declares `RuleId` and `RULES` from one list, in the same order, so a finding can only
+/// name a rule that has a table entry.
+macro_rules! rules {
+    ($($id:ident = $rule:expr,)*) => {
+        /// A rule `lint` reports; `rule()` gives its entry in `RULES`.
+        #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+        pub enum RuleId {
+            $($id,)*
+        }
+
+        /// Every rule, in the order of the rule reference.
+        pub const RULES: &[Rule] = &[$($rule,)*];
+    };
+}
+
+rules! {
+    UsSpelling = rule(
         "us-spelling",
         SPELLING,
         "US spellings that have an Australian form, such as 'color', 'organized' and 'skeptical', and 'percent' in prose.",
     ),
-    rule(
+    WordChoice = rule(
         "word-choice",
         SPELLING,
         "'while' and 'among' as a conjunction or preposition, where the house rule writes 'whilst' and 'amongst'. Noun uses such as 'a while' pass.",
     ),
-    rule(
+    DoubleQuotes = rule(
         "double-quotes",
         QUOTES,
-        "Double quotation marks in prose, where single marks are the default.",
+        "A pair of double quotation marks, straight or curly, around a short span of prose (under 120 characters), where single marks are the default.",
     ),
-    rule(
+    SymbolSpace = rule(
         "symbol-space",
         QUOTES,
-        "A space between a number and its symbol, as in '5 %' or '$ 27.99'.",
+        "A space before a percentage sign or after a dollar sign, with or without a currency code, as in '5 %', '$ 27.99' or 'A$ 5'.",
     ),
-    rule(
+    SerialComma = rule(
         "serial-comma",
         Some("Punctuation"),
         "A possible comma before the final 'and' or 'or' in a list. Keep it only if it prevents a misreading.",
     ),
-    rule("em-dash", DASHES, "Em dashes in original prose."),
-    advisory(
+    EmDash = rule("em-dash", DASHES, "Em dashes in original prose."),
+    ClauseDashes = advisory(
         "clause-dashes",
         DASHES,
         "A paragraph with clause dashes (an em dash, or a spaced en dash, hyphen or double hyphen) in 2 or more sentences, where a pair around one aside counts once.",
     ),
-    rule(
+    Hyphen = rule(
         "hyphen",
         Some("Hyphens"),
         "Unnecessary hyphens in open set phrases and closed compounds, such as 'open-source' and 'e-mail'.",
     ),
-    rule(
+    NumberWord = rule(
         "number-word",
         Some("Numbers"),
         "Numbers from 2 to 20 written as words where the Style Manual uses numerals.",
     ),
-    rule(
+    Date = rule(
         "date",
         DATES,
         "Dates not written as day month year: an ordinal ('19th October'), the month first ('October 19'), a comma before the year and an apostrophe in a decade ('1980's').",
     ),
-    rule(
+    Weekday = rule(
         "weekday",
         DATES,
         "A weekday that does not match its date, such as 'Wednesday 22 October 2026'.",
     ),
-    rule(
+    Time = rule(
         "time",
         DATES,
         "Times not written as '9:30 am' or '9 am', such as '9am', '9.30am' and '9:30 a.m.'.",
     ),
-    rule(
+    Latin = rule(
         "latin",
         Some("Shortened forms"),
         "The Latin abbreviations 'e.g.' and 'i.e.', with or without full stops, where 'for example' and 'that is' are preferred.",
     ),
-    rule(
+    Closer = rule(
         "closer",
         None,
         "Chatbot closers such as 'hope this helps', 'let me know if' and 'feel free to'.",
     ),
-    rule(
+    StockPhrase = rule(
         "stock-phrase",
         None,
         "Stock phrases that rarely carry meaning, such as 'Bottom line:', 'circle back' and 'it's worth noting', and timeless openers such as 'since the dawn of time'.",
     ),
-    advisory(
+    StackedHedge = advisory(
         "stacked-hedge",
         None,
         "Stacked hedges such as 'could potentially' and 'may possibly'.",
     ),
-    advisory(
+    BoldLabel = advisory(
         "bold-label",
         None,
         "3 or more bullets in a row that open with a bold label, such as '**Cause:**'.",
     ),
-    rule(
+    StagedContrast = rule(
         "staged-contrast",
         None,
         "Staged contrasts: 'it's not X, it's Y' and 'not just X but Y'.",
     ),
-    rule(
+    RevealQuestion = rule(
         "reveal-question",
         None,
         "Verbless reveal questions, such as 'The result? A 40% cut.'",
     ),
-    rule(
+    Residue = rule(
         "residue",
         None,
-        "Chat-tool residue: zero-width characters, citation markers and ChatGPT tracking tags, including inside links, and invisible characters that can hide or reorder text (runs of Unicode tag characters, except the England, Scotland and Wales flags, and bidirectional controls).",
+        "Chat-tool residue: 4 known ChatGPT citation and tracking markers (`oaicite`, `contentReference`, `utm_source=chatgpt` and `utm_source=openai`), including inside links, and selected invisible characters that can hide or reorder text: zero-width characters, bidirectional controls and runs of Unicode tag characters (except the England, Scotland and Wales flags).",
     ),
-];
+}
+
+impl RuleId {
+    pub fn rule(self) -> &'static Rule {
+        &RULES[self as usize]
+    }
+
+    /// The name every finding prints; also its anchor in `docs/rules.md`.
+    pub fn name(self) -> &'static str {
+        self.rule().name
+    }
+}
+
+impl std::fmt::Display for RuleId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.name())
+    }
+}
 
 /// The rule reference; each rule's name is its anchor there.
 pub const RULES_URL: &str = "https://github.com/yungSNAT/Laconic/blob/main/docs/rules.md";
-
-/// Whether findings of `rule` never fail `lint`.
-pub fn is_advisory(rule: &str) -> bool {
-    RULES.iter().any(|r| r.advisory && r.name == rule)
-}
 
 #[derive(Debug, PartialEq)]
 pub struct Finding {
     pub line: usize,
     pub column: usize,
-    pub rule: &'static str,
+    pub rule: RuleId,
     pub message: String,
 }
 
@@ -499,7 +526,7 @@ pub fn lint(text: &str) -> Vec<Finding> {
                 findings.push(Finding {
                     line: line_no,
                     column: indent + 1,
-                    rule: "bold-label",
+                    rule: RuleId::BoldLabel,
                     message: "3 or more bullets in a row open with a bold label (advisory); use prose or plain bullets unless a template requires the labels".into(),
                 });
             }
@@ -513,13 +540,6 @@ pub fn lint(text: &str) -> Vec<Finding> {
         }
     }
     paragraph.flush(&mut findings);
-    // A new rule must join RULES, which then requires a seed (seeded_faults.rs).
-    debug_assert!(
-        findings
-            .iter()
-            .all(|f| RULES.iter().any(|r| r.name == f.rule)),
-        "a finding names a rule missing from RULES: {findings:?}"
-    );
     findings
 }
 
@@ -590,7 +610,7 @@ impl Paragraph {
             found.push(self.place(Finding {
                 line: 0,
                 column,
-                rule: "double-quotes",
+                rule: RuleId::DoubleQuotes,
                 message: "double quotation marks in prose; use single marks".into(),
             }));
         }
@@ -667,7 +687,7 @@ fn check_residue(chars: &[char], line: usize, findings: &mut Vec<Finding>) {
                 findings.push(Finding {
                     line,
                     column: k + 1,
-                    rule: "residue",
+                    rule: RuleId::Residue,
                     message: format!(
                         "{n} hidden tag character{} (U+E0000 to U+E007F)",
                         if n == 1 { "" } else { "s" }
@@ -691,7 +711,7 @@ fn check_residue(chars: &[char], line: usize, findings: &mut Vec<Finding>) {
             findings.push(Finding {
                 line,
                 column: k + 1,
-                rule: "residue",
+                rule: RuleId::Residue,
                 message: format!("{kind} U+{:04X}", c as u32),
             });
         }
@@ -704,7 +724,7 @@ fn check_residue(chars: &[char], line: usize, findings: &mut Vec<Finding>) {
             findings.push(Finding {
                 line,
                 column: lower[..from + pos].chars().count() + 1,
-                rule: "residue",
+                rule: RuleId::Residue,
                 message: format!("chat-tool residue '{marker}'"),
             });
             from += pos + marker.len();
@@ -868,7 +888,7 @@ fn check_line(masked: &[char], line: usize, findings: &mut Vec<Finding>) {
             findings.push(Finding {
                 line,
                 column: k + 1,
-                rule: "em-dash",
+                rule: RuleId::EmDash,
                 message: "em dash in original prose".into(),
             });
         }
@@ -886,7 +906,7 @@ fn check_line(masked: &[char], line: usize, findings: &mut Vec<Finding>) {
         findings.push(Finding {
             line,
             column: at + 1,
-            rule: "clause-dashes",
+            rule: RuleId::ClauseDashes,
             message: "clause dashes in 2 or more sentences of one paragraph (advisory); use a comma, colon or full stop where one reads as well".into(),
         });
     }
@@ -900,7 +920,7 @@ fn check_line(masked: &[char], line: usize, findings: &mut Vec<Finding>) {
             findings.push(Finding {
                 line,
                 column: col,
-                rule: "closer",
+                rule: RuleId::Closer,
                 message: format!("chatbot phrase '{phrase}'"),
             });
             from += pos + phrase.len();
@@ -930,7 +950,7 @@ fn check_line(masked: &[char], line: usize, findings: &mut Vec<Finding>) {
                 findings.push(Finding {
                     line,
                     column: plain[..at].chars().count() + 1,
-                    rule: "stock-phrase",
+                    rule: RuleId::StockPhrase,
                     message: format!("stock phrase '{phrase}'; state the point directly"),
                 });
             }
@@ -948,7 +968,7 @@ fn check_line(masked: &[char], line: usize, findings: &mut Vec<Finding>) {
                 findings.push(Finding {
                     line,
                     column: plain[..at].chars().count() + 1,
-                    rule: "stacked-hedge",
+                    rule: RuleId::StackedHedge,
                     message: format!("stacked hedge '{phrase}' (advisory); keep one qualifier at the confidence the source supports"),
                 });
             }
@@ -972,7 +992,7 @@ fn check_line(masked: &[char], line: usize, findings: &mut Vec<Finding>) {
             findings.push(Finding {
                 line,
                 column: plain[..at].chars().count() + 1,
-                rule: "hyphen",
+                rule: RuleId::Hyphen,
                 message: format!("'{hyphenated}{suffix}': write '{house}{suffix}'"),
             });
         }
@@ -994,7 +1014,7 @@ fn check_line(masked: &[char], line: usize, findings: &mut Vec<Finding>) {
                     findings.push(Finding {
                         line,
                         column: s + 1,
-                        rule: "us-spelling",
+                        rule: RuleId::UsSpelling,
                         message: format!("'{word}': Australian form is '{au}'"),
                     });
                 }
@@ -1007,7 +1027,7 @@ fn check_line(masked: &[char], line: usize, findings: &mut Vec<Finding>) {
                     findings.push(Finding {
                         line,
                         column: s + 1,
-                        rule: "word-choice",
+                        rule: RuleId::WordChoice,
                         message: format!("'{word}': the house style prefers '{house}'"),
                     });
                 }
@@ -1020,7 +1040,7 @@ fn check_line(masked: &[char], line: usize, findings: &mut Vec<Finding>) {
                     findings.push(Finding {
                         line,
                         column: s + 1,
-                        rule: "number-word",
+                        rule: RuleId::NumberWord,
                         message: format!("'{word}': use the numeral {numeral} (words only at the start of a sentence)"),
                     });
                 }
@@ -1112,7 +1132,7 @@ fn check_line(masked: &[char], line: usize, findings: &mut Vec<Finding>) {
             && !introductory
             && !clause_join
         {
-            findings.push(Finding { line, column: k + 1, rule: "serial-comma", message: "possible comma before a final 'and' or 'or'; keep it only if it prevents a misreading".into() });
+            findings.push(Finding { line, column: k + 1, rule: RuleId::SerialComma, message: "possible comma before a final 'and' or 'or'; keep it only if it prevents a misreading".into() });
         }
     }
 }
@@ -1245,7 +1265,7 @@ fn check_structure(masked: &[char], plain: &str, line: usize, findings: &mut Vec
             findings.push(Finding {
                 line,
                 column: start + sentence[..at].chars().count() + 1,
-                rule: "staged-contrast",
+                rule: RuleId::StagedContrast,
                 message: "staged contrast ('not X, it's Y'); state what it is".into(),
             });
         }
@@ -1274,7 +1294,7 @@ fn check_structure(masked: &[char], plain: &str, line: usize, findings: &mut Vec
             findings.push(Finding {
                 line,
                 column: start + lead + 1,
-                rule: "reveal-question",
+                rule: RuleId::RevealQuestion,
                 message: "question-and-answer reveal; state the answer directly".into(),
             });
         }
@@ -1359,7 +1379,7 @@ fn check_style_manual_forms(lower: &str, text: &str, line: usize, findings: &mut
                 .chars()
                 .all(|c| c.is_ascii_digit() || matches!(c, ',' | '.'))
     };
-    let mut push = |at: usize, rule: &'static str, message: &str| {
+    let mut push = |at: usize, rule: RuleId, message: &str| {
         findings.push(Finding {
             line,
             column: lower[..at].chars().count() + 1,
@@ -1375,7 +1395,7 @@ fn check_style_manual_forms(lower: &str, text: &str, line: usize, findings: &mut
         if word.starts_with("e.g.") || word.starts_with("i.e.") || bare == "eg" || bare == "ie" {
             push(
                 at,
-                "latin",
+                RuleId::Latin,
                 "Latin abbreviation; write 'for example' or 'that is'",
             );
         }
@@ -1397,7 +1417,7 @@ fn check_style_manual_forms(lower: &str, text: &str, line: usize, findings: &mut
                 .as_deref()
                 .is_some_and(|n| matches!(n.trim_end_matches('.'), "am" | "pm"));
         if time || dotted || period_separator {
-            push(at, "time", "write times as 9:30 am or 9 am");
+            push(at, RuleId::Time, "write times as 9:30 am or 9 am");
         }
         // A digit after the sign is a remainder ('5 % 3'), and a year before it a table
         // heading ('2020 % change').
@@ -1414,7 +1434,7 @@ fn check_style_manual_forms(lower: &str, text: &str, line: usize, findings: &mut
         {
             push(
                 at,
-                "symbol-space",
+                RuleId::SymbolSpace,
                 "no space before the percentage sign: write 12%",
             );
         }
@@ -1424,7 +1444,7 @@ fn check_style_manual_forms(lower: &str, text: &str, line: usize, findings: &mut
         if currency && tokens.get(i + 1).is_some_and(|t| amount(t.1)) {
             push(
                 at,
-                "symbol-space",
+                RuleId::SymbolSpace,
                 "no space after a currency symbol: write $27.99",
             );
         }
@@ -1440,7 +1460,7 @@ fn check_style_manual_forms(lower: &str, text: &str, line: usize, findings: &mut
                 .as_deref()
                 .is_some_and(|p| matches!(p, "the" | "early" | "mid" | "late" | "those" | "these"));
         if apostrophe_decade(&word) && (decade_word || !noun_follows) {
-            push(at, "date", "decades take no apostrophe: write 1980s");
+            push(at, RuleId::Date, "decades take no apostrophe: write 1980s");
         }
         if MONTHS.contains(&word.trim_end_matches('.')) {
             let month = word.trim_end_matches('.');
@@ -1461,7 +1481,11 @@ fn check_style_manual_forms(lower: &str, text: &str, line: usize, findings: &mut
                     .nth(i)
                     .is_some_and(|w| w.contains("may"));
             if (prev_day.is_some_and(ordinal) && !modal) || ordinal_of {
-                push(at, "date", "no ordinal in dates: write 19 October 2026");
+                push(
+                    at,
+                    RuleId::Date,
+                    "no ordinal in dates: write 19 October 2026",
+                );
             }
             if prev_day.is_some()
                 && raw.ends_with(',')
@@ -1472,7 +1496,7 @@ fn check_style_manual_forms(lower: &str, text: &str, line: usize, findings: &mut
             {
                 push(
                     at,
-                    "date",
+                    RuleId::Date,
                     "no comma before the year: write 19 October 2026",
                 );
             }
@@ -1495,7 +1519,7 @@ fn check_style_manual_forms(lower: &str, text: &str, line: usize, findings: &mut
                 {
                     push(
                         tokens[i - 2].0,
-                        "weekday",
+                        RuleId::Weekday,
                         &format!(
                             "{day} {} {year} is a {}, not a {}",
                             capitalise(month),
@@ -1511,7 +1535,7 @@ fn check_style_manual_forms(lower: &str, text: &str, line: usize, findings: &mut
                     (digits(n) && n.len() <= 2) || ordinal(n)
                 })
             {
-                push(at, "date", "day before month: write 19 October 2026");
+                push(at, RuleId::Date, "day before month: write 19 October 2026");
             }
         }
     }
@@ -1675,7 +1699,7 @@ mod tests {
     use super::*;
 
     fn rules(text: &str) -> Vec<&'static str> {
-        lint(text).into_iter().map(|f| f.rule).collect()
+        lint(text).into_iter().map(|f| f.rule.name()).collect()
     }
 
     #[test]
@@ -1738,7 +1762,7 @@ mod tests {
             assert!(rules(text).is_empty(), "{text}: {:?}", rules(text));
         }
         let f = &lint("Read this. It's not X, it's Y.")[0];
-        assert_eq!((f.column, f.rule), (12, "staged-contrast"));
+        assert_eq!((f.column, f.rule.name()), (12, "staged-contrast"));
     }
 
     #[test]
@@ -1780,7 +1804,7 @@ mod tests {
             assert_eq!(rules(&text), vec!["staged-contrast"], "{gap:?}");
         }
         let f = &lint("Caf\u{e9}. It\u{2019}s not X, it\u{2019}s Y.")[0];
-        assert_eq!((f.column, f.rule), (7, "staged-contrast"));
+        assert_eq!((f.column, f.rule.name()), (7, "staged-contrast"));
     }
 
     #[test]
@@ -1849,13 +1873,13 @@ mod tests {
             let found = lint(&text);
             let rules: Vec<_> = found
                 .iter()
-                .map(|f| f.rule)
+                .map(|f| f.rule.name())
                 .filter(|r| *r != "em-dash")
                 .collect();
             assert_eq!(rules, vec!["clause-dashes"], "{dash:?}");
             let at = found
                 .iter()
-                .find(|f| f.rule == "clause-dashes")
+                .find(|f| f.rule == RuleId::ClauseDashes)
                 .unwrap()
                 .column;
             assert_eq!(
@@ -1882,9 +1906,9 @@ mod tests {
     #[test]
     fn stock_phrase_columns_count_characters() {
         let f = &lint("We\u{2019}ll circle back.")[0];
-        assert_eq!((f.column, f.rule), (7, "stock-phrase"));
+        assert_eq!((f.column, f.rule.name()), (7, "stock-phrase"));
         let f = &lint("\u{130} circle back.")[0];
-        assert_eq!((f.column, f.rule), (3, "stock-phrase"));
+        assert_eq!((f.column, f.rule.name()), (3, "stock-phrase"));
     }
 
     #[test]
@@ -2114,10 +2138,10 @@ mod tests {
         let at = |text: &str| -> Vec<(usize, usize, &'static str)> {
             lint(text)
                 .into_iter()
-                .map(|f| (f.line, f.column, f.rule))
+                .map(|f| (f.line, f.column, f.rule.name()))
                 .collect()
         };
-        assert!(is_advisory("bold-label"));
+        assert!(RuleId::BoldLabel.rule().advisory);
         let three = "- **Cause:** a bad key.\n- **Fix:** replace it.\n- **Risk:** low.";
         assert_eq!(at(three), vec![(3, 1, "bold-label")]);
         // Each marker, the colon outside the bold, and one finding however long the run.
@@ -2157,7 +2181,7 @@ mod tests {
     fn flags_a_weekday_that_does_not_match_its_date() {
         let found = lint("Reply by Wednesday 22 October 2026, please.");
         assert_eq!(found.len(), 1);
-        assert_eq!(found[0].rule, "weekday");
+        assert_eq!(found[0].rule, RuleId::Weekday);
         assert_eq!(found[0].column, 10);
         assert_eq!(
             found[0].message,
@@ -2189,7 +2213,7 @@ mod tests {
         }
         let found = lint("Peers since October 20; 14 new.");
         assert_eq!(found.len(), 1);
-        assert_eq!((found[0].rule, found[0].column), ("date", 13));
+        assert_eq!((found[0].rule.name(), found[0].column), ("date", 13));
     }
 
     #[test]
@@ -2268,7 +2292,7 @@ mod tests {
     #[test]
     fn reports_line_and_column() {
         let f = &lint("ok\nThe color.")[0];
-        assert_eq!((f.line, f.column, f.rule), (2, 5, "us-spelling"));
+        assert_eq!((f.line, f.column, f.rule.name()), (2, 5, "us-spelling"));
     }
 
     #[test]
@@ -2276,7 +2300,7 @@ mod tests {
         let at = |text: &str| -> Vec<(usize, usize, &'static str)> {
             lint(text)
                 .into_iter()
-                .map(|f| (f.line, f.column, f.rule))
+                .map(|f| (f.line, f.column, f.rule.name()))
                 .collect()
         };
         // Present day, present time: the wrap falls inside each phrase.

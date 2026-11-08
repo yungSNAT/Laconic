@@ -68,7 +68,7 @@ fn main() -> ExitCode {
                 };
                 for f in lint::lint(&text) {
                     println!("{file}:{}:{}: {}: {}", f.line, f.column, f.rule, f.message);
-                    if !lint::is_advisory(f.rule) {
+                    if !f.rule.rule().advisory {
                         total += 1;
                     }
                 }

@@ -12,6 +12,8 @@
 //!                                        regenerate laconic-check's US word list
 
 mod au_words;
+#[cfg(test)]
+mod contracts;
 mod pi_check;
 
 use std::fs;

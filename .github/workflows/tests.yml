@@ -1,8 +1,9 @@
 name: tests
 
-# Runs the whole Python suite and validates the evaluation cases. The other
-# workflows each cover one layer; this catches the rest (eval tooling, judge,
-# humanise metrics, OpenCode plugin).
+# Runs the repository contract tests in laconic-tools and the whole Python
+# suite, and validates the evaluation cases. The other workflows each cover one
+# layer; this catches the rest (OpenCode plugin, manifests, skills, CI guards,
+# eval tooling, judge, humanise metrics).
 on:
   pull_request:
   push:

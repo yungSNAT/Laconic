@@ -1,8 +1,10 @@
 # Opengrep's subprocess audit rules fire on every test that runs a script, a
-# hook or Node with an argument list, so it does not scan tests; shipped
-# code, scripts and evals are still scanned. Bandit's settings live in
+# hook or Node with an argument list, so it does not scan tests (tests/ and
+# laconic-tools' contract tests); shipped code, scripts and evals are still
+# scanned. Bandit's settings live in
 # bandit.yml, which Codacy reads for that tool.
 engines:
   opengrep:
     exclude_paths:
       - "tests/**"
+      - "tools/laconic-tools/src/contracts/**"

@@ -45,9 +45,11 @@ The manifests still declare plugin 0.5.0, so a build from `main` carries that ve
 - Advise, without failing `lint`, on stacked hedges such as 'could potentially' and 'may possibly'.
 - Flag a space in '5 %' and '$ 27.99', the decade form '1980's' and the date form '21st of September'.
 - Advise, without failing `lint`, on 3 or more bullets in a row that open with a bold label; `humanise_metrics.py` reports these runs.
+- Attest each release archive's build provenance, and attach an MCP bundle and Scoop, Homebrew, winget and MCP Registry manifests to each release, written by `laconic-tools package-manifests`.
 
 ### laconic-check: fixed
 
+- Link the C runtime statically in the Windows binary, which needed the VC++ redistributable.
 - Stop reading 'may' after an ordinal as the month in 'the 13th may be rooted', found by a run over 150 human articles.
 - End `preserve`'s report with both lengths in words and the edit's as a share of the original's.
 

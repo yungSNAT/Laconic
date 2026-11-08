@@ -6,9 +6,9 @@
 //! assertions; each module names the file it replaces.
 //!
 //! Each regular expression is the Python test's pattern, compiled by the regex crate (a
-//! dev-dependency, so the binary does not carry it). Both engines read `\w`, `\d`, `\s` and
-//! `` as Unicode classes; `$` without `(?m)` matches only at the end here, where Python also
-//! allows a final newline, which no tested value contains.
+//! dev-dependency, so the binary does not carry it). Both engines read `\w`, `\d` and `\b` as
+//! Unicode classes; `re` widens `\s` to match Python's. `$` without `(?m)` matches only at the
+//! end here, where Python also allows a final newline, which no tested value contains.
 
 mod ci_installs;
 mod hooks;
@@ -185,9 +185,42 @@ fn truthy(value: &Value) -> bool {
     }
 }
 
-/// A regular expression from the Python tests.
+/// A regular expression from the Python tests. Python's `\s` also matches U+001C to U+001F,
+/// so `\s` and `\S` become classes that do too; nested classes keep this right inside a class
+/// such as `[^\S\n]`.
 fn re(pattern: &str) -> regex::Regex {
-    regex::Regex::new(pattern).unwrap_or_else(|e| panic!("bad pattern {pattern}: {e}"))
+    let mut rust = String::with_capacity(pattern.len());
+    let mut chars = pattern.chars();
+    while let Some(c) = chars.next() {
+        if c != '\\' {
+            rust.push(c);
+            continue;
+        }
+        match chars.next() {
+            Some('s') => rust.push_str(r"[\s\x1C-\x1F]"),
+            Some('S') => rust.push_str(r"[^\s\x1C-\x1F]"),
+            Some(escaped) => {
+                rust.push('\\');
+                rust.push(escaped);
+            }
+            None => rust.push('\\'),
+        }
+    }
+    regex::Regex::new(&rust).unwrap_or_else(|e| panic!("bad pattern {pattern}: {e}"))
+}
+
+#[test]
+fn patterns_treat_whitespace_as_python_does() {
+    // Python's re splits 'refresh\n\x1c\nupdate' at the blank line; so must the port.
+    let blank = re(r"\n[^\S\n]*\n");
+    assert_eq!(
+        blank.split("refresh\n\x1c\nupdate").collect::<Vec<_>>(),
+        ["refresh", "update"]
+    );
+    assert!(re(r"^\s*npm$").is_match("\x1f npm"));
+    assert!(!re(r"^\S+$").is_match("a\x1cb"));
+    // An escaped backslash stays a literal backslash followed by s.
+    assert!(re(r"^a\\s$").is_match(r"a\s"));
 }
 
 #[test]

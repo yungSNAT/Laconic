@@ -57,7 +57,11 @@ const SEEDS: &[(&str, &str, &str)] = &[
         "'the licence is current'",
         "\"the licence is current\"",
     ),
-    ("serial-comma", "metrics and traces", "metrics, and traces"),
+    (
+        "serial-comma",
+        "logs, metrics and traces",
+        "logs, metrics, and traces",
+    ),
     (
         "number-word",
         "organised 3 workshops",
@@ -178,6 +182,21 @@ fn every_seeded_fault_is_caught_exactly_once() {
         failures.len(),
         SEEDS.len(),
         failures.join("\n")
+    );
+}
+
+/// docs/rules.md shows each seed's faulty form as an example, so it must flag its rule alone.
+#[test]
+fn every_example_flags_its_rule_on_its_own() {
+    let missed: Vec<String> = SEEDS
+        .iter()
+        .filter(|(rule, _, to)| !rules(to).contains(rule))
+        .map(|(rule, _, to)| format!("{rule}: {to:?}"))
+        .collect();
+    assert!(
+        missed.is_empty(),
+        "examples that do not flag their rule alone:\n{}",
+        missed.join("\n")
     );
 }
 
@@ -443,7 +462,12 @@ fn reference() -> String {
         let mut examples: Vec<String> = Vec::new();
         if !inline.is_empty() {
             let codes: Vec<String> = inline.iter().map(|to| format!("`{to}`")).collect();
-            examples.push(format!("Examples: {}.", codes.join(", ")));
+            let label = if codes.len() == 1 {
+                "Example"
+            } else {
+                "Examples"
+            };
+            examples.push(format!("{label}: {}.", codes.join(", ")));
         }
         for block in blocks {
             examples.push(format!("Example:\n\n```markdown\n{block}\n```"));

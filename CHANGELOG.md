@@ -46,7 +46,7 @@ The manifests still declare plugin 0.5.0, so a build from `main` carries that ve
 - Flag a space in '5 %' and '$ 27.99', the decade form '1980's' and the date form '21st of September'.
 - Advise, without failing `lint`, on 3 or more bullets in a row that open with a bold label; `humanise_metrics.py` reports these runs.
 - A rule reference, `docs/rules.md`, generated from one rule table: what each rule flags, examples, its Style Manual section and its rate on human prose, with a Style Manual coverage table. The usage text and the MCP `lint` description link to it, and a false-positive issue form links back.
-- A seed for `weekday`; the seed check now covers every rule in the table, and a finding with an unlisted rule fails the tests.
+- A seed for `weekday`; the seed check now covers every rule in the table, each example flags its rule on its own, and a finding can name only a rule in the table.
 
 ### laconic-check: fixed
 

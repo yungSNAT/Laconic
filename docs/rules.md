@@ -73,7 +73,7 @@ A pair of double quotation marks, straight or curly, around a short span of pros
 
 Fails `lint`: yes. Style Manual: [Percentages, quotes and titles](../skills/laconic-prose/references/style-manual-rules.md#percentages-quotes-and-titles). Human prose: 2 findings, 0.01 per 1,000 words.
 
-Examples: `"the licence is current"`.
+Example: `"the licence is current"`.
 
 ### symbol-space
 
@@ -89,7 +89,7 @@ A possible comma before the final 'and' or 'or' in a list. Keep it only if it pr
 
 Fails `lint`: yes. Style Manual: [Punctuation](../skills/laconic-prose/references/style-manual-rules.md#punctuation). Human prose: 166 findings, 0.81 per 1,000 words.
 
-Examples: `metrics, and traces`.
+Example: `logs, metrics, and traces`.
 
 ### em-dash
 
@@ -97,7 +97,7 @@ Em dashes in original prose.
 
 Fails `lint`: yes. Style Manual: [Dashes](../skills/laconic-prose/references/style-manual-rules.md#dashes). Human prose: 1,415 findings, 6.89 per 1,000 words.
 
-Examples: `after the go-ahead — finally.`.
+Example: `after the go-ahead — finally.`.
 
 ### clause-dashes
 
@@ -105,7 +105,7 @@ A paragraph with clause dashes (an em dash, or a spaced en dash, hyphen or doubl
 
 Fails `lint`: no (advisory). Style Manual: [Dashes](../skills/laconic-prose/references/style-manual-rules.md#dashes). Human prose: 41 findings, 0.20 per 1,000 words.
 
-Examples: `and stayed low - for a while. Supply rose - slowly.`.
+Example: `and stayed low - for a while. Supply rose - slowly.`.
 
 ### hyphen
 
@@ -121,7 +121,7 @@ Numbers from 2 to 20 written as words where the Style Manual uses numerals.
 
 Fails `lint`: yes. Style Manual: [Numbers](../skills/laconic-prose/references/style-manual-rules.md#numbers). Human prose: 329 findings, 1.60 per 1,000 words.
 
-Examples: `organised three workshops`.
+Example: `organised three workshops`.
 
 ### date
 
@@ -137,7 +137,7 @@ A weekday that does not match its date, such as 'Wednesday 22 October 2026'.
 
 Fails `lint`: yes. Style Manual: [Dates and time](../skills/laconic-prose/references/style-manual-rules.md#dates-and-time). Human prose: 0 findings, 0.00 per 1,000 words.
 
-Examples: `on Tuesday 19 October 2026`.
+Example: `on Tuesday 19 October 2026`.
 
 ### time
 
@@ -153,7 +153,7 @@ The Latin abbreviations 'e.g.' and 'i.e.', with or without full stops, where 'fo
 
 Fails `lint`: yes. Style Manual: [Shortened forms](../skills/laconic-prose/references/style-manual-rules.md#shortened-forms). Human prose: 1 finding, under 0.01 per 1,000 words.
 
-Examples: `e.g. the colour`.
+Example: `e.g. the colour`.
 
 ### closer
 
@@ -161,7 +161,7 @@ Chatbot closers such as 'hope this helps', 'let me know if' and 'feel free to'.
 
 Fails `lint`: yes. Not a Style Manual rule. Human prose: 0 findings, 0.00 per 1,000 words.
 
-Examples: `to the review. Hope this helps!`.
+Example: `to the review. Hope this helps!`.
 
 ### stock-phrase
 
@@ -169,7 +169,7 @@ Stock phrases that rarely carry meaning, such as 'Bottom line:', 'circle back' a
 
 Fails `lint`: yes. Not a Style Manual rule. Human prose: 5 findings, 0.02 per 1,000 words.
 
-Examples: `to the review. Bottom line: it works.`.
+Example: `to the review. Bottom line: it works.`.
 
 ### stacked-hedge
 
@@ -177,7 +177,7 @@ Stacked hedges such as 'could potentially' and 'may possibly'.
 
 Fails `lint`: no (advisory). Not a Style Manual rule. Human prose: 8 findings, 0.04 per 1,000 words.
 
-Examples: `delay could potentially affect`.
+Example: `delay could potentially affect`.
 
 ### bold-label
 
@@ -207,7 +207,7 @@ Verbless reveal questions, such as 'The result? A 40% cut.'
 
 Fails `lint`: yes. Not a Style Manual rule. Human prose: 0 findings, 0.00 per 1,000 words.
 
-Examples: `The result? Two reviewers checked`.
+Example: `The result? Two reviewers checked`.
 
 ### residue
 

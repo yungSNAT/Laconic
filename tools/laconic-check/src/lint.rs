@@ -10,8 +10,149 @@
 use std::collections::HashMap;
 use std::sync::OnceLock;
 
-/// Rules that report a pattern worth a look but never fail `lint`.
-pub const ADVISORY: &[&str] = &["clause-dashes", "stacked-hedge", "bold-label"];
+/// One lint rule. `docs/rules.md` is generated from this table and the seeded-fault tests,
+/// and every finding must name a rule listed here.
+pub struct Rule {
+    /// The name every finding carries; also its anchor in `docs/rules.md`.
+    pub name: &'static str,
+    /// Advisory findings report a pattern worth a look but never fail `lint`.
+    pub advisory: bool,
+    /// The heading in `skills/laconic-prose/references/style-manual-rules.md` whose rules
+    /// this one checks in part; `None` for writing patterns and chat-tool residue.
+    pub section: Option<&'static str>,
+    /// What the rule flags.
+    pub checks: &'static str,
+}
+
+const fn rule(name: &'static str, section: Option<&'static str>, checks: &'static str) -> Rule {
+    Rule {
+        name,
+        advisory: false,
+        section,
+        checks,
+    }
+}
+
+const fn advisory(name: &'static str, section: Option<&'static str>, checks: &'static str) -> Rule {
+    Rule {
+        name,
+        advisory: true,
+        section,
+        checks,
+    }
+}
+
+const SPELLING: Option<&str> = Some("Spelling");
+const QUOTES: Option<&str> = Some("Percentages, quotes and titles");
+const DASHES: Option<&str> = Some("Dashes");
+const DATES: Option<&str> = Some("Dates and time");
+
+pub const RULES: &[Rule] = &[
+    rule(
+        "us-spelling",
+        SPELLING,
+        "US spellings that have an Australian form, such as 'color', 'organized' and 'skeptical', and 'percent' in prose.",
+    ),
+    rule(
+        "word-choice",
+        SPELLING,
+        "'while' and 'among' as a conjunction or preposition, where the house rule writes 'whilst' and 'amongst'. Noun uses such as 'a while' pass.",
+    ),
+    rule(
+        "double-quotes",
+        QUOTES,
+        "Double quotation marks in prose, where single marks are the default.",
+    ),
+    rule(
+        "symbol-space",
+        QUOTES,
+        "A space between a number and its symbol, as in '5 %' or '$ 27.99'.",
+    ),
+    rule(
+        "serial-comma",
+        Some("Punctuation"),
+        "A possible comma before the final 'and' or 'or' in a list. Keep it only if it prevents a misreading.",
+    ),
+    rule("em-dash", DASHES, "Em dashes in original prose."),
+    advisory(
+        "clause-dashes",
+        DASHES,
+        "A paragraph with clause dashes (an em dash, or a spaced en dash, hyphen or double hyphen) in 2 or more sentences, where a pair around one aside counts once.",
+    ),
+    rule(
+        "hyphen",
+        Some("Hyphens"),
+        "Unnecessary hyphens in open set phrases and closed compounds, such as 'open-source' and 'e-mail'.",
+    ),
+    rule(
+        "number-word",
+        Some("Numbers"),
+        "Numbers from 2 to 20 written as words where the Style Manual uses numerals.",
+    ),
+    rule(
+        "date",
+        DATES,
+        "Dates not written as day month year: an ordinal ('19th October'), the month first ('October 19'), a comma before the year and an apostrophe in a decade ('1980's').",
+    ),
+    rule(
+        "weekday",
+        DATES,
+        "A weekday that does not match its date, such as 'Wednesday 22 October 2026'.",
+    ),
+    rule(
+        "time",
+        DATES,
+        "Times not written as '9:30 am' or '9 am', such as '9am', '9.30am' and '9:30 a.m.'.",
+    ),
+    rule(
+        "latin",
+        Some("Shortened forms"),
+        "The Latin abbreviations 'e.g.' and 'i.e.', with or without full stops, where 'for example' and 'that is' are preferred.",
+    ),
+    rule(
+        "closer",
+        None,
+        "Chatbot closers such as 'hope this helps', 'let me know if' and 'feel free to'.",
+    ),
+    rule(
+        "stock-phrase",
+        None,
+        "Stock phrases that rarely carry meaning, such as 'Bottom line:', 'circle back' and 'it's worth noting', and timeless openers such as 'since the dawn of time'.",
+    ),
+    advisory(
+        "stacked-hedge",
+        None,
+        "Stacked hedges such as 'could potentially' and 'may possibly'.",
+    ),
+    advisory(
+        "bold-label",
+        None,
+        "3 or more bullets in a row that open with a bold label, such as '**Cause:**'.",
+    ),
+    rule(
+        "staged-contrast",
+        None,
+        "Staged contrasts: 'it's not X, it's Y' and 'not just X but Y'.",
+    ),
+    rule(
+        "reveal-question",
+        None,
+        "Verbless reveal questions, such as 'The result? A 40% cut.'",
+    ),
+    rule(
+        "residue",
+        None,
+        "Chat-tool residue: zero-width characters, citation markers and ChatGPT tracking tags, including inside links, and invisible characters that can hide or reorder text (runs of Unicode tag characters, except the England, Scotland and Wales flags, and bidirectional controls).",
+    ),
+];
+
+/// The rule reference; each rule's name is its anchor there.
+pub const RULES_URL: &str = "https://github.com/yungSNAT/Laconic/blob/main/docs/rules.md";
+
+/// Whether findings of `rule` never fail `lint`.
+pub fn is_advisory(rule: &str) -> bool {
+    RULES.iter().any(|r| r.advisory && r.name == rule)
+}
 
 #[derive(Debug, PartialEq)]
 pub struct Finding {
@@ -372,6 +513,13 @@ pub fn lint(text: &str) -> Vec<Finding> {
         }
     }
     paragraph.flush(&mut findings);
+    // A new rule must join RULES, which then requires a seed (seeded_faults.rs).
+    debug_assert!(
+        findings
+            .iter()
+            .all(|f| RULES.iter().any(|r| r.name == f.rule)),
+        "a finding names a rule missing from RULES: {findings:?}"
+    );
     findings
 }
 
@@ -1969,7 +2117,7 @@ mod tests {
                 .map(|f| (f.line, f.column, f.rule))
                 .collect()
         };
-        assert!(ADVISORY.contains(&"bold-label"));
+        assert!(is_advisory("bold-label"));
         let three = "- **Cause:** a bad key.\n- **Fix:** replace it.\n- **Risk:** low.";
         assert_eq!(at(three), vec![(3, 1, "bold-label")]);
         // Each marker, the colon outside the bold, and one finding however long the run.

@@ -5,6 +5,8 @@ on:
   pull_request:
     paths:
       - tools/laconic-check/**
+      - docs/**
+      - .github/ISSUE_TEMPLATE/**
       - skills/**
       - rules/**
       - README.md
@@ -16,6 +18,8 @@ on:
     branches: [main]
     paths:
       - tools/laconic-check/**
+      - docs/**
+      - .github/ISSUE_TEMPLATE/**
       - skills/**
       - rules/**
       - README.md
@@ -52,4 +56,4 @@ jobs:
           cargo run --quiet -- lint \
             ../../skills/laconic/SKILL.md ../../skills/laconic-prose/SKILL.md \
             ../../rules/laconic.md ../../README.md ../../INSTALL.md ../../AGENTS.md \
-            ../../evals/README.md
+            ../../evals/README.md ../../docs/rules.md

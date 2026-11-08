@@ -19,7 +19,7 @@ const PROTOCOL_VERSIONS: [&str; 4] = ["2025-11-25", "2025-06-18", "2025-03-26", 
 /// The deepest nesting a request may use; deeper input is a parse error, not a stack overflow.
 const MAX_DEPTH: usize = 64;
 
-const LINT: &str = "Flag Australian English and house-style candidates in Markdown prose: em dashes, US spellings, 'while' and 'among', double quotation marks, possible serial commas, numbers 2 to 20 written as words, dates and times in non-Style Manual forms, weekdays that do not match their date, Latin abbreviations, chatbot closers, stock phrases and chat-tool residue. Code, URLs and quoted text are skipped. A finding is a reason to look, not proof of a defect.";
+const LINT: &str = "Flag Australian English and house-style candidates in Markdown prose: em dashes, US spellings, 'while' and 'among', double quotation marks, possible serial commas, numbers 2 to 20 written as words, dates and times in non-Style Manual forms, weekdays that do not match their date, Latin abbreviations, chatbot closers, stock phrases and chat-tool residue. Code, URLs and quoted text are skipped. A finding is a reason to look, not proof of a defect. Each finding names its rule, described under that name at https://github.com/yungSNAT/Laconic/blob/main/docs/rules.md.";
 const PRESERVE: &str = "Compare an original and an edited text and report numbers, sizes and units, dated months, inline code, URLs and meaning words and bounds (not, never, must, may, will, if, before, likely, some, all, only, unless, up to, about 50% and similar) that the edit dropped, then, as advice, those it added (an added figure or obligation can be invented) and any names to check. A clean result rules out these losses only; it does not prove the meaning survived.";
 
 /// A JSON value. A number keeps its text, so a request's `id` is echoed exactly.
@@ -524,6 +524,11 @@ fn content(s: &str) -> Json {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn lint_description_links_the_rule_reference() {
+        assert!(LINT.contains(lint::RULES_URL));
+    }
 
     fn result(line: &str) -> Json {
         let reply = parse(&handle_line(line).unwrap()).unwrap();

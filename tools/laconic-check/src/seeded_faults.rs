@@ -293,6 +293,39 @@ const REFERENCE: &str = "docs/rules.md";
 const STYLE_RULES: &str = "skills/laconic-prose/references/style-manual-rules.md";
 const PATTERNS: &str = "skills/laconic-prose/references/patterns.md";
 const ISSUE_FORM: &str = "https://github.com/yungSNAT/Laconic/issues/new?template=";
+const OUTSIDE: &str = "tools/laconic-check/tests/outside-corpus.tsv";
+const CALIBRATE: &str =
+    "cargo run --manifest-path tools/laconic-tools/Cargo.toml -- calibrate <human_detectors.json>";
+/// The row of outside-corpus totals: articles and words per split, then local words.
+const TOTALS: &str = "(articles and words)";
+/// Advisory rules that predate the 5% gate: clause-dashes flags about a fifth of the
+/// held-out articles.
+const GRANDFATHERED: &[&str] = &["clause-dashes"];
+
+/// tests/outside-corpus.tsv by row name. Each row holds calibration articles and findings,
+/// held-out articles and findings, and findings on tests/corpus; the totals row holds
+/// articles and words in the same places.
+fn outside() -> BTreeMap<String, [usize; 5]> {
+    read(OUTSIDE)
+        .lines()
+        .filter(|l| !l.starts_with('#'))
+        .skip(1)
+        .map(|line| {
+            let mut cells = line.split('\t');
+            let name = cells.next().unwrap_or_default().to_owned();
+            let counts: Vec<usize> = cells
+                .map(|c| {
+                    c.parse()
+                        .unwrap_or_else(|_| panic!("{OUTSIDE}: bad count in {line:?}"))
+                })
+                .collect();
+            let counts = counts
+                .try_into()
+                .unwrap_or_else(|_| panic!("{OUTSIDE}: expected 5 counts in {line:?}"));
+            (name, counts)
+        })
+        .collect()
+}
 
 fn repo_root() -> &'static Path {
     Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/../.."))
@@ -391,6 +424,9 @@ fn reference() -> String {
         };
         (n, rate)
     };
+    let outside = outside();
+    let totals = outside[TOTALS];
+    let outside_rule = |name: &str| outside.get(name).copied().unwrap_or_default();
     let style_rules = format!("../{STYLE_RULES}");
     let section_link = |s: &str| format!("[{s}]({style_rules}#{})", anchor(s));
     let fails = |advisory: bool| if advisory { "no (advisory)" } else { "yes" };
@@ -402,19 +438,25 @@ fn reference() -> String {
          # laconic-check rules\n\n\
          `laconic-check lint` reports each finding as `file:line:column: rule: message`. Each rule below is headed by its name, so `docs/rules.md#<rule>` links to it. A finding is a reason to look, not proof of a defect. Advisory rules never fail `lint`.\n\n\
          Each example is a seeded fault: the tests plant it in clean prose, and `lint` must flag it exactly once. The human prose figures count findings in 3 Productivity Commission reports released in 2018 and 2021 ({} whitespace-separated words of Australian Government prose under CC BY 3.0 AU, in `tools/laconic-check/tests/corpus`). Most of them are house-style differences the Commission's own style allows, such as spaced dashes, words for numbers below 10 and serial commas, rather than errors.\n\n\
+         The outside figures come from the {} human-written news articles in `human_detectors.json` from jenna-russell/human_detectors at commit `afcf03d` ({} words of mostly American prose, not stored here because the texts carry no licence). `laconic-tools calibrate` lints them from a local download. Articles with odd prompt ids are the calibration half, for tuning rules; the even half is held out, and the table shows how many of those {} articles each rule flags. A new advisory rule must flag under 5% of them.\n\n\
          To report a finding that should not have been flagged, use the [false-positive form]({ISSUE_FORM}false-positive.yml).\n\n\
-         | Rule | Fails `lint` | Style Manual section | Human prose, per 1,000 words |\n\
-         | --- | --- | --- | --- |",
-        thousands(words)
+         | Rule | Fails `lint` | Style Manual section | Human prose, per 1,000 words | Outside articles flagged |\n\
+         | --- | --- | --- | --- | --- |",
+        thousands(words),
+        totals[0] + totals[2],
+        thousands(totals[1] + totals[3]),
+        totals[2]
     );
     for rule in RULES {
         let _ = writeln!(
             out,
-            "| [`{0}`](#{0}) | {1} | {2} | {3} |",
+            "| [`{0}`](#{0}) | {1} | {2} | {3} | {4} of {5} |",
             rule.name,
             fails(rule.advisory),
             rule.section.unwrap_or("none"),
-            human(rule.name).1
+            human(rule.name).1,
+            outside_rule(rule.name)[2],
+            totals[2]
         );
     }
     let _ = writeln!(
@@ -449,6 +491,7 @@ fn reference() -> String {
     );
     for rule in RULES {
         let (n, rate) = human(rule.name);
+        let [ca, _, ha, hf, _] = outside_rule(rule.name);
         let section = rule
             .section
             .map_or("Not a Style Manual rule.".to_owned(), |s| {
@@ -481,16 +524,69 @@ fn reference() -> String {
         }
         let _ = writeln!(
             out,
-            "\n### {}\n\n{}\n\nFails `lint`: {}. {section} Human prose: {} {}, {rate} per 1,000 words.\n\n{}",
+            "\n### {}\n\n{}\n\nFails `lint`: {}. {section} Human prose: {} {}, {rate} per 1,000 words. Outside articles: flags {ha} of {} held out ({hf} {}) and {ca} of {} for calibration.\n\n{}",
             rule.name,
             rule.checks,
             fails(rule.advisory),
             thousands(n),
             if n == 1 { "finding" } else { "findings" },
+            totals[2],
+            if hf == 1 { "finding" } else { "findings" },
+            totals[0],
             examples.join("\n\n")
         );
     }
     out
+}
+
+/// The outside counts must list every rule and come from the rules as they are now, which
+/// the findings on tests/corpus stand in for, since the outside corpus is not stored here.
+#[test]
+fn outside_corpus_counts_are_current() {
+    let outside = outside();
+    let corpus = human_corpus();
+    let mut local: BTreeMap<&str, usize> = BTreeMap::new();
+    for finding in corpus.iter().flat_map(|t| lint(t)) {
+        *local.entry(finding.rule.name()).or_default() += 1;
+    }
+    let words: usize = corpus.iter().map(|t| t.split_whitespace().count()).sum();
+    let mut stale: Vec<&str> = Vec::new();
+    if outside.get(TOTALS).map(|r| r[4]) != Some(words) {
+        stale.push(TOTALS);
+    }
+    for rule in RULES {
+        let now = local.get(rule.name).copied().unwrap_or(0);
+        if outside.get(rule.name).map(|r| r[4]) != Some(now) {
+            stale.push(rule.name);
+        }
+    }
+    assert!(
+        stale.is_empty(),
+        "{OUTSIDE} is out of date for {}: run {CALIBRATE}",
+        stale.join(", ")
+    );
+    assert_eq!(
+        outside.len(),
+        RULES.len() + 1,
+        "{OUTSIDE} has a row for a rule not in RULES: run {CALIBRATE}"
+    );
+}
+
+#[test]
+fn advisory_rules_flag_under_5_percent_of_held_out_articles() {
+    let outside = outside();
+    let held_out = outside[TOTALS][2];
+    for rule in RULES
+        .iter()
+        .filter(|r| r.advisory && !GRANDFATHERED.contains(&r.name))
+    {
+        let flagged = outside[rule.name][2];
+        assert!(
+            flagged * 20 < held_out,
+            "{} flags {flagged} of {held_out} held-out human articles; an advisory must stay under 5%",
+            rule.name
+        );
+    }
 }
 
 /// docs/rules.md must match the rule table; `LACONIC_WRITE_DOCS=1` rewrites it.

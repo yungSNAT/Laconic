@@ -42,6 +42,7 @@
 <!-- List only commands actually run and their results. Remove unrun examples. -->
 
 <!-- Common checks, when relevant:
+cargo test --manifest-path tools/laconic-tools/Cargo.toml
 python3 -m unittest discover -s tests -v
 python3 scripts/run_evals.py validate
 -->

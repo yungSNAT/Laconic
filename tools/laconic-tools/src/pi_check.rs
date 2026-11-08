@@ -73,10 +73,12 @@ fn validate_package_manifest(root: &Path) -> Result<(), String> {
     Ok(())
 }
 
-/// The first `name` on `PATH`, as a shell would find it.
-fn which(name: &str) -> Option<PathBuf> {
+/// The first `name` on `PATH`, as a shell would find it. On Windows only names with an
+/// executable extension match, as in cmd.exe and Python's `shutil.which`: an extensionless
+/// npm shim is a shell script that Windows cannot start.
+pub(crate) fn which(name: &str) -> Option<PathBuf> {
     let extensions: &[&str] = if cfg!(windows) {
-        &["", ".exe", ".cmd", ".bat"]
+        &[".exe", ".cmd", ".bat"]
     } else {
         &[""]
     };
@@ -115,14 +117,18 @@ fn isolated_env(
 
 /// A directory under the system temporary directory, removed when dropped. Like Python's
 /// `tempfile.mkdtemp`, creation fails on an existing path and the directory is private on Unix.
-struct TempDir(PathBuf);
+pub(crate) struct TempDir(pub(crate) PathBuf);
 
 impl TempDir {
-    fn new(prefix: &str) -> Result<Self, String> {
+    pub(crate) fn new(prefix: &str) -> Result<Self, String> {
+        // Tests create directories in parallel, so the clock alone could repeat a name.
+        static COUNT: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+        let count = COUNT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         let nanos = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .map_or(0, |d| d.subsec_nanos());
-        let path = std::env::temp_dir().join(format!("{prefix}{}-{nanos}", std::process::id()));
+        let path =
+            std::env::temp_dir().join(format!("{prefix}{}-{nanos}-{count}", std::process::id()));
         #[cfg(unix)]
         let created =
             std::os::unix::fs::DirBuilderExt::mode(&mut fs::DirBuilder::new(), 0o700).create(&path);

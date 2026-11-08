@@ -99,7 +99,7 @@ const HEADER: &str = "\
 
 /// Python's `str.isspace` for one character: Unicode White_Space plus the 4 information
 /// separators U+001C to U+001F, which Python also counts.
-fn is_space(c: char) -> bool {
+pub(crate) fn is_space(c: char) -> bool {
     c.is_whitespace() || ('\u{1c}'..='\u{1f}').contains(&c)
 }
 
@@ -131,7 +131,7 @@ fn is_alpha(word: &str) -> bool {
 }
 
 /// Python's `str.splitlines` without line ends.
-fn split_lines(text: &str) -> Vec<&str> {
+pub(crate) fn split_lines(text: &str) -> Vec<&str> {
     let mut lines = Vec::new();
     let mut start = 0;
     let mut chars = text.char_indices().peekable();

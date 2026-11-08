@@ -9,7 +9,7 @@ on:
       - .claude-plugin/**
       - hooks/**
       - skills/**
-      - tests/test_always_on_hooks.py
+      - tools/laconic-tools/**
       - .github/ci/claude-code/**
       - .github/workflows/plugin-load-check.yml
   push:
@@ -18,7 +18,7 @@ on:
       - .claude-plugin/**
       - hooks/**
       - skills/**
-      - tests/test_always_on_hooks.py
+      - tools/laconic-tools/**
       - .github/ci/claude-code/**
       - .github/workflows/plugin-load-check.yml
 
@@ -40,11 +40,8 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
-        with:
-          python-version: "3.x"
       - name: Test native hook implementations
-        run: python -m unittest tests.test_always_on_hooks -v
+        run: cargo test --locked --manifest-path tools/laconic-tools/Cargo.toml contracts::hooks
 
   load:
     runs-on: ubuntu-latest

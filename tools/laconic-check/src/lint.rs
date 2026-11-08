@@ -801,12 +801,12 @@ fn spells(before: &[char], acronym: &str) -> bool {
     let text: String = before.iter().collect();
     let words: Vec<&str> = text.split_whitespace().collect();
     // The definition lies within min(|A| + 5, 2|A|) words before the parenthesis, after any
-    // earlier use of the acronym itself.
+    // earlier use of the acronym itself, singular or plural.
     let limit = (capitals.len() + 5).min(capitals.len() * 2);
     let mut window = &words[words.len().saturating_sub(limit)..];
     if let Some(last) = window.iter().rposition(|w| {
         let bare = w.trim_matches(|c: char| !c.is_alphanumeric());
-        bare == acronym || bare == capitals
+        bare.strip_suffix('s').unwrap_or(bare) == capitals
     }) {
         window = &window[last + 1..];
     }
@@ -2403,6 +2403,7 @@ mod tests {
             "The `BOM` key, then the Bureau of Meteorology (BOM).",
             // An earlier use of the acronym ends the words that may spell it.
             "BOM was mentioned. It was discussed (BOM).",
+            "NGOs were mentioned. It was discussed (NGO).",
             "Plan A. The Australian (A) league.",
             // A parenthesised label the words before it do not spell is not a definition.
             "Vale is MIT. The fork is by Ayoub G. (MIT).",

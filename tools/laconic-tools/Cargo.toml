@@ -3,7 +3,7 @@ name = "laconic-tools"
 version = "0.1.0"
 edition = "2024"
 license = "FSL-1.1-ALv2"
-description = "Maintainer tooling for Laconic: syncs the compact rules into INSTALL.md and smoke-tests the Pi package."
+description = "Maintainer tooling for Laconic: syncs the compact rules into INSTALL.md, smoke-tests the Pi package, regenerates the US word list and writes release package manifests."
 publish = false
 
 [dependencies]

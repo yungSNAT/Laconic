@@ -10,10 +10,15 @@
 //!                                        smoke-test the Pi or OMP package over RPC
 //!   laconic-tools gen-au-words <scowl-pre.txt> <style-manual.txt>
 //!                                        regenerate laconic-check's US word list
+//!   laconic-tools mcpb-manifest <version> <bundle-dir>
+//!                                        write the MCP bundle's manifest.json
+//!   laconic-tools package-manifests <version> <dist> <out>
+//!                                        write a release's package manifests
 
 mod au_words;
 #[cfg(test)]
 mod contracts;
+mod packages;
 mod pi_check;
 
 use std::fs;
@@ -115,9 +120,15 @@ fn main() -> ExitCode {
         ["check-pi"] => pi_check::run(&root(), "pi"),
         ["check-pi", "--runtime", runtime] => pi_check::run(&root(), runtime),
         ["gen-au-words", esdb, manual] => au_words::run(&root(), esdb, manual),
+        ["mcpb-manifest", version, dir] => packages::write_mcpb_manifest(version, Path::new(dir)),
+        ["package-manifests", version, dist, out] => {
+            packages::write_manifests(version, Path::new(dist), Path::new(out))
+        }
         _ => Err(
             "usage: laconic-tools <sync-rules [--check] | check-pi [--runtime pi|omp] \
-             | gen-au-words <scowl-pre.txt> <style-manual.txt>>"
+             | gen-au-words <scowl-pre.txt> <style-manual.txt> \
+             | mcpb-manifest <version> <bundle-dir> \
+             | package-manifests <version> <dist> <out>>"
                 .into(),
         ),
     };

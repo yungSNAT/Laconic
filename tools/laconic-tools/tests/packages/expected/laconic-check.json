@@ -1,0 +1,13 @@
+{
+  "architecture": {
+    "64bit": {
+      "hash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "url": "https://github.com/yungSNAT/Laconic/releases/download/laconic-check-v1.2.3/laconic-check-x86_64-pc-windows-msvc.zip"
+    }
+  },
+  "bin": "laconic-check.exe",
+  "description": "Flags Australian English and house-style candidates in Markdown prose, and checks that an edit kept numbers, code, URLs and negations.",
+  "homepage": "https://github.com/yungSNAT/Laconic",
+  "license": "FSL-1.1-ALv2",
+  "version": "1.2.3"
+}

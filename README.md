@@ -204,6 +204,14 @@ cargo run --manifest-path tools/laconic-check/Cargo.toml -- preserve original.md
 
 Prebuilt binaries for Linux (x86_64, static), Windows (x86_64) and macOS (Apple silicon) are attached to each `laconic-check-v*` release, with SHA-256 checksums; put the binary on the PATH. Building from source needs only Rust.
 
+Releases after 0.3.0 also carry a build provenance attestation for each archive and manifests for Scoop, Homebrew, winget and the MCP Registry. Their MCP bundle, `laconic-check.mcpb`, installs in Claude Desktop in one step. Check a downloaded archive with `gh attestation verify <archive> --repo yungSNAT/Laconic`. Scoop installs straight from the release:
+
+```bash
+scoop install https://github.com/yungSNAT/Laconic/releases/latest/download/laconic-check.json
+```
+
+The Homebrew formula and winget manifests are attached for a tap and the winget catalogue, which do not list laconic-check yet.
+
 [docs/rules.md](docs/rules.md) describes each rule under its name, with examples, its Style Manual section and how often it flags human prose; it also shows which Style Manual sections the checker covers. Report a false positive with the [issue form](https://github.com/yungSNAT/Laconic/issues/new?template=false-positive.yml).
 
 `lint -` reads standard input, so an agent can check a draft without saving it. When `laconic-check` is on the PATH, both skills run it on written deliverables before sending. Its US-to-Australian word list combines a hand-written list with about 2,400 pairs generated from the [English Speller Database](https://github.com/en-wl/wordlist) and reviewed against the Style Manual (`laconic-tools gen-au-words`). Seeded-fault tests plant one known fault per rule into clean prose and require the checker to catch each one exactly once, with no findings on the clean text. A calibration test runs `lint` over 3 Productivity Commission reports released in 2018 and 2021 (about 198,500 words of human prose, CC BY 3.0 AU) and fails if its 2,246 findings, its 49 advisories (41 clause-dash paragraphs and 8 stacked hedges) or the 7 stock phrases, staged contrasts and unnecessary hyphens amongst them rise, which guards against a net increase in findings on human text. An outside run on 5 November 2026 linted the 150 human articles in [jenna-russell/human_detectors](https://github.com/jenna-russell/human_detectors) at commit `afcf03d` (110,723 words of mostly American non-fiction, not stored here): 25.9 findings per 1,000 words, 97% of them house-style differences (double quotation marks, US spellings, em dashes, number words, word choice and serial commas). The AI-tell rules fired 18 times (0.16 per 1,000 words: 8 staged contrasts, 7 stock phrases, 2 reveal questions and 1 chatbot closer), not yet labelled true or false. The articles are plain text, so this run does not test `bold-label`.

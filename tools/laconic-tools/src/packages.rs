@@ -312,6 +312,10 @@ mod tests {
         );
         assert_eq!(config["args"], json!(["mcp"]));
         assert_eq!(
+            config["platform_overrides"]["darwin"]["command"],
+            "${__dirname}/server/darwin-arm64/laconic-check"
+        );
+        assert_eq!(
             config["platform_overrides"]["win32"]["command"],
             "${__dirname}/server/win32-x64/laconic-check.exe"
         );

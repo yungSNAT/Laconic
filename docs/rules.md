@@ -216,3 +216,5 @@ Chat-tool residue: 4 known ChatGPT citation and tracking markers (`oaicite`, `co
 Fails `lint`: yes. Not a Style Manual rule. Human prose: 1 finding, under 0.01 per 1,000 words.
 
 Examples: `after the go-ahead.\u{200b}`, `https://example.com/guide?utm_source=chatgpt.com`.
+
+Invisible characters appear here as `\u{...}` escapes, so copying an example does not reproduce them; the tests plant the characters themselves.

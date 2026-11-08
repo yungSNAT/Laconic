@@ -186,6 +186,7 @@ fn every_seeded_fault_is_caught_exactly_once() {
 }
 
 /// docs/rules.md shows each seed's faulty form as an example, so it must flag its rule alone.
+/// An example with invisible characters is printed with escapes and labelled as such.
 #[test]
 fn every_example_flags_its_rule_on_its_own() {
     let missed: Vec<String> = SEEDS
@@ -471,6 +472,12 @@ fn reference() -> String {
         }
         for block in blocks {
             examples.push(format!("Example:\n\n```markdown\n{block}\n```"));
+        }
+        if SEEDS
+            .iter()
+            .any(|(r, _, to)| *r == rule.name && shown(to) != *to)
+        {
+            examples.push("Invisible characters appear here as `\\u{...}` escapes, so copying an example does not reproduce them; the tests plant the characters themselves.".to_owned());
         }
         let _ = writeln!(
             out,

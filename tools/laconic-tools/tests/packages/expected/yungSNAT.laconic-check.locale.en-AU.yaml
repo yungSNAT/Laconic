@@ -1,0 +1,21 @@
+# yaml-language-server: $schema=https://aka.ms/winget-manifest.defaultLocale.1.28.0.schema.json
+
+PackageIdentifier: yungSNAT.laconic-check
+PackageVersion: 1.2.3
+PackageLocale: en-AU
+Publisher: yungSNAT
+PublisherUrl: https://github.com/yungSNAT
+PackageName: laconic-check
+PackageUrl: https://github.com/yungSNAT/Laconic
+License: FSL-1.1-ALv2
+LicenseUrl: https://github.com/yungSNAT/Laconic/blob/main/LICENSE
+ShortDescription: Flags Australian English and house-style candidates in Markdown prose, and checks that an edit kept numbers, code, URLs and negations.
+Tags:
+- australian-english
+- linter
+- markdown
+- mcp
+- prose
+ReleaseNotesUrl: https://github.com/yungSNAT/Laconic/releases/tag/laconic-check-v1.2.3
+ManifestType: defaultLocale
+ManifestVersion: 1.28.0

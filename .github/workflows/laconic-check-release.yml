@@ -1,8 +1,9 @@
 name: laconic-check release
 
-# Builds laconic-check for Linux, Windows and macOS. A tag such as laconic-check-v0.1.0
-# publishes the binaries as a GitHub release; a manual run, or a PR that changes this
-# workflow, only uploads them as artefacts.
+# Builds laconic-check for Linux, Windows and macOS, bundles them as an MCP bundle and writes
+# the Scoop, Homebrew, winget and MCP Registry manifests for them. A tag such as
+# laconic-check-v0.1.0 attests the archives and publishes everything as a GitHub release; a
+# manual run attests and uploads artefacts; a PR that changes this workflow only uploads them.
 on:
   push:
     tags: ["laconic-check-v*"]
@@ -51,6 +52,9 @@ jobs:
         if: matrix.target == 'x86_64-unknown-linux-musl'
         run: sudo apt-get update && sudo apt-get install -y musl-tools
       - name: Test and build
+        env:
+          # A static C runtime, so the Windows binary runs without the VC++ redistributable.
+          RUSTFLAGS: ${{ matrix.target == 'x86_64-pc-windows-msvc' && '-C target-feature=+crt-static' || '' }}
         run: |
           rustup target add ${{ matrix.target }}
           cargo test --locked
@@ -75,9 +79,65 @@ jobs:
             tools/laconic-check/laconic-check-${{ matrix.target }}.*
           if-no-files-found: error
 
+  packages:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Bundle the MCP server and write the package manifests
+        working-directory: tools/laconic-tools
+        run: |
+          set -euo pipefail
+          version=$(sed -n 's/^version = "\(.*\)"/\1/p' ../laconic-check/Cargo.toml | head -n 1)
+          dist="$GITHUB_WORKSPACE/dist"
+          bundle="$RUNNER_TEMP/bundle"
+          mkdir -p "$bundle/server/linux-x64" "$bundle/server/darwin-arm64" "$bundle/server/win32-x64" "$RUNNER_TEMP/packages"
+          tar -xzf "$dist/laconic-check-x86_64-unknown-linux-musl.tar.gz" -C "$bundle/server/linux-x64"
+          tar -xzf "$dist/laconic-check-aarch64-apple-darwin.tar.gz" -C "$bundle/server/darwin-arm64"
+          unzip -q "$dist/laconic-check-x86_64-pc-windows-msvc.zip" -d "$bundle/server/win32-x64"
+          cargo run --locked --quiet -- mcpb-manifest "$version" "$bundle"
+          (cd "$bundle" && zip -qr "$RUNNER_TEMP/packages/laconic-check.mcpb" .)
+          (cd "$RUNNER_TEMP/packages" && sha256sum laconic-check.mcpb > laconic-check.mcpb.sha256)
+          cp "$RUNNER_TEMP/packages/laconic-check.mcpb.sha256" "$dist/"
+          cargo run --locked --quiet -- package-manifests "$version" "$dist" "$RUNNER_TEMP/packages"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: laconic-check-packages
+          path: ${{ runner.temp }}/packages/*
+          if-no-files-found: error
+
+  # Attestations go to the public Sigstore log, so PR runs skip this job.
+  attest:
+    if: github.event_name != 'pull_request'
+    needs: [build, packages]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          path: dist
+          merge-multiple: true
+      - uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: |
+            dist/*.tar.gz
+            dist/*.zip
+            dist/*.mcpb
+
   release:
     if: startsWith(github.ref, 'refs/tags/')
-    needs: build
+    needs: [build, packages, attest]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
@@ -94,4 +154,4 @@ jobs:
           gh release create "${GITHUB_REF_NAME}" dist/* \
             --repo "${GITHUB_REPOSITORY}" \
             --title "${GITHUB_REF_NAME}" \
-            --notes "Prebuilt laconic-check binaries for Linux (x86_64, static), Windows (x86_64) and macOS (Apple silicon), each with a SHA-256 checksum."
+            --notes "Prebuilt laconic-check binaries for Linux (x86_64, static), Windows (x86_64) and macOS (Apple silicon), each with a SHA-256 checksum and a build provenance attestation; an MCP bundle (laconic-check.mcpb); and Scoop, Homebrew, winget and MCP Registry manifests for them."

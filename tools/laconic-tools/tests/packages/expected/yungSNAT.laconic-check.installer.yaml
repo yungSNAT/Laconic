@@ -1,0 +1,15 @@
+# yaml-language-server: $schema=https://aka.ms/winget-manifest.installer.1.28.0.schema.json
+
+PackageIdentifier: yungSNAT.laconic-check
+PackageVersion: 1.2.3
+InstallerType: zip
+NestedInstallerType: portable
+NestedInstallerFiles:
+- RelativeFilePath: laconic-check.exe
+  PortableCommandAlias: laconic-check
+Installers:
+- Architecture: x64
+  InstallerUrl: https://github.com/yungSNAT/Laconic/releases/download/laconic-check-v1.2.3/laconic-check-x86_64-pc-windows-msvc.zip
+  InstallerSha256: CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
+ManifestType: installer
+ManifestVersion: 1.28.0

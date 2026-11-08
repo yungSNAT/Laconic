@@ -50,6 +50,7 @@ The manifests still declare plugin 0.5.0, so a build from `main` carries that ve
 - Attest each release archive's build provenance, and attach an MCP bundle and Scoop, Homebrew, winget and MCP Registry manifests to each release, written by `laconic-tools package-manifests`.
 - A rule reference, `docs/rules.md`, generated from one rule table: what each rule flags, examples, its Style Manual section and its rate on human prose, with a Style Manual coverage table. The usage text and the MCP `lint` description link to it, and a false-positive issue form links back.
 - A seed for `weekday`; the seed check now covers every rule in the table, each example flags its rule on its own, and a finding can name only a rule in the table.
+- `lint` options for use as a gate: `--json`, `--disable` and `--only` for rules, `--max-findings`, `--commit-msg` for Git commit messages and `--config`, with a `.laconic-check` project file. A `<!-- laconic-check-disable-next-line rule -->` comment silences the named rules on the next line, and an `unused-suppression` advisory flags one that silences nothing. An unknown option, rule name or count exits 2. README lists the exit statuses.
 
 ### laconic-check: fixed
 

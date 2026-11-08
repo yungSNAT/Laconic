@@ -152,6 +152,11 @@ const SEEDS: &[(&str, &str, &str)] = &[
         "https://example.com/guide",
         "https://example.com/guide?utm_source=chatgpt.com",
     ),
+    (
+        "unused-suppression",
+        "Each member gets a healthcare plan.",
+        "<!-- laconic-check-disable-next-line em-dash -->",
+    ),
 ];
 
 fn corpus() -> String {
@@ -500,7 +505,7 @@ fn reference() -> String {
         .collect();
     let _ = writeln!(
         out,
-        "\nThe rules with no Style Manual section flag writing patterns from [patterns.md](../{PATTERNS}) or chat-tool residue: {}.\n\n## Rules",
+        "\nThe rules with no Style Manual section flag writing patterns from [patterns.md](../{PATTERNS}), chat-tool residue or suppression comments: {}.\n\n## Rules",
         others.join(", ")
     );
     for rule in RULES {

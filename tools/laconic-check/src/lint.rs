@@ -59,6 +59,8 @@ macro_rules! rules {
 
         /// Every rule, in the order of the rule reference.
         pub const RULES: &[Rule] = &[$($rule,)*];
+
+        const IDS: &[RuleId] = &[$(RuleId::$id,)*];
     };
 }
 
@@ -169,11 +171,21 @@ rules! {
         None,
         "Chat-tool residue: 4 known ChatGPT citation and tracking markers (`oaicite`, `contentReference`, `utm_source=chatgpt` and `utm_source=openai`), including inside links, and selected invisible characters that can hide or reorder text: zero-width characters, bidirectional controls and runs of Unicode tag characters (except the England, Scotland and Wales flags).",
     ),
+    UnusedSuppression = advisory(
+        "unused-suppression",
+        None,
+        "A suppression comment, `<!-- laconic-check-disable-next-line rule -->` on its own line, that silences nothing: it names no rule or an unknown one, or the next non-blank line has no finding of the rule it names. A suppression silences the named rules (comma or space separated) on that line only.",
+    ),
 }
 
 impl RuleId {
     pub fn rule(self) -> &'static Rule {
         &RULES[self as usize]
+    }
+
+    /// The rule with this name, if there is one.
+    pub fn named(name: &str) -> Option<RuleId> {
+        IDS.iter().copied().find(|id| id.name() == name)
     }
 
     /// The name every finding prints; also its anchor in `docs/rules.md`.
@@ -467,8 +479,15 @@ fn ize_is_part_of_word(word: &str) -> bool {
     IZE_STEMS.iter().any(|stem| base.ends_with(stem))
 }
 
+/// Candidate findings in `text`, less those its suppression comments silence.
 pub fn lint(text: &str) -> Vec<Finding> {
+    lint_counting(text).0
+}
+
+/// `lint`'s findings and how many findings suppression comments silenced.
+pub fn lint_counting(text: &str) -> (Vec<Finding>, usize) {
     let mut findings = Vec::new();
+    let mut suppressions: Vec<Suppression> = Vec::new();
     let mut paragraph = Paragraph::default();
     let mut document = Document::default();
     let mut fence: Option<&str> = None;
@@ -485,6 +504,18 @@ pub fn lint(text: &str) -> Vec<Finding> {
                 in_frontmatter = false;
             }
             continue;
+        }
+        // A suppression silences the next non-blank line that is not itself a suppression. One
+        // in code is never recorded, since code lines do not reach the HTML branch below.
+        let names = suppression_names(trimmed);
+        if !trimmed.is_empty() && names.is_none() {
+            for waiting in suppressions
+                .iter_mut()
+                .rev()
+                .take_while(|s| s.target.is_none())
+            {
+                waiting.target = Some(line_no);
+            }
         }
         if let Some(marker) = fence {
             if trimmed.starts_with(marker) {
@@ -504,6 +535,17 @@ pub fn lint(text: &str) -> Vec<Finding> {
         if trimmed.is_empty() || trimmed.starts_with('<') || trimmed.starts_with('>') {
             // A blank line ends the paragraph; HTML and block quotations are not
             // original prose.
+            if let Some(names) = names {
+                suppressions.push(Suppression {
+                    line: line_no,
+                    column: raw.len() - trimmed.len() + 1,
+                    target: None,
+                    rules: names
+                        .into_iter()
+                        .map(|n| (n, RuleId::named(n), false))
+                        .collect(),
+                });
+            }
             paragraph.flush(&mut findings, &mut document);
             continue;
         }
@@ -557,7 +599,79 @@ pub fn lint(text: &str) -> Vec<Finding> {
         let at = findings.partition_point(|f| f.line <= finding.line);
         findings.insert(at, finding);
     }
-    findings
+    let before = findings.len();
+    findings.retain(|f| {
+        let hit = suppressions
+            .iter_mut()
+            .filter(|s| s.target == Some(f.line))
+            .flat_map(|s| s.rules.iter_mut())
+            .find(|(_, id, _)| *id == Some(f.rule));
+        match hit {
+            Some((_, _, used)) => {
+                *used = true;
+                false
+            }
+            None => true,
+        }
+    });
+    let suppressed = before - findings.len();
+    for s in &suppressions {
+        let mut messages: Vec<String> = s
+            .rules
+            .iter()
+            .filter(|(_, _, used)| !used)
+            .map(|&(name, id, _)| match (id, s.target) {
+                (None, _) => format!("'{name}' is not a rule, so the suppression silences nothing (advisory)"),
+                (Some(_), None) => format!("no line follows for the suppression of '{name}' (advisory)"),
+                (Some(_), Some(target)) => format!(
+                    "no '{name}' finding on line {target} to silence (advisory); remove it from the suppression"
+                ),
+            })
+            .collect();
+        if s.rules.is_empty() {
+            messages.push("the suppression names no rule (advisory)".into());
+        }
+        for message in messages {
+            let at = findings.partition_point(|f| f.line <= s.line);
+            findings.insert(
+                at,
+                Finding {
+                    line: s.line,
+                    column: s.column,
+                    rule: RuleId::UnusedSuppression,
+                    message,
+                },
+            );
+        }
+    }
+    (findings, suppressed)
+}
+
+/// A suppression comment, `<!-- laconic-check-disable-next-line rule ... -->` on its own line.
+struct Suppression<'a> {
+    line: usize,
+    column: usize,
+    /// The next non-blank line that is not itself a suppression; `None` until it is read.
+    target: Option<usize>,
+    /// Each name, its rule if it names one, and whether it silenced a finding.
+    rules: Vec<(&'a str, Option<RuleId>, bool)>,
+}
+
+/// The rule names a suppression comment lists, comma or space separated, or `None` when the
+/// line is not a suppression comment.
+fn suppression_names(trimmed: &str) -> Option<Vec<&str>> {
+    let names = trimmed
+        .trim_end()
+        .strip_prefix("<!--")?
+        .trim_start()
+        .strip_prefix("laconic-check-disable-next-line")?
+        .strip_suffix("-->")?;
+    Some(
+        names
+            .split([',', ' ', '\t'])
+            .filter(|n| !n.is_empty())
+            .collect(),
+    )
 }
 
 /// A thematic break or setext underline: 3 or more of one of - * _ =, spaces allowed.
@@ -2411,6 +2525,62 @@ mod tests {
         ] {
             assert!(found(clean).is_empty(), "{clean}: {:?}", found(clean));
         }
+    }
+
+    #[test]
+    fn a_suppression_silences_its_rules_on_the_next_non_blank_line_only() {
+        let text = "<!-- laconic-check-disable-next-line us-spelling, em-dash -->\n\n\
+                    The color changed \u{2014} slowly, e.g. today.\n\nThe color stayed.";
+        assert_eq!(rules(text), ["latin", "us-spelling"]);
+        assert_eq!(lint_counting(text).1, 2);
+        // Stacked suppressions share the next line; space-separated names work too.
+        let stacked = "<!-- laconic-check-disable-next-line us-spelling -->\n\
+                       <!--laconic-check-disable-next-line latin em-dash-->\n\
+                       The color changed \u{2014} slowly, e.g. today.";
+        assert_eq!(lint_counting(stacked), (Vec::new(), 3));
+        // Paragraph and document findings are silenced on the line they are reported on.
+        let later = "The BOM met.\n\n\
+                     <!-- laconic-check-disable-next-line acronym-before-definition -->\n\
+                     The Bureau of Meteorology (BOM) met.";
+        assert_eq!(
+            rules(later),
+            ["acronym-before-definition", "unused-suppression"]
+        );
+        // In code it is an example, not a suppression.
+        let code = "```\n<!-- laconic-check-disable-next-line us-spelling -->\n```\nThe color.";
+        assert_eq!(rules(code), ["us-spelling"]);
+    }
+
+    #[test]
+    fn flags_a_suppression_that_silences_nothing() {
+        let unused = |text: &str| of(RuleId::UnusedSuppression, text);
+        assert!(RuleId::UnusedSuppression.rule().advisory);
+        assert_eq!(
+            unused("  <!-- laconic-check-disable-next-line us-spellings em-dash -->\nThe color."),
+            [
+                (1, 3, "'us-spellings' is not a rule, so the suppression silences nothing (advisory)".to_owned()),
+                (1, 3, "no 'em-dash' finding on line 2 to silence (advisory); remove it from the suppression".to_owned()),
+            ]
+        );
+        assert_eq!(
+            rules("<!-- laconic-check-disable-next-line us-spellings -->\nThe color."),
+            ["unused-suppression", "us-spelling"]
+        );
+        assert_eq!(
+            unused("Text.\n\n<!-- laconic-check-disable-next-line -->\nThe colour."),
+            [(3, 1, "the suppression names no rule (advisory)".to_owned())]
+        );
+        assert_eq!(
+            unused("<!-- laconic-check-disable-next-line latin -->\n"),
+            [(
+                1,
+                1,
+                "no line follows for the suppression of 'latin' (advisory)".to_owned()
+            )]
+        );
+        // Other comments are not suppressions.
+        assert!(unused("<!-- laconic-check-disable-next-line latin\nThe colour.").is_empty());
+        assert!(unused("<!-- prettier-ignore -->\nThe colour.").is_empty());
     }
 
     #[test]

@@ -214,6 +214,38 @@ The Homebrew formula and winget manifests are attached for a tap and the winget 
 
 [docs/rules.md](docs/rules.md) describes each rule under its name, with examples, its Style Manual section and how often it flags human prose; it also shows which Style Manual sections the checker covers. Report a false positive with the [issue form](https://github.com/yungSNAT/Laconic/issues/new?template=false-positive.yml).
 
+To run `lint` as a gate in CI or a pre-commit hook, these options set what it reports and what fails:
+
+| Option | Effect |
+| --- | --- |
+| `--json` | Prints one JSON object: `findings`, each with `file`, `line`, `column`, `rule`, `advisory`, `message` and `url`, then the `failing` count and the number of findings `suppressed` by comments. |
+| `--disable <rules>` | Drops these rules' findings; comma-separated and repeatable. |
+| `--only <rules>` | Keeps only these rules' findings; `--disable` wins over it. |
+| `--max-findings <n>` | Fails only on more than n failing findings (default 0). |
+| `--warn` | Never fails on findings. |
+| `--commit-msg` | Reads each file as a Git commit message, without comment lines or anything below the scissors line. |
+| `--config <file>` | Reads settings from this file instead of `.laconic-check`. |
+
+A `.laconic-check` file in the directory `lint` runs from holds `key = value` lines for `disable`, `only` and `max-findings`, and `#` comment lines. Rules on the command line add to its lists, and `--max-findings` replaces its count:
+
+```text
+# Quoted American titles are expected here.
+disable = us-spelling
+```
+
+To silence one finding, put a comment naming its rule on its own line before it. It covers the next non-blank line only, and `lint` reports a suppression that silences nothing as `unused-suppression`:
+
+```markdown
+<!-- laconic-check-disable-next-line us-spelling -->
+The Color Purple won the prize.
+```
+
+| Exit status | Meaning |
+| --- | --- |
+| 0 | `lint` found no more failing findings than `--max-findings` allows, or ran with `--warn`; `preserve` found nothing dropped, and nothing added under `--strict`; `mcp` reached the end of its input. |
+| 1 | `lint` found more failing findings than allowed; `preserve` found an item dropped, or one added under `--strict`. |
+| 2 | A usage, project file or read error, or an input or output error in `mcp`. |
+
 `lint -` reads standard input, so an agent can check a draft without saving it. When `laconic-check` is on the PATH, both skills run it on written deliverables before sending. Its US-to-Australian word list combines a hand-written list with about 2,400 pairs generated from the [English Speller Database](https://github.com/en-wl/wordlist) and reviewed against the Style Manual (`laconic-tools gen-au-words`). Seeded-fault tests plant one known fault per rule into clean prose and require the checker to catch each one exactly once, with no findings on the clean text. A calibration test runs `lint` over 3 Productivity Commission reports released in 2018 and 2021 (about 198,500 words of human prose, CC BY 3.0 AU) and fails if its 2,246 findings, its 68 advisories (41 clause-dash paragraphs, 8 stacked hedges, 15 acronyms used before their definition and 4 compounds written both closed and hyphenated) or the 7 stock phrases, staged contrasts and unnecessary hyphens amongst them rise, which guards against a net increase in findings on human text. An outside run on 5 November 2026 linted the 150 human articles in [jenna-russell/human_detectors](https://github.com/jenna-russell/human_detectors) at commit `afcf03d` (110,723 words of mostly American non-fiction, not stored here): 25.9 findings per 1,000 words, 97% of them house-style differences (double quotation marks, US spellings, em dashes, number words, word choice and serial commas). The AI-tell rules fired 18 times (0.16 per 1,000 words: 8 staged contrasts, 7 stock phrases, 2 reveal questions and 1 chatbot closer), not yet labelled true or false. The articles are plain text, so this run does not test `bold-label`.
 
 `laconic-check mcp` serves `lint` and `preserve` as MCP tools over standard input and output, with nothing else to install:

@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Downloads the laconic-check release binary for this runner, checks it against the release's
-# SHA-256 file and puts it on the PATH. Used by the composite Action in action.yml.
+# Downloads the laconic-check release archive for this runner into a new folder, checks it
+# against the release's SHA-256 file and writes the extracted binary's path to the step output
+# `bin`, so the lint step runs that binary and no other. Used by the composite Action in action.yml.
 set -euo pipefail
 case "$VERSION" in
   '' | *[!0-9.]*)
@@ -9,9 +10,9 @@ case "$VERSION" in
     ;;
 esac
 case "$RUNNER_OS/$RUNNER_ARCH" in
-  Linux/X64) target=x86_64-unknown-linux-musl ext=tar.gz ;;
-  Windows/X64) target=x86_64-pc-windows-msvc ext=zip ;;
-  macOS/ARM64) target=aarch64-apple-darwin ext=tar.gz ;;
+  Linux/X64) target=x86_64-unknown-linux-musl ext=tar.gz exe=laconic-check ;;
+  Windows/X64) target=x86_64-pc-windows-msvc ext=zip exe=laconic-check.exe ;;
+  macOS/ARM64) target=aarch64-apple-darwin ext=tar.gz exe=laconic-check ;;
   *)
     echo "::error::laconic-check has no release binary for $RUNNER_OS on $RUNNER_ARCH"
     exit 2
@@ -19,8 +20,10 @@ case "$RUNNER_OS/$RUNNER_ARCH" in
 esac
 name="laconic-check-$target.$ext"
 url="https://github.com/yungSNAT/Laconic/releases/download/laconic-check-v$VERSION"
-dir="$RUNNER_TEMP/laconic-check-$VERSION"
-mkdir -p "$dir"
+temp=$RUNNER_TEMP
+if command -v cygpath > /dev/null; then temp=$(cygpath -u "$temp"); fi
+# A new folder each run, so a second use of the Action in a job cannot find the first's binary.
+dir=$(mktemp -d "$temp/laconic-check.XXXXXX")
 cd "$dir"
 curl -fsSL --retry 3 -o "$name" "$url/$name"
 curl -fsSL --retry 3 -o "$name.sha256" "$url/$name.sha256"
@@ -31,4 +34,8 @@ if [ "$expected" != "$actual" ]; then
   exit 1
 fi
 if [ "$ext" = zip ]; then unzip -oq "$name"; else tar -xzf "$name"; fi
-echo "$dir" >> "$GITHUB_PATH"
+if [ ! -f "$exe" ] || [ ! -x "$exe" ]; then
+  echo "::error::$name holds no executable $exe"
+  exit 1
+fi
+echo "bin=$(pwd)/$exe" >> "$GITHUB_OUTPUT"

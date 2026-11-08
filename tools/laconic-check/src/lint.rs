@@ -660,12 +660,17 @@ struct Suppression<'a> {
 /// The rule names a suppression comment lists, comma or space separated, or `None` when the
 /// line is not a suppression comment.
 fn suppression_names(trimmed: &str) -> Option<Vec<&str>> {
-    let names = trimmed
+    let rest = trimmed
         .trim_end()
         .strip_prefix("<!--")?
         .trim_start()
-        .strip_prefix("laconic-check-disable-next-line")?
-        .strip_suffix("-->")?;
+        .strip_prefix("laconic-check-disable-next-line")?;
+    // Whitespace or the comment's end follows the keyword, so a comment such as
+    // 'disable-next-lineus-spelling' is not a suppression.
+    if !(rest == "-->" || rest.starts_with(char::is_whitespace)) {
+        return None;
+    }
+    let names = rest.strip_suffix("-->")?;
     Some(
         names
             .split([',', ' ', '\t'])
@@ -2549,6 +2554,9 @@ mod tests {
         // In code it is an example, not a suppression.
         let code = "```\n<!-- laconic-check-disable-next-line us-spelling -->\n```\nThe color.";
         assert_eq!(rules(code), ["us-spelling"]);
+        // Without a space after the keyword it is an ordinary comment.
+        let joined = "<!-- laconic-check-disable-next-lineus-spelling -->\nThe color.";
+        assert_eq!(rules(joined), ["us-spelling"]);
     }
 
     #[test]

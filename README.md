@@ -233,7 +233,7 @@ A `.laconic-check` file in the directory `lint` runs from holds `key = value` li
 disable = us-spelling
 ```
 
-To silence one finding, put a comment naming its rule on its own line before it. It covers the next non-blank line only, and `lint` reports a suppression that silences nothing as `unused-suppression`:
+To silence one finding, put a comment naming its rule on its own line before it. It covers the next non-blank line only, and `lint` reports each named rule that silences nothing as `unused-suppression`, even when the comment silences another:
 
 ```markdown
 <!-- laconic-check-disable-next-line us-spelling -->
@@ -257,14 +257,14 @@ repos:
       - id: laconic-check-commit-msg
 ```
 
-In GitHub Actions, the composite Action downloads a laconic-check release for the runner (Linux x86_64, Windows x86_64 or macOS on Apple silicon), checks it against the release's SHA-256 file, lints and annotates each finding:
+In GitHub Actions, the composite Action downloads a laconic-check release for the runner (Linux x86_64, Windows x86_64 or macOS on Apple silicon), checks it against the release's SHA-256 file, lints and annotates each finding. The checksum catches a corrupted or swapped download, not a compromised release:
 
 ```yaml
 - uses: actions/checkout@v7
 - uses: yungSNAT/Laconic@<commit>
   with:
     version: 0.3.0     # the laconic-check release; 0.3.0 by default
-    files: README.md   # default: every Markdown file Git tracks
+    files: README.md   # one path a line; default: every .md and .markdown file Git tracks
     args: --warn       # further lint options
 ```
 

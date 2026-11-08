@@ -1,17 +1,28 @@
 #!/usr/bin/env bash
-# Runs laconic-check lint with LACONIC_ARGS on LACONIC_FILES, or on every Markdown file Git
-# tracks, and turns each finding into a workflow annotation: an error, or a warning for an
-# advisory finding. Exits with lint's status. Used by the composite Action in action.yml;
-# written for bash 3.2, which some macOS runners still use.
+# Runs the laconic-check binary install.sh verified ($LACONIC_CHECK) with LACONIC_ARGS on
+# LACONIC_FILES, one path a line, or on every Markdown file Git tracks, and turns each finding
+# into a workflow annotation: an error, or a warning for an advisory finding. Exits with lint's
+# status. Used by the composite Action in action.yml; written for bash 3.2, which some macOS
+# runners still use.
 set -uo pipefail
 files=()
-if [ -n "$LACONIC_FILES" ]; then
-  read -r -d '' -a files <<< "$LACONIC_FILES" || true
-else
-  while IFS= read -r file; do files+=("$file"); done < <(git ls-files -- '*.md')
+if [ -z "$LACONIC_FILES" ]; then
+  if ! LACONIC_FILES=$(git ls-files -- '*.md' '*.markdown'); then
+    echo "::error::cannot list the Markdown files Git tracks; check out the repository first, or name files in the files input"
+    exit 2
+  fi
 fi
+while IFS= read -r file; do
+  [ -z "$file" ] || files+=("$file")
+done <<< "$LACONIC_FILES"
 args=()
-read -r -a args <<< "$LACONIC_ARGS" || true
+read -r -d '' -a args <<< "$LACONIC_ARGS" || true
+for arg in ${args[@]+"${args[@]}"}; do
+  if [ "$arg" = --json ]; then
+    echo "::error::the Action reads lint's text output, so args cannot include --json"
+    exit 2
+  fi
+done
 if [ ${#files[@]} -eq 0 ]; then
   echo "No Markdown files to lint."
   exit 0
@@ -28,7 +39,7 @@ property() {
   s=${s//,/%2C}
   printf '%s' "${s//:/%3A}"
 }
-out=$(laconic-check lint ${args[@]+"${args[@]}"} "${files[@]}")
+out=$("$LACONIC_CHECK" lint ${args[@]+"${args[@]}"} "${files[@]}")
 status=$?
 [ -z "$out" ] || printf '%s\n' "$out"
 pattern='^(.+):([0-9]+):([0-9]+): ([a-z-]+): (.*)$'

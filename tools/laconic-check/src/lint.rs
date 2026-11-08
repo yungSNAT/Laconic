@@ -593,12 +593,8 @@ pub fn lint_counting(text: &str) -> (Vec<Finding>, usize) {
         }
     }
     paragraph.flush(&mut findings, &mut document);
-    // Rules that compare paragraphs report once the whole document is read, each after the
-    // findings already on its line.
-    for finding in document.findings() {
-        let at = findings.partition_point(|f| f.line <= finding.line);
-        findings.insert(at, finding);
-    }
+    // Rules that compare paragraphs report once the whole document is read.
+    findings.extend(document.findings());
     let before = findings.len();
     findings.retain(|f| {
         let hit = suppressions
@@ -631,19 +627,16 @@ pub fn lint_counting(text: &str) -> (Vec<Finding>, usize) {
         if s.rules.is_empty() {
             messages.push("the suppression names no rule (advisory)".into());
         }
-        for message in messages {
-            let at = findings.partition_point(|f| f.line <= s.line);
-            findings.insert(
-                at,
-                Finding {
-                    line: s.line,
-                    column: s.column,
-                    rule: RuleId::UnusedSuppression,
-                    message,
-                },
-            );
-        }
+        findings.extend(messages.into_iter().map(|message| Finding {
+            line: s.line,
+            column: s.column,
+            rule: RuleId::UnusedSuppression,
+            message,
+        }));
     }
+    // Report in line order. The sort is stable, so each line keeps the order its findings were
+    // added in: line and paragraph rules, then rules that compare paragraphs, then suppressions.
+    findings.sort_by_key(|f| f.line);
     (findings, suppressed)
 }
 

@@ -228,10 +228,10 @@ const HUMAN_CORPUS_CEILING: usize = 2246;
 /// Advisory findings have their own ceiling: 41 paragraphs put clause dashes in 2 or more
 /// sentences when the corpus was calibrated on 2 November 2026, and the stacked-hedge rule
 /// added 8 human uses on 4 November ('could potentially' 5 times, 'can potentially' twice,
-/// 'may potentially' once). The document rules added 19 on 8 November: 15 acronyms used
+/// 'may potentially' once). The document rules added 18 on 8 November: 14 acronyms used
 /// before their definition and 4 compounds written both ways ('re-use', 'co-operation',
 /// 'well-being' and 'socio-economic').
-const HUMAN_CORPUS_ADVISORY_CEILING: usize = 68;
+const HUMAN_CORPUS_ADVISORY_CEILING: usize = 67;
 /// AI-tell findings at calibration, all human uses: 'it is important to note' 3 times,
 /// 'innovative', 'deep dive', 'not just X, but Y' and 'time-frame'.
 const HUMAN_CORPUS_TELL_CEILING: usize = 7;
@@ -317,9 +317,9 @@ const TOTALS: &str = "(articles and words)";
 const GRANDFATHERED: &[&str] = &["clause-dashes"];
 
 /// tests/outside-corpus.tsv by row name. Each row holds calibration articles and findings,
-/// held-out articles and findings, and findings on tests/corpus; the totals row holds
-/// articles and words in the same places.
-fn outside() -> BTreeMap<String, [usize; 5]> {
+/// then held-out articles and findings; the totals row holds articles and words in the same
+/// places.
+fn outside() -> BTreeMap<String, [usize; 4]> {
     read(OUTSIDE)
         .lines()
         .filter(|l| !l.starts_with('#'))
@@ -335,7 +335,7 @@ fn outside() -> BTreeMap<String, [usize; 5]> {
                 .collect();
             let counts = counts
                 .try_into()
-                .unwrap_or_else(|_| panic!("{OUTSIDE}: expected 5 counts in {line:?}"));
+                .unwrap_or_else(|_| panic!("{OUTSIDE}: expected 4 counts in {line:?}"));
             (name, counts)
         })
         .collect()
@@ -505,7 +505,7 @@ fn reference() -> String {
     );
     for rule in RULES {
         let (n, rate) = human(rule.name);
-        let [ca, _, ha, hf, _] = outside_rule(rule.name);
+        let [ca, _, ha, hf] = outside_rule(rule.name);
         let section = rule
             .section
             .map_or("Not a Style Manual rule.".to_owned(), |s| {
@@ -553,36 +553,19 @@ fn reference() -> String {
     out
 }
 
-/// The outside counts must list every rule and come from the rules as they are now, which
-/// the findings on tests/corpus stand in for, since the outside corpus is not stored here.
+/// The outside counts must list every rule. laconic-tools' tests check, by the table's
+/// fingerprint, that the counts come from the rules as they are now.
 #[test]
-fn outside_corpus_counts_are_current() {
+fn outside_corpus_lists_every_rule() {
     let outside = outside();
-    let corpus = human_corpus();
-    let mut local: BTreeMap<&str, usize> = BTreeMap::new();
-    for finding in corpus.iter().flat_map(|t| lint(t)) {
-        *local.entry(finding.rule.name()).or_default() += 1;
-    }
-    let words: usize = corpus.iter().map(|t| t.split_whitespace().count()).sum();
-    let mut stale: Vec<&str> = Vec::new();
-    if outside.get(TOTALS).map(|r| r[4]) != Some(words) {
-        stale.push(TOTALS);
-    }
-    for rule in RULES {
-        let now = local.get(rule.name).copied().unwrap_or(0);
-        if outside.get(rule.name).map(|r| r[4]) != Some(now) {
-            stale.push(rule.name);
-        }
-    }
+    let missing: Vec<&str> = std::iter::once(TOTALS)
+        .chain(RULES.iter().map(|r| r.name))
+        .filter(|name| !outside.contains_key(*name))
+        .collect();
     assert!(
-        stale.is_empty(),
-        "{OUTSIDE} is out of date for {}: run {CALIBRATE}",
-        stale.join(", ")
-    );
-    assert_eq!(
-        outside.len(),
-        RULES.len() + 1,
-        "{OUTSIDE} has a row for a rule not in RULES: run {CALIBRATE}"
+        missing.is_empty() && outside.len() == RULES.len() + 1,
+        "{OUTSIDE} does not list exactly the rules (missing: {}): run {CALIBRATE}",
+        missing.join(", ")
     );
 }
 

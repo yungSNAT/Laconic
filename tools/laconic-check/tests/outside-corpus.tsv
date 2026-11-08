@@ -1,29 +1,30 @@
 # Written by `laconic-tools calibrate`; do not edit. Counts for the 150 human-written
 # articles in human_detectors.json (jenna-russell/human_detectors at afcf03d14d2da4a038d8d0fafa5ec779dd858181,
 # blob eb4030e4591de8fd687089b15bf86d6688b128eb), which are not stored here. Calibration articles have odd prompt ids and
-# held-out articles even ones. The last column counts findings on tools/laconic-check/tests/corpus
-# when this file was written; the rule reference fails when they change, so rerun then.
-rule	calibration articles	calibration findings	held-out articles	held-out findings	local findings
-(articles and words)	75	54423	75	56300	205299
-us-spelling	69	263	71	364	24
-word-choice	44	74	44	72	297
-double-quotes	72	550	74	574	2
-symbol-space	0	0	0	0	0
-serial-comma	32	65	32	70	166
-em-dash	64	228	58	245	1415
-clause-dashes	15	17	16	17	41
-hyphen	0	0	0	0	1
-hyphen-consistency	0	0	0	0	4
-number-word	56	152	57	137	329
-date	7	8	6	10	3
-weekday	0	0	0	0	0
-time	3	3	3	4	1
-latin	0	0	0	0	1
-acronym-before-definition	0	0	0	0	15
-closer	1	1	0	0	0
-stock-phrase	2	2	4	5	5
-stacked-hedge	0	0	0	0	8
-bold-label	0	0	0	0	0
-staged-contrast	6	6	2	2	1
-reveal-question	1	1	1	1	0
-residue	0	0	0	0	1
+# held-out articles even ones. The fingerprint covers the counts and the rule sources;
+# a test fails when either changes without a rerun.
+# fingerprint 22e844bbd96f45bc
+rule	calibration articles	calibration findings	held-out articles	held-out findings
+(articles and words)	75	54423	75	56300
+us-spelling	69	263	71	364
+word-choice	44	74	44	72
+double-quotes	72	550	74	574
+symbol-space	0	0	0	0
+serial-comma	32	65	32	70
+em-dash	64	228	58	245
+clause-dashes	15	17	16	17
+hyphen	0	0	0	0
+hyphen-consistency	0	0	0	0
+number-word	56	152	57	137
+date	7	8	6	10
+weekday	0	0	0	0
+time	3	3	3	4
+latin	0	0	0	0
+acronym-before-definition	0	0	0	0
+closer	1	1	0	0
+stock-phrase	2	2	4	5
+stacked-hedge	0	0	0	0
+bold-label	0	0	0	0
+staged-contrast	6	6	2	2
+reveal-question	1	1	1	1
+residue	0	0	0	0

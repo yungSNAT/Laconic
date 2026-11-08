@@ -171,7 +171,7 @@ Example: `e.g. the colour`.
 
 An acronym of 2 to 6 capitals used before the parenthesised definition that introduces it later in the document, as in 'The BOM said ... the Bureau of Meteorology (BOM)'.
 
-Fails `lint`: no (advisory). Style Manual: [Shortened forms](../skills/laconic-prose/references/style-manual-rules.md#shortened-forms). Human prose: 15 findings, 0.07 per 1,000 words. Outside articles: flags 0 of 75 held out (0 findings) and 0 of 75 for calibration.
+Fails `lint`: no (advisory). Style Manual: [Shortened forms](../skills/laconic-prose/references/style-manual-rules.md#shortened-forms). Human prose: 14 findings, 0.07 per 1,000 words. Outside articles: flags 0 of 75 held out (0 findings) and 0 of 75 for calibration.
 
 Example: `The BOM forecast came from the Bureau of Meteorology (BOM), which`.
 

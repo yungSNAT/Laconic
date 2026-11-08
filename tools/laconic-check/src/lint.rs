@@ -712,7 +712,7 @@ impl Document {
             }
             let word: String = masked[start..k].iter().collect();
             let place = at(start + 1);
-            if is_acronym(&word) {
+            if let Some(capitals) = acronym(&word) {
                 let defines = start > 0
                     && masked[start - 1] == '('
                     && masked.get(k) == Some(&')')
@@ -722,7 +722,8 @@ impl Document {
                 } else {
                     &mut self.used
                 };
-                first.entry(word.clone()).or_insert(place);
+                // 'NGOs' is a use of 'NGO', and '(NGO)' defines both.
+                first.entry(capitals.to_owned()).or_insert(place);
             }
             self.words.entry(word.to_lowercase()).or_insert(place);
         }
@@ -783,10 +784,12 @@ impl Document {
     }
 }
 
-/// 2 to 6 capital letters, with an optional plural 's': 'BOM', 'NGOs'.
-fn is_acronym(word: &str) -> bool {
+/// The capitals of an acronym: 2 to 6 capital letters, with an optional plural 's' ('BOM',
+/// 'NGOs').
+fn acronym(word: &str) -> Option<&str> {
     let capitals = word.strip_suffix('s').unwrap_or(word);
-    (2..=6).contains(&capitals.len()) && capitals.bytes().all(|b| b.is_ascii_uppercase())
+    ((2..=6).contains(&capitals.len()) && capitals.bytes().all(|b| b.is_ascii_uppercase()))
+        .then_some(capitals)
 }
 
 /// True when the few words before a parenthesised acronym spell it, as 'Bureau of
@@ -2381,10 +2384,14 @@ mod tests {
             1,
             "one finding however often it is used first"
         );
-        assert_eq!(
-            found("NGOs met. Non-government organisations (NGOs) met.").len(),
-            1
-        );
+        // Singular and plural are one acronym, whichever comes first.
+        for plural in [
+            "NGOs met. Non-government organisations (NGOs) met.",
+            "NGOs were consulted. The non-government organisation (NGO) responded.",
+            "The NGO met. Non-government organisations (NGOs) met.",
+        ] {
+            assert_eq!(found(plural).len(), 1, "{plural}");
+        }
         assert_eq!(
             found("The ABS counts. The Australian Bureau of Statistics (ABS) counts.").len(),
             1
@@ -2393,8 +2400,9 @@ mod tests {
             "The Bureau of Meteorology (BOM) said so. The BOM agreed.",
             "The BOM agreed.",
             "DNA (deoxyribonucleic acid) is a molecule.",
-            "The NGO met. Non-government organisations (NGOs) met.",
             "The `BOM` key, then the Bureau of Meteorology (BOM).",
+            // An earlier use of the acronym ends the words that may spell it.
+            "BOM was mentioned. It was discussed (BOM).",
             "Plan A. The Australian (A) league.",
             // A parenthesised label the words before it do not spell is not a definition.
             "Vale is MIT. The fork is by Ayoub G. (MIT).",

@@ -239,6 +239,7 @@ Delete the file to turn session mode off. Choose one or the other: session mode 
 ## Development
 
 ```sh
+cargo test --manifest-path tools/laconic-tools/Cargo.toml
 python3 -m unittest discover -s tests -v
 python3 scripts/run_evals.py validate
 ```

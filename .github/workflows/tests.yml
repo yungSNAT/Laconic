@@ -1,9 +1,10 @@
 name: tests
 
-# Runs the repository contract tests in laconic-tools and the whole Python
-# suite, and validates the evaluation cases. The other workflows each cover one
-# layer; this catches the rest (OpenCode plugin, manifests, skills, CI guards,
-# eval tooling, judge, humanise metrics).
+# Runs the repository contract tests in laconic-tools, laconic-check's tests and
+# its lint of Laconic's own prose, and the whole Python suite; checks the .cursor
+# copy of the skills; and validates the evaluation cases. The other workflows each
+# cover one layer; this catches the rest (OpenCode plugin, manifests, skills, CI
+# guards, eval tooling, judge, humanise metrics).
 on:
   pull_request:
   push:
@@ -27,12 +28,14 @@ jobs:
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: "3.x"
-      # unittest is the only required check, so laconic-check's format and lints block here.
-      - name: Format and lint laconic-check
+      # unittest is the only required check, so laconic-check's format, lints, tests and prose
+      # lint, and the .cursor copy check, block here.
+      - name: Format, lint and test laconic-check
         working-directory: tools/laconic-check
         run: |
           cargo fmt --check
           cargo clippy --locked --all-targets -- -D warnings
+          cargo test --locked
       # Its test fails when an INSTALL.md snippet differs from rules/laconic.md.
       - name: Format, lint and test laconic-tools
         working-directory: tools/laconic-tools
@@ -43,6 +46,21 @@ jobs:
       # Without the binary, tests/test_mcp_server.py would skip.
       - name: Build laconic-check
         run: cargo build --locked --manifest-path tools/laconic-check/Cargo.toml
+      - name: Lint Laconic's own prose
+        working-directory: tools/laconic-check
+        run: |
+          cargo run --quiet --locked -- lint \
+            ../../skills/laconic/SKILL.md ../../skills/laconic-prose/SKILL.md \
+            ../../rules/laconic.md ../../README.md ../../INSTALL.md ../../AGENTS.md \
+            ../../evals/README.md ../../docs/rules.md
+      # The .cursor copy is a real folder, not a symlink, so Windows clones and GitHub ZIP
+      # downloads work; it must match skills/, references included.
+      - name: Fail if the .cursor copy differs from skills
+        run: |
+          diff -r skills .cursor/skills || {
+            echo "::error::.cursor copy is out of sync. Run: rm -rf .cursor/skills && cp -R skills .cursor/skills"
+            exit 1
+          }
       # Coverage only records the run for the Codecov badge; no threshold.
       - name: Install coverage
         run: python -m pip install --only-binary=":all:" --require-hashes -r .github/ci/requirements-coverage.txt

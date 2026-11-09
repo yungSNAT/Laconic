@@ -34,6 +34,7 @@ To report a finding that should not have been flagged, use the [false-positive f
 | [`staged-contrast`](#staged-contrast) | yes | none | under 0.01 | 2 of 75 |
 | [`reveal-question`](#reveal-question) | yes | none | 0.00 | 1 of 75 |
 | [`residue`](#residue) | yes | none | under 0.01 | 0 of 75 |
+| [`unused-suppression`](#unused-suppression) | no (advisory) | none | 0.00 | 0 of 75 |
 
 ## Style Manual coverage
 
@@ -51,7 +52,7 @@ To report a finding that should not have been flagged, use the [false-positive f
 | [Dates and time](../skills/laconic-prose/references/style-manual-rules.md#dates-and-time) | `date`, `weekday`, `time` |
 | [Shortened forms](../skills/laconic-prose/references/style-manual-rules.md#shortened-forms) | `latin`, `acronym-before-definition` |
 
-The rules with no Style Manual section flag writing patterns from [patterns.md](../skills/laconic-prose/references/patterns.md) or chat-tool residue: `closer`, `stock-phrase`, `stacked-hedge`, `bold-label`, `staged-contrast`, `reveal-question`, `residue`.
+The rules with no Style Manual section flag writing patterns from [patterns.md](../skills/laconic-prose/references/patterns.md), chat-tool residue or suppression comments: `closer`, `stock-phrase`, `stacked-hedge`, `bold-label`, `staged-contrast`, `reveal-question`, `residue`, `unused-suppression`.
 
 ## Rules
 
@@ -238,3 +239,11 @@ Fails `lint`: yes. Not a Style Manual rule. Human prose: 1 finding, under 0.01 p
 Examples: `after the go-ahead.\u{200b}`, `https://example.com/guide?utm_source=chatgpt.com`.
 
 Invisible characters appear here as `\u{...}` escapes, so copying an example does not reproduce them; the tests plant the characters themselves.
+
+### unused-suppression
+
+A suppression comment, `<!-- laconic-check-disable-next-line rule -->` on its own line, that silences nothing: it names no rule or an unknown one, or the next non-blank line has no finding of the rule it names. A suppression silences the named rules (comma or space separated) on that line only.
+
+Fails `lint`: no (advisory). Not a Style Manual rule. Human prose: 0 findings, 0.00 per 1,000 words. Outside articles: flags 0 of 75 held out (0 findings) and 0 of 75 for calibration.
+
+Example: `<!-- laconic-check-disable-next-line em-dash -->`.

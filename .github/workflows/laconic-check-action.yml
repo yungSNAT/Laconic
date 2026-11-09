@@ -1,0 +1,47 @@
+name: laconic-check action
+
+# Runs the composite Action in action.yml on each runner it supports: a clean file passes and a
+# seeded fault fails the step.
+on:
+  pull_request:
+    paths:
+      - action.yml
+      - tools/laconic-check/action/**
+      - .github/workflows/laconic-check-action.yml
+  push:
+    branches: [main]
+    paths:
+      - action.yml
+      - tools/laconic-check/action/**
+      - .github/workflows/laconic-check-action.yml
+
+permissions:
+  contents: read
+
+jobs:
+  action:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: A clean file passes
+        uses: ./
+        with:
+          files: tools/laconic-check/action/tests/clean.md
+      - name: A seeded fault fails
+        id: fault
+        continue-on-error: true
+        uses: ./
+        with:
+          files: tools/laconic-check/action/tests/fault.md
+      - name: Check the seeded fault failed the step
+        shell: bash
+        env:
+          OUTCOME: ${{ steps.fault.outcome }}
+        run: test "$OUTCOME" = failure

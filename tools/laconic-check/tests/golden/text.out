@@ -1,0 +1,7 @@
+input.md:3:18: double-quotes: double quotation marks in prose; use single marks
+input.md:3:32: em-dash: em dash in original prose
+input.md:3:5: us-spelling: 'color': Australian form is 'colour'
+input.md:5:4: stacked-hedge: stacked hedge 'could potentially' (advisory); keep one qualifier at the confidence the source supports
+input.md:5:28: latin: Latin abbreviation; write 'for example' or 'that is'
+input.md:14:1: unused-suppression: no 'latin' finding on line 15 to silence (advisory); remove it from the suppression
+input.md:15:5: us-spelling: 'flavor': Australian form is 'flavour'

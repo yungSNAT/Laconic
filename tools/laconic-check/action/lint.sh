@@ -6,7 +6,7 @@
 # runners still use.
 set -uo pipefail
 files=()
-if [ -z "$LACONIC_FILES" ]; then
+if [[ -z "$LACONIC_FILES" ]]; then
   tracked=$(mktemp) || exit 2
   trap 'rm -f -- "$tracked"' EXIT
   if ! git ls-files -z -- '*.md' '*.markdown' > "$tracked"; then
@@ -18,18 +18,18 @@ if [ -z "$LACONIC_FILES" ]; then
   done < "$tracked"
 else
   while IFS= read -r file; do
-    [ -z "$file" ] || files+=("$file")
+    [[ -z "$file" ]] || files+=("$file")
   done <<< "$LACONIC_FILES"
 fi
 args=()
 read -r -d '' -a args <<< "$LACONIC_ARGS" || true
 for arg in ${args[@]+"${args[@]}"}; do
-  if [ "$arg" = --json ]; then
+  if [[ "$arg" == --json ]]; then
     echo "::error::the Action reads lint's text output, so args cannot include --json"
     exit 2
   fi
 done
-if [ ${#files[@]} -eq 0 ]; then
+if [[ ${#files[@]} -eq 0 ]]; then
   echo "No Markdown files to lint."
   exit 0
 fi
@@ -59,7 +59,7 @@ status=$?
 pattern='^(.+):([0-9]+):([0-9]+): ([a-z-]+): (.*)$'
 while IFS= read -r finding; do
   # Filename and message text must not be interpreted as workflow commands.
-  [ -z "$finding" ] || printf 'laconic-check: %s\n' "$finding"
+  [[ -z "$finding" ]] || printf 'laconic-check: %s\n' "$finding"
   [[ $finding =~ $pattern ]] || continue
   level=error
   [[ ${BASH_REMATCH[5]} == *'(advisory)'* ]] && level=warning

@@ -25,16 +25,16 @@ if command -v cygpath > /dev/null; then temp=$(cygpath -u "$temp"); fi
 # A new folder each run, so a second use of the Action in a job cannot find the first's binary.
 dir=$(mktemp -d "$temp/laconic-check.XXXXXX")
 cd "$dir"
-curl -fsSL --retry 3 -o "$name" "$url/$name"
-curl -fsSL --retry 3 -o "$name.sha256" "$url/$name.sha256"
+curl --proto '=https' --proto-redir '=https' -fsSL --retry 3 -o "$name" "$url/$name"
+curl --proto '=https' --proto-redir '=https' -fsSL --retry 3 -o "$name.sha256" "$url/$name.sha256"
 expected=$(cut -d ' ' -f 1 "$name.sha256")
 actual=$({ sha256sum "$name" 2>/dev/null || shasum -a 256 "$name"; } | cut -d ' ' -f 1)
-if [ "$expected" != "$actual" ]; then
+if [[ "$expected" != "$actual" ]]; then
   echo "::error::$name does not match its published SHA-256"
   exit 1
 fi
-if [ "$ext" = zip ]; then unzip -oq "$name"; else tar -xzf "$name"; fi
-if [ ! -f "$exe" ] || [ ! -x "$exe" ]; then
+if [[ "$ext" == zip ]]; then unzip -oq "$name"; else tar -xzf "$name"; fi
+if [[ ! -f "$exe" || ! -x "$exe" ]]; then
   echo "::error::$name holds no executable $exe"
   exit 1
 fi

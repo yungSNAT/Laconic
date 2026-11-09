@@ -491,7 +491,7 @@ pub fn lint_counting(text: &str) -> (Vec<Finding>, usize) {
     let mut paragraph = Paragraph::default();
     let mut document = Document::default();
     let mut fence: Option<&str> = None;
-    let mut in_list = false;
+    let mut list_indent = None;
     // The indent and length of the current run of bold-label bullets.
     let mut labels = (0, 0);
     // A leading YAML frontmatter block is metadata, not prose.
@@ -505,9 +505,15 @@ pub fn lint_counting(text: &str) -> (Vec<Finding>, usize) {
             }
             continue;
         }
-        // A suppression silences the next non-blank line that is not itself a suppression. One
-        // in code is never recorded, since code lines do not reach the HTML branch below.
-        let names = suppression_names(trimmed);
+        // A suppression silences the next non-blank line that is not itself a suppression.
+        // Four columns beyond the current list item's content start form indented code.
+        let indent = raw.len() - trimmed.len();
+        let columns = indent_columns(&raw[..indent]);
+        let names = if paragraph.lines.is_empty() && columns >= list_indent.unwrap_or(0) + 4 {
+            None
+        } else {
+            suppression_names(trimmed)
+        };
         if !trimmed.is_empty() && names.is_none() {
             for waiting in suppressions
                 .iter_mut()
@@ -549,13 +555,18 @@ pub fn lint_counting(text: &str) -> (Vec<Finding>, usize) {
             paragraph.flush(&mut findings, &mut document);
             continue;
         }
-        let list_item = !is_break_line(trimmed) && starts_list_item(trimmed);
-        let indent = raw.len() - trimmed.len();
-        if list_item {
-            in_list = true;
+        let marker_width = if is_break_line(trimmed) {
+            None
+        } else {
+            list_marker_width(trimmed)
+        };
+        if let Some(width) = marker_width {
+            list_indent = Some(columns + width);
         } else if paragraph.lines.is_empty() && indent == 0 {
-            in_list = false;
+            list_indent = None;
         }
+        let list_item = marker_width.is_some();
+        let in_list = list_indent.is_some();
         // Headings, table rows, thematic breaks, setext underlines and indented code
         // lines are one line each; a list item opens a block that its wrapped lines
         // continue.
@@ -680,13 +691,31 @@ fn is_break_line(trimmed: &str) -> bool {
         && marks.iter().all(|&c| c == marks[0])
 }
 
-fn starts_list_item(trimmed: &str) -> bool {
+fn indent_columns(whitespace: &str) -> usize {
+    whitespace.chars().fold(0, |columns, ch| {
+        if ch == '\t' {
+            columns + (4 - columns % 4)
+        } else {
+            columns + 1
+        }
+    })
+}
+
+fn list_marker_width(trimmed: &str) -> Option<usize> {
     let digits = trimmed.chars().take_while(char::is_ascii_digit).count();
-    ["- ", "* ", "+ "].iter().any(|m| trimmed.starts_with(m))
-        || (digits > 0
-            && [". ", ") "]
-                .iter()
-                .any(|m| trimmed[digits..].starts_with(m)))
+    let marker = if ["- ", "* ", "+ "].iter().any(|m| trimmed.starts_with(m)) {
+        1
+    } else if digits > 0
+        && [". ", ") "]
+            .iter()
+            .any(|m| trimmed[digits..].starts_with(m))
+    {
+        digits + 1
+    } else {
+        return None;
+    };
+    let padding = trimmed[marker..].bytes().take_while(|&b| b == b' ').count();
+    Some(marker + if padding > 4 { 1 } else { padding })
 }
 
 /// True for a bullet that opens with a bold label: `- **Cause:** ...` or `- **Cause**: ...`.
@@ -2550,6 +2579,38 @@ mod tests {
         // Without a space after the keyword it is an ordinary comment.
         let joined = "<!-- laconic-check-disable-next-lineus-spelling -->\nThe color.";
         assert_eq!(rules(joined), ["us-spelling"]);
+    }
+
+    #[test]
+    fn suppression_examples_in_indented_code_do_not_silence_prose() {
+        for indent in ["    ", "        ", "\t", "  \t"] {
+            let text = format!(
+                "{indent}<!-- laconic-check-disable-next-line us-spelling -->\n\nThe color is red."
+            );
+            let (findings, suppressed) = lint_counting(&text);
+            assert_eq!(suppressed, 0, "{indent:?}");
+            assert_eq!(findings.len(), 1, "{indent:?}: {findings:?}");
+            assert_eq!(findings[0].rule, RuleId::UsSpelling);
+            assert_eq!(findings[0].line, 3);
+        }
+        // Up to 3 spaces leave a comment outside a code block.
+        let text = "   <!-- laconic-check-disable-next-line us-spelling -->\nThe color is red.";
+        assert_eq!(lint_counting(text), (Vec::new(), 1));
+        // An indented comment within a list remains a suppression.
+        let text = "- The colour is red.\n\n    <!-- laconic-check-disable-next-line us-spelling -->\n    The color is red.";
+        assert_eq!(lint_counting(text), (Vec::new(), 1));
+        for (item, content_indent) in [("- ", 2), ("12. ", 4)] {
+            let code = " ".repeat(content_indent + 4);
+            let prose = " ".repeat(content_indent);
+            let text = format!(
+                "{item}The colour is red.\n\n{code}<!-- laconic-check-disable-next-line us-spelling -->\n\n{prose}The color is red."
+            );
+            let (findings, suppressed) = lint_counting(&text);
+            assert_eq!(suppressed, 0, "{item:?}");
+            assert_eq!(findings.len(), 1, "{item:?}: {findings:?}");
+            assert_eq!(findings[0].rule, RuleId::UsSpelling);
+            assert_eq!(findings[0].line, 5);
+        }
     }
 
     #[test]

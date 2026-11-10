@@ -4,6 +4,7 @@ import datetime
 import hashlib
 import io
 import json
+import runpy
 import subprocess
 import sys
 import tempfile
@@ -20,6 +21,181 @@ import run_evals  # noqa: E402
 
 
 class EvaluationHarnessTest(unittest.TestCase):
+    def test_script_entry_point_validates_the_shipped_catalogue(self):
+        script = ROOT / "scripts" / "run_evals.py"
+        with mock.patch.object(sys, "argv", [str(script), "validate"]), \
+                contextlib.redirect_stdout(io.StringIO()) as output, \
+                self.assertRaises(SystemExit) as exit_status:
+            runpy.run_path(str(script), run_name="__main__")
+        self.assertEqual(0, exit_status.exception.code)
+        self.assertIn("Evaluation cases are valid.", output.getvalue())
+
+    def test_checks_command_scores_recorded_responses_and_rejects_a_bad_catalogue(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            args = self._run_args(Path(temporary))
+            case = run_evals.load_cases(args.cases)[0]
+            case["checks"] = {
+                "must_include": [r"\b102\b"], "pass": ["102"], "fail": ["112"],
+            }
+            args.cases.write_text(json.dumps(case) + "\n", encoding="utf-8")
+            responses = [
+                {"case_id": "probe", "trial": 1, "condition": "candidate", "response": "102"},
+                {"case_id": "probe", "trial": 2, "condition": "candidate", "response": "112"},
+            ]
+            args.output.write_text(
+                "".join(json.dumps(row) + "\n" for row in responses), encoding="utf-8"
+            )
+            command = ["checks", str(args.output), "--cases", str(args.cases)]
+            with contextlib.redirect_stdout(io.StringIO()) as output:
+                self.assertEqual(0, run_evals.main(command))
+            summary = json.loads(output.getvalue())["candidate"]
+            self.assertEqual((2, 1), (summary["checked"], summary["passed"]))
+            self.assertEqual(2, summary["failures"][0]["trial"])
+
+            case["checks"]["fail"] = []
+            args.cases.write_text(json.dumps(case) + "\n", encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "at least one pass and one fail"):
+                run_evals.main(command)
+
+    def test_case_fields_must_match_the_catalogue_schema(self):
+        case = {"id": "", "category": "direct-answer", "prompt": "Answer.", "risk": "other",
+                "criteria": [], "checks": []}
+        errors = run_evals.validate_cases([case])
+        self.assertEqual(4, len(errors))
+        for detail in ("id must be", "risk must be", "criteria must be", "checks must be"):
+            self.assertTrue(any(detail in error for error in errors), errors)
+
+    def test_jsonl_ignores_blank_lines_but_rejects_non_objects(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "responses.jsonl"
+            path.write_text('\n{"case_id": "probe"}\n', encoding="utf-8")
+            self.assertEqual([{"case_id": "probe"}], run_evals.read_jsonl(path))
+            path.write_text('\n[]\n', encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "line 2: expected a JSON object"):
+                run_evals.read_jsonl(path)
+
+    def test_score_rows_reject_bad_fields_before_pairing(self):
+        valid = self._score_row("probe", "candidate", 4)
+        missing = dict(valid)
+        del missing["correctness"]
+        cases = (
+            (missing, "missing fields: correctness"),
+            (dict(valid, condition="unknown"), "unsupported condition"),
+            (dict(valid, blocker=1), "blocker must be boolean"),
+        )
+        for row, expected in cases:
+            with self.subTest(expected=expected), self.assertRaisesRegex(ValueError, expected):
+                run_evals.summarize_scores([row])
+
+    def test_safety_and_correctness_regressions_block_a_higher_weighted_score(self):
+        baseline = self._score_row("probe", "baseline", 3)
+        candidate = dict(self._score_row("probe", "candidate", 5), safety=2, correctness=2)
+        summary = run_evals.summarize_scores([baseline, candidate])
+        self.assertGreater(summary["conditions"]["candidate"]["weighted_score"],
+                           summary["conditions"]["baseline"]["weighted_score"])
+        self.assertFalse(summary["release_gate"]["passed"])
+        self.assertEqual([
+            "Candidate correctness regressed by more than 0.1 points.",
+            "Candidate safety regressed by more than 0.1 points.",
+        ], summary["release_gate"]["reasons"])
+
+    def test_usage_requires_a_separate_reference_and_valid_model_metadata(self):
+        row = self._usage_row("probe", "candidate", "102", 0.1, {})
+        for rows, reference, expected in (
+            ([row], "candidate", "reference must be a condition other than candidate"),
+            ([row], "baseline", "include baseline and candidate"),
+            ([dict(row, model=" ")], "baseline", "model must be a non-empty string"),
+        ):
+            with self.subTest(expected=expected), self.assertRaisesRegex(ValueError, expected):
+                run_evals.summarize_usage(rows, reference)
+
+    def test_unterminated_frontmatter_preserves_the_skill_text(self):
+        text = "---\nname: draft\nInstructions"
+        self.assertEqual(text, run_evals._strip_frontmatter(text))
+
+    def test_codex_response_uses_the_final_message_and_turn_usage(self):
+        events = [
+            {"type": "item.completed", "item": {"type": "agent_message", "text": "draft"}},
+            {"type": "item.completed", "item": {"type": "agent_message", "text": " 102 "}},
+            {"type": "item.completed", "item": {"type": "command_execution", "text": "log"}},
+            {"type": "turn.completed", "usage": {"input_tokens": 30, "output_tokens": 1}},
+        ]
+        payload = "\n\n".join(json.dumps(event) for event in events)
+        self.assertEqual(
+            ("102", {"input_tokens": 30, "output_tokens": 1}, None),
+            run_evals._parse_response(payload, "codex-jsonl"),
+        )
+        with self.assertRaisesRegex(ValueError, "Unsupported response format"):
+            run_evals._parse_response(payload, "other")
+
+    def test_runner_model_ignores_model_options_after_the_end_of_options(self):
+        self.assertEqual("fixture", run_evals._runner_model(
+            ["codex", "-m", "fixture", "--", "-m", "untrusted"]
+        ))
+
+    def test_run_rejects_bad_cases_unknown_case_ids_and_zero_workers_before_any_call(self):
+        with tempfile.TemporaryDirectory() as temporary, \
+                mock.patch.object(run_evals, "_run_with_timeout") as invoke:
+            args = self._run_args(Path(temporary))
+            args.case = ["unknown"]
+            with self.assertRaisesRegex(ValueError, "--case matched no evaluation case: unknown"):
+                run_evals.run_evaluations(args)
+            args.case = None
+            args.jobs = 0
+            with self.assertRaisesRegex(ValueError, "--jobs must be at least 1"):
+                run_evals.run_evaluations(args)
+            args.cases.write_text("{}\n", encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "missing fields"):
+                run_evals.run_evaluations(args)
+        invoke.assert_not_called()
+
+    def test_run_cli_retries_with_the_remaining_budget_and_records_one_response(self):
+        with tempfile.TemporaryDirectory() as temporary, \
+                mock.patch.object(run_evals, "_run_with_timeout") as invoke, \
+                mock.patch.object(run_evals.time, "sleep") as backoff, \
+                contextlib.redirect_stdout(io.StringIO()):
+            args = self._run_args(Path(temporary))
+            config = json.loads(args.runner_config.read_text(encoding="utf-8"))
+            config["stub"]["budget_flag"] = "--max-budget-usd"
+            args.runner_config.write_text(json.dumps(config), encoding="utf-8")
+            invoke.side_effect = [
+                subprocess.CompletedProcess([], 1, "", "unavailable"),
+                subprocess.CompletedProcess([], 0, '{"result": "102", "total_cost_usd": 0.25}', ""),
+            ]
+            self.assertEqual(0, run_evals.main([
+                "run", "--cases", str(args.cases), "--runner-config", str(args.runner_config),
+                "--runner", args.runner, "--condition", args.condition, "--trials", "1",
+                "--retries", "1", "--budget-usd", "1", "--output", str(args.output),
+            ]))
+            rows = run_evals.read_jsonl(args.output)
+            self.assertEqual([("102", 0.25)], [(row["response"], row["cost_usd"]) for row in rows])
+            self.assertEqual(2, invoke.call_count)
+            for call in invoke.call_args_list:
+                self.assertEqual(["--max-budget-usd", "1.0000"], call.args[0][1:3])
+            backoff.assert_called_once_with(1)
+
+    def test_failed_runner_uses_structured_error_or_falls_back_to_stderr(self):
+        for stdout, expected in (
+            ('{"result": "over capacity"}', "over capacity"),
+            ("invalid JSON", "transport failed"),
+        ):
+            with self.subTest(stdout=stdout), tempfile.TemporaryDirectory() as temporary, \
+                    mock.patch.object(run_evals, "_run_with_timeout", return_value=
+                                      subprocess.CompletedProcess([], 1, stdout, "transport failed")):
+                args = self._run_args(Path(temporary))
+                with self.assertRaisesRegex(RuntimeError, expected):
+                    run_evals.run_evaluations(args)
+                self.assertEqual([], run_evals.read_jsonl(args.output))
+
+    def test_successful_runner_without_cost_is_rejected_in_metered_mode(self):
+        with tempfile.TemporaryDirectory() as temporary, \
+                mock.patch.object(run_evals, "_run_with_timeout", return_value=
+                                  subprocess.CompletedProcess([], 0, '{"result": "102"}', "")):
+            args = self._run_args(Path(temporary))
+            with self.assertRaisesRegex(RuntimeError, "Runner did not report dollar cost"):
+                run_evals.run_evaluations(args)
+            self.assertEqual([], run_evals.read_jsonl(args.output))
+
     def test_plan_emits_one_row_per_case_trial_and_condition(self):
         cases_path = ROOT / "evals" / "holdout-cases.jsonl"
         case_ids = {case["id"] for case in run_evals.load_cases(cases_path)}

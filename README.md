@@ -300,6 +300,8 @@ Delete the file to turn session mode off. Choose one or the other: session mode 
 
 ## Development
 
+The Codecov badge measures the Python evaluation scripts. The Rust checks run in CI.
+
 ```sh
 cargo test --manifest-path tools/laconic-tools/Cargo.toml
 python3 -m unittest discover -s tests -v

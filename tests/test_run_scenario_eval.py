@@ -49,6 +49,18 @@ class ScenarioEvaluationTest(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     run_scenario_eval.load_scenario(self.root)
 
+    def test_validate_command_reports_valid_and_invalid_scenarios_without_a_provider(self):
+        with mock.patch.object(sys, "argv", ["run_scenario_eval.py", "validate", str(SCENARIO)]), \
+                contextlib.redirect_stdout(io.StringIO()) as output:
+            self.assertEqual(0, run_scenario_eval.main())
+        self.assertIn(f"Valid scenario: {SCENARIO.name}", output.getvalue())
+
+        (self.root / "case.jsonl").write_text("{}\n", encoding="utf-8")
+        with mock.patch.object(sys, "argv", ["run_scenario_eval.py", "validate", str(self.root)]), \
+                contextlib.redirect_stderr(io.StringIO()) as error:
+            self.assertEqual(1, run_scenario_eval.main())
+        self.assertTrue(error.getvalue().startswith("error:"))
+
     @mock.patch("run_scenario_eval.subprocess.run")
     def test_capture_is_compatible_with_existing_blind_judge(self, run):
         run.return_value = subprocess.CompletedProcess(

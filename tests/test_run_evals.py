@@ -1,6 +1,8 @@
 import argparse
+import contextlib
 import datetime
 import hashlib
+import io
 import json
 import subprocess
 import sys
@@ -18,6 +20,36 @@ import run_evals  # noqa: E402
 
 
 class EvaluationHarnessTest(unittest.TestCase):
+    def test_plan_emits_one_row_per_case_trial_and_condition(self):
+        cases_path = ROOT / "evals" / "holdout-cases.jsonl"
+        case_ids = {case["id"] for case in run_evals.load_cases(cases_path)}
+        with contextlib.redirect_stdout(io.StringIO()) as output:
+            self.assertEqual(0, run_evals.main([
+                "plan", "--cases", str(cases_path), "--trials", "2", "--include-comparator",
+            ]))
+
+        rows = [json.loads(line) for line in output.getvalue().splitlines()]
+        expected = {
+            (case_id, trial, condition)
+            for case_id in case_ids
+            for trial in (1, 2)
+            for condition in ("baseline", "candidate", "comparator")
+        }
+        self.assertEqual(len(expected), len(rows))
+        self.assertEqual(expected, {
+            (row["case_id"], row["trial"], row["condition"]) for row in rows
+        })
+
+    def test_validate_and_plan_reject_an_invalid_catalog(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            cases_path = Path(temporary) / "cases.jsonl"
+            cases_path.write_text("{}\n", encoding="utf-8")
+            with contextlib.redirect_stderr(io.StringIO()) as error:
+                self.assertEqual(1, run_evals.main(["validate", "--cases", str(cases_path)]))
+            self.assertIn("Case 1: missing fields", error.getvalue())
+            with self.assertRaisesRegex(ValueError, "Case 1: missing fields"):
+                run_evals.main(["plan", "--cases", str(cases_path)])
+
     def test_holdout_cases_are_valid_and_frozen(self):
         # Changing a held-out case after seeing results would make it a tuning case;
         # replace the whole set for a new comparison instead.
@@ -266,6 +298,15 @@ class EvaluationHarnessTest(unittest.TestCase):
         measured = run_evals.summarize_usage(rows, "comparator")
         self.assertAlmostEqual(-50, measured["delta"]["candidate"]["cost_usd_pct"])
         self.assertNotIn("comparator", measured["delta"])
+
+        with tempfile.TemporaryDirectory() as temporary:
+            for command, records, expected in (("score", scores, summary), ("measure", rows, measured)):
+                with self.subTest(command=command):
+                    path = Path(temporary) / f"{command}.jsonl"
+                    path.write_text("".join(json.dumps(row) + "\n" for row in records), encoding="utf-8")
+                    with contextlib.redirect_stdout(io.StringIO()) as output:
+                        self.assertEqual(0, run_evals.main([command, str(path), "--reference", "comparator"]))
+                    self.assertEqual(expected, json.loads(output.getvalue()))
 
     def test_candidate_blocker_fails_release_gate(self):
         rows = []

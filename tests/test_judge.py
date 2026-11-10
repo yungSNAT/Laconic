@@ -1,8 +1,13 @@
+import contextlib
+import io
 import json
+import runpy
+import subprocess
 import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -93,6 +98,11 @@ class ParseJudgeScoresTest(unittest.TestCase):
             judge.parse_judge_scores(
                 payload, ("direct-answer", 1), {"baseline": "B", "candidate": "A"}
             )
+
+    def test_blocker_must_be_a_boolean_in_the_judges_verdict(self):
+        payload = json.dumps({"A": self._verdict(4, blocker="false")})
+        with self.assertRaisesRegex(ValueError, "blocker must be boolean"):
+            judge.parse_judge_scores(payload, ("direct-answer", 1), {"candidate": "A"})
 
     def test_json_wrapped_in_code_fences_is_still_parsed(self):
         payload = "```json\n" + json.dumps({"A": self._verdict(4), "B": self._verdict(4)}) + "\n```"
@@ -432,6 +442,97 @@ class EndToEndTest(unittest.TestCase):
             self.assertEqual({"casual-message"}, {row["case_id"] for row in rows})
             self.assertEqual(2, len(rows))
             self.assertNotEqual(0, exit_code, "skipped groups must not report success")
+
+
+class JudgeCommandTest(unittest.TestCase):
+    def setUp(self):
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        root = Path(temporary.name)
+        self.responses = root / "responses.jsonl"
+        self.output = root / "scores.jsonl"
+        config = root / "runners.json"
+        config.write_text(json.dumps({
+            "stub": {"command": ["stub-runner"], "response_format": "claude-json"},
+        }), encoding="utf-8")
+        self.options = ["--runner-config", str(config), "--runner", "stub", "--retries", "1"]
+
+    def write_responses(self, entries):
+        rows = [
+            {"case_id": case, "condition": condition, "trial": trial, "response": "102"}
+            for case, condition, trial in entries
+        ]
+        self.responses.write_text(
+            "".join(json.dumps(row) + "\n" for row in rows), encoding="utf-8"
+        )
+
+    @staticmethod
+    def verdict(*labels):
+        result = json.dumps({label: EndToEndTest.VERDICT for label in labels})
+        return subprocess.CompletedProcess(
+            [], 0, json.dumps({"result": result, "total_cost_usd": 0.25}), ""
+        )
+
+    def test_script_calibrates_using_only_the_labelled_fixture(self):
+        self.responses.write_text(json.dumps({
+            "case_id": "direct-answer", "name": "right", "response": "102", "blocker": False,
+        }) + "\n", encoding="utf-8")
+        script = ROOT / "scripts" / "judge.py"
+        argv = [str(script), *self.options, "--calibrate", str(self.responses)]
+        with mock.patch.object(sys, "argv", argv), \
+                mock.patch.object(run_evals, "_run_with_timeout", return_value=self.verdict("A")) as invoke, \
+                contextlib.redirect_stdout(io.StringIO()) as output, \
+                self.assertRaises(SystemExit) as exit_status:
+            runpy.run_path(str(script), run_name="__main__")
+        self.assertEqual(0, exit_status.exception.code)
+        self.assertEqual({"compared": 1, "agreement": 1.0, "errors": [], "cost_usd": 0.25},
+                         json.loads(output.getvalue()))
+        self.assertIn("## Response A\n\n102", invoke.call_args.kwargs["input"])
+        self.assertFalse(self.output.exists())
+
+    def test_judge_reports_empty_unexpected_and_unknown_responses(self):
+        argv = [*self.options, "--responses", str(self.responses), "--output", str(self.output)]
+        cases = (
+            ([], "no responses to judge"),
+            ([("direct-answer", name, 1) for name in ("baseline", "candidate", "comparator")],
+             r"unexpected condition\(s\): comparator"),
+            ([("unknown", name, 1) for name in ("baseline", "candidate")], "no matching case"),
+        )
+        with mock.patch.object(run_evals, "_run_with_timeout") as invoke:
+            for entries, expected in cases:
+                with self.subTest(expected=expected), self.assertRaisesRegex(ValueError, expected):
+                    self.write_responses(entries)
+                    judge.main(argv)
+        invoke.assert_not_called()
+
+    def test_resume_skips_judged_and_incomplete_trials_and_retries_failed_calls(self):
+        self.write_responses(
+            [("direct-answer", name, trial) for trial in (1, 3) for name in ("baseline", "candidate")]
+            + [("direct-answer", "baseline", 2)]
+        )
+        prior = {"case_id": "direct-answer", "trial": 1, "condition": "baseline"}
+        self.output.write_text(json.dumps(prior) + "\n", encoding="utf-8")
+        results = [
+            subprocess.CompletedProcess([], 1, "", "unavailable"),
+            subprocess.CompletedProcess([], 0, '{"result": "bad verdict"}', ""),
+            self.verdict("A", "B"),
+        ]
+        with mock.patch.object(run_evals, "_run_with_timeout", side_effect=results) as invoke, \
+                mock.patch.object(judge.time, "sleep") as backoff, \
+                contextlib.redirect_stdout(io.StringIO()) as output, \
+                contextlib.redirect_stderr(io.StringIO()) as error:
+            self.assertEqual(0, judge.main([
+                *self.options, "--responses", str(self.responses), "--output", str(self.output),
+            ]))
+        rows = run_evals.read_jsonl(self.output)
+        self.assertEqual(prior, rows[0])
+        self.assertEqual({(3, "baseline"), (3, "candidate")},
+                         {(row["trial"], row["condition"]) for row in rows[1:]})
+        self.assertEqual(3, invoke.call_count)
+        self.assertEqual([mock.call(1), mock.call(1)], backoff.call_args_list)
+        self.assertIn("skip judged direct-answer/trial 1", output.getvalue())
+        self.assertIn("Reported judge cost: $0.2500", output.getvalue())
+        self.assertIn("skip direct-answer/trial 2: missing candidate", error.getvalue())
 
 
 class CalibrateTest(unittest.TestCase):

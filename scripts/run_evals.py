@@ -738,15 +738,13 @@ def main(argv: Optional[list[str]] = None) -> int:
     if args.command == "measure":
         print(json.dumps(summarize_usage(read_jsonl(args.responses), args.reference), indent=2, allow_nan=False))
         return 0
-    if args.command == "checks":
-        cases = load_cases(args.cases)
-        errors = validate_cases(cases)
-        if errors:
-            raise ValueError("\n".join(errors))
-        print(json.dumps(summarize_checks(cases, read_jsonl(args.responses)), indent=2))
-        return 0
-    parser.error("unknown command")
-    return 2
+    # The parser rejects unknown commands. Only "checks" remains.
+    cases = load_cases(args.cases)
+    errors = validate_cases(cases)
+    if errors:
+        raise ValueError("\n".join(errors))
+    print(json.dumps(summarize_checks(cases, read_jsonl(args.responses)), indent=2))
+    return 0
 
 
 if __name__ == "__main__":

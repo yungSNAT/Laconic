@@ -5,6 +5,7 @@ import contextlib
 import io
 import json
 import pathlib
+import runpy
 import subprocess
 import sys
 import tempfile
@@ -60,6 +61,25 @@ class ScenarioEvaluationTest(unittest.TestCase):
                 contextlib.redirect_stderr(io.StringIO()) as error:
             self.assertEqual(1, run_scenario_eval.main())
         self.assertTrue(error.getvalue().startswith("error:"))
+
+    def test_script_rejects_a_frontmatter_only_candidate_skill_before_starting_capture(self):
+        skill = self.root / "empty-skill.md"
+        skill.write_text("---\nname: empty\n---\n", encoding="utf-8")
+        script = ROOT / "scripts" / "run_scenario_eval.py"
+        argv = [
+            str(script), "run", "--scenario", str(SCENARIO), "--condition", "candidate",
+            "--condition-skill", str(skill), "--model", "fixture", "--budget-usd", "1",
+            "--output", str(self.args.output),
+        ]
+        with mock.patch.object(sys, "argv", argv), \
+                mock.patch.object(subprocess, "run") as invoke, \
+                contextlib.redirect_stderr(io.StringIO()) as error, \
+                self.assertRaises(SystemExit) as exit_status:
+            runpy.run_path(str(script), run_name="__main__")
+        self.assertEqual(1, exit_status.exception.code)
+        self.assertIn("Candidate skill cannot be empty", error.getvalue())
+        self.assertFalse(self.args.output.exists())
+        invoke.assert_not_called()
 
     @mock.patch("run_scenario_eval.subprocess.run")
     def test_capture_is_compatible_with_existing_blind_judge(self, run):

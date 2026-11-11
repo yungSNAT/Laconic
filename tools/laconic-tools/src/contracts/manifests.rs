@@ -1,15 +1,15 @@
 // Copyright 2026 Ryan Duguid
 // SPDX-License-Identifier: FSL-1.1-ALv2
 
-//! Every plugin manifest declares one version and CHANGELOG.md names it. Replaces
+//! Every plugin manifest except Claude Code's declares one version and CHANGELOG.md
+//! names it. Replaces
 //! `tests/test_manifest_versions.py`.
 
 use super::{re, read, read_json, root};
 use serde_json::Value;
 use std::collections::BTreeSet;
 
-const VERSIONED: [&str; 6] = [
-    ".claude-plugin/plugin.json",
+const VERSIONED: [&str; 5] = [
     ".codex-plugin/plugin.json",
     "gemini-extension.json",
     "qwen-extension.json",
@@ -17,11 +17,14 @@ const VERSIONED: [&str; 6] = [
     "package.json",
 ];
 /// These declare no version today; if one ever does, it must agree too.
-const OPTIONAL: [&str; 3] = [
-    ".claude-plugin/marketplace.json",
-    ".agents/plugins/marketplace.json",
-    "plugin.json",
-];
+const OPTIONAL: [&str; 2] = [".agents/plugins/marketplace.json", "plugin.json"];
+
+/// Claude Code updates an installed plugin only when its version changes. With
+/// no `version`, it uses the installed commit SHA, so every change reaches users
+/// without a bump. This manifest, and the plugin's entry in the marketplace,
+/// must therefore declare none.
+const UNVERSIONED: &str = ".claude-plugin/plugin.json";
+const MARKETPLACE: &str = ".claude-plugin/marketplace.json";
 
 /// Each declared version by manifest (and plugin entry), in declaration order.
 fn declared_versions() -> Vec<(String, Value)> {
@@ -67,6 +70,16 @@ fn versioned_manifests_declare_a_version() {
     let versions = declared_versions();
     for name in VERSIONED {
         assert!(versions.iter().any(|(n, _)| n == name), "{name}");
+    }
+}
+
+#[test]
+fn claude_code_manifest_declares_no_version() {
+    let manifest = read_json(&root().join(UNVERSIONED));
+    assert!(manifest.get("version").is_none(), "{UNVERSIONED}");
+    let marketplace = read_json(&root().join(MARKETPLACE));
+    for plugin in marketplace["plugins"].as_array().into_iter().flatten() {
+        assert!(plugin.get("version").is_none(), "{MARKETPLACE}: {plugin}");
     }
 }
 

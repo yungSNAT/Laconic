@@ -142,7 +142,7 @@ claude plugin update laconic@laconic
 
 The first command refreshes the marketplace listing. The second updates the installed plugin. Restart Claude Code to load it.
 
-`claude plugin update` skips a plugin whose `version` has not changed. If you maintain a fork, bump `version` in `.claude-plugin/plugin.json` after you edit the rules.
+`.claude-plugin/plugin.json` declares no `version`, so `claude plugin update` installs the latest commit. A fork that adds a `version` must raise it after each change, or `claude plugin update` skips the plugin.
 
 ### Uninstall
 

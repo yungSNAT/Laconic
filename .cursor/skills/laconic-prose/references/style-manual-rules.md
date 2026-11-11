@@ -40,7 +40,7 @@ Prefer words for spans: from 57 to 65, between 1970 and 1980. Never combine from
 
 ### Hyphens
 
-Remove a hyphen when the phrase reads the same without it. Keep set phrases open: open source, plain language, public sector. Close established compounds: email, online, website, codebase, dataset, timeframe, roadmap, coordinate. Resolve uncertain compounds from a dictionary or the Style Manual's website.
+Use a hyphen only when needed for meaning, grammar or an established form. A phrase before a noun does not automatically need one: write code review findings and test coverage report. Remove a hyphen when the phrase reads the same without it. Keep set phrases open: open source, plain language, public sector. Close established compounds: email, online, website, codebase, dataset, timeframe, roadmap, coordinate. Resolve uncertain compounds from a dictionary or the Style Manual's website.
 
 Temporary compound modifiers take a hyphen before a noun only when needed, and stay open after it: up-to-date accounts; accounts are up to date. Compounds with 2 adjectives or a noun plus an adjective keep it in both positions. Never hyphenate compounds modified by very, particularly, least or most. Preserve meaningful participle, numeral and fixed compounds: well-known, 4-part, forty-five, go-ahead, mother-in-law. An adverb ending in -ly takes no hyphen; fully-fashioned and fully-fledged are exceptions.
 

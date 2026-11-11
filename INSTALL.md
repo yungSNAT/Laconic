@@ -47,7 +47,7 @@ Before sending original prose, check:
 - 'whilst' and 'amongst', not 'while' and 'among';
 - numerals from 2, even 'all 3', except at a sentence start;
 - no serial comma ('logs, metrics and traces') unless it prevents a misreading;
-- no em dashes or unnecessary hyphens ('open source software'); financial years as 2026-27.
+- no em dashes or unnecessary hyphens; financial years as 2026-27.
 
 This is enough for routine chat, comments, handoffs, emails, short repository prose and small edits. For substantial drafting or editing, or a requested prose audit, load the `laconic-prose` skill. Reuse loaded guidance and consult its references only as needed. This routing overrides broader default reading requirements. Report an editorial score only when asked.
 ```
@@ -231,7 +231,7 @@ Before sending original prose, check:
 - 'whilst' and 'amongst', not 'while' and 'among';
 - numerals from 2, even 'all 3', except at a sentence start;
 - no serial comma ('logs, metrics and traces') unless it prevents a misreading;
-- no em dashes or unnecessary hyphens ('open source software'); financial years as 2026-27.
+- no em dashes or unnecessary hyphens; financial years as 2026-27.
 
 This is enough for routine chat, comments, handoffs, emails, short repository prose and small edits. For substantial drafting or editing, or a requested prose audit, load the `laconic-prose` skill. Reuse loaded guidance and consult its references only as needed. This routing overrides broader default reading requirements. Report an editorial score only when asked.
 ```
@@ -293,7 +293,7 @@ Before sending original prose, check:
 - 'whilst' and 'amongst', not 'while' and 'among';
 - numerals from 2, even 'all 3', except at a sentence start;
 - no serial comma ('logs, metrics and traces') unless it prevents a misreading;
-- no em dashes or unnecessary hyphens ('open source software'); financial years as 2026-27.
+- no em dashes or unnecessary hyphens; financial years as 2026-27.
 
 This is enough for routine chat, comments, handoffs, emails, short repository prose and small edits. For substantial drafting or editing, or a requested prose audit, load the `laconic-prose` skill. Reuse loaded guidance and consult its references only as needed. This routing overrides broader default reading requirements. Report an editorial score only when asked.
 ```
@@ -415,7 +415,7 @@ Before sending original prose, check:
 - 'whilst' and 'amongst', not 'while' and 'among';
 - numerals from 2, even 'all 3', except at a sentence start;
 - no serial comma ('logs, metrics and traces') unless it prevents a misreading;
-- no em dashes or unnecessary hyphens ('open source software'); financial years as 2026-27.
+- no em dashes or unnecessary hyphens; financial years as 2026-27.
 
 This is enough for routine chat, comments, handoffs, emails, short repository prose and small edits. For substantial drafting or editing, or a requested prose audit, load the `laconic-prose` skill. Reuse loaded guidance and consult its references only as needed. This routing overrides broader default reading requirements. Report an editorial score only when asked.
 ```
@@ -481,7 +481,7 @@ Before sending original prose, check:
 - 'whilst' and 'amongst', not 'while' and 'among';
 - numerals from 2, even 'all 3', except at a sentence start;
 - no serial comma ('logs, metrics and traces') unless it prevents a misreading;
-- no em dashes or unnecessary hyphens ('open source software'); financial years as 2026-27.
+- no em dashes or unnecessary hyphens; financial years as 2026-27.
 
 This is enough for routine chat, comments, handoffs, emails, short repository prose and small edits. For substantial drafting or editing, or a requested prose audit, load the `laconic-prose` skill. Reuse loaded guidance and consult its references only as needed. This routing overrides broader default reading requirements. Report an editorial score only when asked.
 ```
@@ -802,7 +802,7 @@ Before sending original prose, check:
 - 'whilst' and 'amongst', not 'while' and 'among';
 - numerals from 2, even 'all 3', except at a sentence start;
 - no serial comma ('logs, metrics and traces') unless it prevents a misreading;
-- no em dashes or unnecessary hyphens ('open source software'); financial years as 2026-27.
+- no em dashes or unnecessary hyphens; financial years as 2026-27.
 
 This is enough for routine chat, comments, handoffs, emails, short repository prose and small edits. For substantial drafting or editing, or a requested prose audit, load the `laconic-prose` skill. Reuse loaded guidance and consult its references only as needed. This routing overrides broader default reading requirements. Report an editorial score only when asked.
 ```
@@ -872,7 +872,7 @@ Before sending original prose, check:
 - 'whilst' and 'amongst', not 'while' and 'among';
 - numerals from 2, even 'all 3', except at a sentence start;
 - no serial comma ('logs, metrics and traces') unless it prevents a misreading;
-- no em dashes or unnecessary hyphens ('open source software'); financial years as 2026-27.
+- no em dashes or unnecessary hyphens; financial years as 2026-27.
 
 This is enough for routine chat, comments, handoffs, emails, short repository prose and small edits. For substantial drafting or editing, or a requested prose audit, load the `laconic-prose` skill. Reuse loaded guidance and consult its references only as needed. This routing overrides broader default reading requirements. Report an editorial score only when asked.
 ```

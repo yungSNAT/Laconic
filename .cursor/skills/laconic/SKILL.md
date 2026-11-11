@@ -44,7 +44,7 @@ Follow the Australian Government Style Manual and the first spelling in the Macq
 - **Numbers:** 'zero' and 'one' in words, numerals from 2 (including 'the other 2', 'all 3' and 'there are 2 risks'), words at the start of a sentence; commas in numbers of 4 or more digits (1,000); per cent in prose, 12% with numerals; a space before units (10 km); ordinals first to ninth in words, then 10th.
 - **Dates and times:** 19 October 2026, with no ordinal or comma; 9:30 am. House rule: financial years take a hyphen (2026-27), where the Style Manual uses an en dash.
 - **Other forms:** 'for example' and 'that is' instead of Latin abbreviations; whilst and amongst, not 'while' and 'among' (house rule; keep noun uses such as 'a while'); singular 'they' when gender is unknown.
-- **Dashes and hyphens:** no em dashes in original prose. Drop a hyphen when the phrase reads the same without it: open source project, but up-to-date accounts.
+- **Dashes and hyphens:** no em dashes in original prose. Use a hyphen only when needed for meaning, grammar or an established form. Do not automatically hyphenate words before a noun: write 'code review findings', 'test coverage report' and 'plain language guide'. Keep necessary forms such as 'up-to-date accounts' and meaningful distinctions such as 're-sign' versus 'resign'. Protected literals stay exact.
 
 Details are in the `laconic-prose` skill's `references/style-manual-rules.md`.
 

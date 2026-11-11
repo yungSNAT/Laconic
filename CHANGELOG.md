@@ -2,7 +2,7 @@
 
 This file follows the shape of [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and is built from `git log`. The plugin and `laconic-check` are versioned separately. Dates are commit dates. Numbers in brackets are pull requests.
 
-The manifests still declare plugin 0.5.0, so a build from `main` carries that version plus the Unreleased changes. `v0.4.1`, `laconic-check-v0.1.0`, `laconic-check-v0.2.0` and `laconic-check-v0.3.0` are tagged; plugin 0.5.0 has no tag or release.
+The manifests other than Claude Code's still declare plugin 0.5.0, so a build from `main` carries that version plus the Unreleased changes. `v0.4.1`, `laconic-check-v0.1.0`, `laconic-check-v0.2.0` and `laconic-check-v0.3.0` are tagged; plugin 0.5.0 has no tag or release.
 
 ## [Unreleased]
 
@@ -31,6 +31,7 @@ The manifests still declare plugin 0.5.0, so a build from `main` carries that ve
 
 ### Plugin: fixed
 
+- Claude Code installs follow each commit: `.claude-plugin/plugin.json` no longer declares a version, so `claude plugin update` stops skipping changes made since 0.5.0.
 - Validate eval inputs and record requested model metadata (#20).
 - Make hook trimming linear (#29).
 - Remove the copy of the Australian Government Style Manual and correct the claim that it is CC BY 4.0: the manual is not openly licensed. The references now send agents to stylemanual.gov.au for rules they do not cover (#62).

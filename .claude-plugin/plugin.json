@@ -1,6 +1,5 @@
 {
   "name": "laconic",
-  "version": "0.5.0",
   "description": "Concise, answer-first Claude Code output in Australian English: lead with the answer, mark unverified claims, cut filler without losing substance.",
   "author": {
     "name": "yungSNAT",

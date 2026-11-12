@@ -19,11 +19,6 @@ const MEANING_WORDS: &[&str] = &[
     "neither",
     "without",
     "cannot",
-    "can't",
-    "don't",
-    "doesn't",
-    "isn't",
-    "won't",
     "must",
     "may",
     "only",
@@ -75,9 +70,9 @@ const MEANING_PHRASES: &[&str] = &[
 ];
 
 /// Attached or following words that give a number its size or unit, with the form a
-/// quantity reports. Upper-case `M` is million and lower-case `m` is metres, and `Mb` is
-/// bits where `MB` is bytes, so these match case-sensitively; every other spelling
-/// matches in any case.
+/// quantity reports. Upper-case `M` is million and lower-case `m` is metres, `Mb` is
+/// bits where `MB` is bytes, and `g` and `L` stand alone only in those cases, so these
+/// match case-sensitively; every other spelling matches in any case.
 const QUANTITY_WORDS: &[(&[&str], &str)] = &[
     (&["k", "thousand"], "thousand"),
     (&["mn", "million", "millions"], "million"),
@@ -101,9 +96,16 @@ const QUANTITY_WORDS: &[(&[&str], &str)] = &[
     (&["kg", "kgs", "kilogram", "kilograms"], "kg"),
     (&["tonne", "tonnes"], "tonne"),
     (&["lb", "lbs", "pound", "pounds"], "lb"),
+    (&["mg", "milligram", "milligrams"], "mg"),
+    (&["gram", "grams"], "g"),
+    (&["ml", "millilitre", "millilitres", "milliliter", "milliliters"], "mL"),
+    (&["litre", "litres", "liter", "liters"], "L"),
+    (&["°c", "celsius"], "°C"),
+    (&["°f", "fahrenheit"], "°F"),
     (&["hour", "hours", "hr", "hrs"], "hour"),
     (&["minute", "minutes", "min", "mins"], "minute"),
     (&["second", "seconds", "sec", "secs"], "second"),
+    (&["ms", "millisecond", "milliseconds"], "ms"),
     (&["day", "days"], "day"),
     (&["week", "weeks"], "week"),
     (&["month", "months"], "month"),
@@ -242,6 +244,12 @@ pub fn report(original: &str, edited: &str) -> Report {
             .into_iter()
             .map(|name| format!("check name: {name}")),
     );
+    // A name only the edit has may be invented; like a lost name, it never fails.
+    lines.extend(
+        names(edited, original)
+            .into_iter()
+            .map(|name| format!("check added name: {name}")),
+    );
     lines.push(length(original, edited));
     Report {
         lines,
@@ -291,7 +299,15 @@ fn only_in(
     order: fn(usize, usize) -> (usize, usize),
 ) -> BTreeMap<&'static str, Vec<String>> {
     let mut out: BTreeMap<&'static str, Vec<String>> = BTreeMap::new();
-    let values_to: Vec<String> = numbers(to).iter().map(|n| number_value(n)).collect();
+    // Unsigned values, as a quantity carries no sign or currency.
+    let values_to: Vec<String> = numbers(to)
+        .iter()
+        .map(|n| {
+            number_value(n)
+                .trim_start_matches(|c: char| !c.is_ascii_digit())
+                .to_string()
+        })
+        .collect();
     for (kind, extract) in [
         ("number", numbers as fn(&str) -> Vec<String>),
         ("quantity", quantities),
@@ -344,9 +360,13 @@ fn only_in(
 }
 
 /// Words for meaning counts, with hedges on a number read as one: 'approximately 50' to
-/// 'about 50' is not a change.
+/// 'about 50' is not a change, and every negative contraction ('didn't', 'wasn't') reads
+/// as 'not', so 'do not' to 'don't' is not one either.
 fn meaning_tokens(text: &str) -> Vec<String> {
-    let mut tokens = words(&prose(text));
+    let mut tokens: Vec<String> = words(&prose(text))
+        .into_iter()
+        .map(|w| if w.ends_with("n't") { "not".into() } else { w })
+        .collect();
     for i in 1..tokens.len() {
         if matches!(
             tokens[i - 1].as_str(),
@@ -388,8 +408,10 @@ fn dedup(mut v: Vec<String>) -> Vec<String> {
 }
 
 /// A number's value, so a required edit such as 1000 to 1,000 is not a change. Only
-/// commas that group thousands go; '1,2,3' stays a list.
+/// commas that group thousands go; '1,2,3' stays a list. A sign or currency stays.
 fn number_value(token: &str) -> String {
+    let digits = token.find(|c: char| c.is_ascii_digit()).unwrap_or(0);
+    let (prefix, token) = token.split_at(digits);
     let whole = token
         .split('.')
         .next()
@@ -398,19 +420,24 @@ fn number_value(token: &str) -> String {
     let mut groups = whole.split(',');
     let first_fits = groups.next().is_some_and(|g| (1..=3).contains(&g.len()));
     if whole.contains(',') && first_fits && groups.all(|g| g.len() == 3) {
-        token.replace(',', "")
+        format!("{prefix}{}", token.replace(',', ""))
     } else {
-        token.to_string()
+        format!("{prefix}{token}")
     }
 }
 
-/// The text without ordered list markers, which number the layout and not the content.
+/// The text without ordered list markers, which number the layout and not the content,
+/// including a marker inside bold or strong emphasis ('**1. Plan**').
 /// shortcut: a hard-wrapped line starting '12. ' reads as a marker, so markers stop at
 /// 2 digits; a longer list reports its later markers as numbers.
 fn without_list_markers(text: &str) -> String {
     text.lines()
         .map(|line| {
             let body = line.trim_start();
+            let body = body
+                .strip_prefix("**")
+                .or_else(|| body.strip_prefix("__"))
+                .unwrap_or(body);
             let digits = body.len() - body.trim_start_matches(|c: char| c.is_ascii_digit()).len();
             let marker = (1..=2).contains(&digits)
                 && [". ", ".\t", ") ", ")\t"]
@@ -493,6 +520,8 @@ fn quantity_word(word: &str) -> Option<&'static str> {
         "Mb" => return Some("Mb"),
         "Gb" => return Some("Gb"),
         "Tb" => return Some("Tb"),
+        "g" => return Some("g"),
+        "L" => return Some("L"),
         _ => {}
     }
     let lower = word.to_lowercase();
@@ -548,7 +577,16 @@ fn numbers(text: &str) -> Vec<String> {
                 .to_string();
             let after: String = chars[j..chars.len().min(j + 12)].iter().collect();
             let percent = !token.ends_with('%') && starts_with_percent(&after);
-            out.push(if percent { token + "%" } else { token });
+            let token = if percent { token + "%" } else { token };
+            let (start, mut negative, currency) = number_prefix(&chars, i);
+            // Accounting brackets mark a negative amount: '(1,200)' or '($250)'. A bare
+            // whole number in brackets, such as a note '(3)', is an aside, not an amount.
+            let amount = !currency.is_empty() || token.contains([',', '.']);
+            if start > 0 && chars[start - 1] == '(' && chars.get(j) == Some(&')') && amount {
+                negative = true;
+            }
+            let sign = if negative { "-" } else { "" };
+            out.push(format!("{sign}{currency}{token}"));
             i = j;
         } else {
             i += 1;
@@ -569,7 +607,102 @@ fn numbers(text: &str) -> Vec<String> {
             }
         })
     }));
+    out.extend(ordinals(&text));
     out
+}
+
+/// Ordinal words count as their numerals, so 'first' matches '1st' and a dropped 'first'
+/// in 'first-time buyers' reports. 'second' is left out because it is also a unit of
+/// time, and an ordinal before a comma ('First, ...') orders the text, not the facts.
+const ORDINAL_WORDS: &[(&str, &str)] = &[
+    ("first", "1"),
+    ("third", "3"),
+    ("fourth", "4"),
+    ("fifth", "5"),
+    ("sixth", "6"),
+    ("seventh", "7"),
+    ("eighth", "8"),
+    ("ninth", "9"),
+    ("tenth", "10"),
+];
+
+/// Ordinal words in prose, except those that order the text.
+fn ordinals(text: &str) -> Vec<String> {
+    prose(text)
+        .split_whitespace()
+        .filter_map(|token| {
+            let body = token.trim_start_matches(|c: char| !c.is_alphanumeric());
+            let word: String = body
+                .chars()
+                .take_while(|c| c.is_alphabetic())
+                .collect::<String>()
+                .to_lowercase();
+            let rest = &body[word.len()..];
+            if rest.starts_with(',') {
+                return None;
+            }
+            ORDINAL_WORDS
+                .iter()
+                .find(|(w, _)| *w == word)
+                .map(|(_, n)| n.to_string())
+        })
+        .collect()
+}
+
+/// The sign and currency before the digits at `digit`: whether a minus sign makes the
+/// number negative, the currency mark with up to 3 capital letters before it ('$', 'US$',
+/// '£'), and where that prefix starts. A minus counts only at the start of a word, so
+/// '2-3' is a range and 'COVID-19' a name, and a currency mark may stand one space before
+/// the digits, as in '$ 27.99'.
+fn number_prefix(chars: &[char], digit: usize) -> (usize, bool, String) {
+    let minus = |c: char| matches!(c, '-' | '\u{2212}');
+    let currency_mark = |c: char| matches!(c, '$' | '£' | '€' | '¥');
+    let mut start = digit;
+    let mut sign_at = None;
+    if start > 0 && minus(chars[start - 1]) {
+        start -= 1;
+        sign_at = Some(start);
+    }
+    let mark = if start > 0 && currency_mark(chars[start - 1]) {
+        Some(start - 1)
+    } else if sign_at.is_none()
+        && start > 1
+        && chars[start - 1] == ' '
+        && currency_mark(chars[start - 2])
+    {
+        Some(start - 2)
+    } else {
+        None
+    };
+    let mut currency = String::new();
+    if let Some(mark) = mark {
+        let mut from = mark;
+        while from > 0 && mark - from < 3 && chars[from - 1].is_ascii_uppercase() {
+            from -= 1;
+        }
+        if from > 0 && chars[from - 1].is_alphanumeric() {
+            from = mark;
+        }
+        currency = chars[from..=mark].iter().collect();
+        start = from;
+        if sign_at.is_none() && start > 0 && minus(chars[start - 1]) {
+            start -= 1;
+            sign_at = Some(start);
+        }
+    }
+    match sign_at {
+        // A hyphen after a word or figure joins, so it is not a sign. A currency mark
+        // after it still counts: '2-$3' keeps '$3'.
+        Some(at) if at > 0 && chars[at - 1].is_alphanumeric() => {
+            let currency = if mark.is_some_and(|m| m > at) {
+                currency
+            } else {
+                String::new()
+            };
+            (at + 1, false, currency)
+        }
+        signed => (start, signed.is_some(), currency),
+    }
 }
 
 fn number_word(w: &str) -> Option<&'static str> {
@@ -984,7 +1117,7 @@ mod tests {
         let original = "Refund the fee. See the policy.";
         let edited = "You must refund the $1,200 fee within 14 days. See https://example.com/p and run `refund --all`.";
         let a = added(original, edited);
-        assert_eq!(a["number"], vec!["1,200", "14"]);
+        assert_eq!(a["number"], vec!["$1,200", "14"]);
         assert_eq!(a["url"], vec!["https://example.com/p"]);
         assert_eq!(a["code"], vec!["refund --all"]);
         assert_eq!(a["meaning word"], vec!["'must' (0 before, 1 after)"]);
@@ -1020,7 +1153,7 @@ mod tests {
         let lower_case_m = missing("A 5m cable.", "A 5M cable.");
         assert_eq!(lower_case_m["quantity"], vec!["5 m"]);
         let m = missing("Revenue was $47.3 million.", "Revenue rose.");
-        assert_eq!(m["number"], vec!["47.3"]);
+        assert_eq!(m["number"], vec!["$47.3"]);
         assert!(!m.contains_key("quantity"), "{m:?}");
     }
 
@@ -1200,5 +1333,112 @@ Priya said.",
             .is_empty()
         );
         assert!(names("Enhanced Caching Now Implemented Here.", "Cached.").is_empty());
+    }
+
+    #[test]
+    fn a_bold_list_marker_numbers_the_layout_but_a_changed_figure_still_reports() {
+        let original = "**1. Start early**\n\n**2. Keep it quiet**";
+        let edited = "1. Start early\n2. Keep it quiet";
+        assert!(missing(original, edited).is_empty());
+        assert!(added(original, edited).is_empty());
+        assert_eq!(
+            missing("**1. Pay $500 now**", "1. Pay $400 now")["number"],
+            vec!["$500"]
+        );
+        assert_eq!(
+            missing("**3 of 4** passed.", "**2 of 4** passed.")["number"],
+            vec!["3"]
+        );
+    }
+
+    #[test]
+    fn ordinal_words_are_numbers_unless_they_order_the_text() {
+        assert_eq!(
+            missing("Coaching for first-time triathletes.", "Coaching for triathletes.")["number"],
+            vec!["1"]
+        );
+        assert!(missing("It came first.", "It came 1st.").is_empty());
+        assert!(added("It came first.", "It came 1st.").is_empty());
+        assert!(missing("First, run it.", "Run it.").is_empty());
+        assert_eq!(
+            missing("Pay the first instalment.", "Pay the third instalment.")["number"],
+            vec!["1"]
+        );
+        assert_eq!(
+            added("Pay the first instalment.", "Pay the third instalment.")["number"],
+            vec!["3"]
+        );
+    }
+
+    #[test]
+    fn every_negative_contraction_counts_as_not() {
+        for original in ["The build didn't pass.", "The fee wasn't paid.", "It won't ship."] {
+            assert_eq!(
+                missing(original, &original.replace("n't", "").replace("wo ", "will "))
+                    ["meaning word"],
+                vec!["'not' (1 before, 0 after)"],
+                "{original}"
+            );
+        }
+        assert!(missing("Do not deploy.", "Don't deploy.").is_empty());
+        assert!(added("Do not deploy.", "Don't deploy.").is_empty());
+        assert!(missing("It can\u{2019}t run.", "It can not run.").is_empty());
+        assert_eq!(
+            added("The build passed.", "The build didn't pass.")["meaning word"],
+            vec!["'not' (0 before, 1 after)"]
+        );
+    }
+
+    #[test]
+    fn sign_brackets_and_currency_belong_to_the_value() {
+        for (original, edited, dropped) in [
+            ("It costs $500.", "It costs £500.", "$500"),
+            ("Pay US$5.", "Pay A$5.", "US$5"),
+            ("Growth was -3%.", "Growth was 3%.", "-3%"),
+            ("A loss of (1,200).", "A loss of 1,200.", "-1,200"),
+            ("A loss of ($250).", "A loss of $250.", "-$250"),
+            ("A refund of $250.", "A refund of ($250).", "$250"),
+        ] {
+            assert_eq!(missing(original, edited)["number"], vec![dropped], "{original}");
+        }
+        assert_eq!(added("It costs $500.", "It costs £500.")["number"], vec!["£500"]);
+        for (original, edited) in [
+            ("Growth was \u{2212}3%.", "Growth was -3%."),
+            ("A loss of (1,200).", "A loss of -1,200."),
+            ("It costs $ 27.99.", "It costs $27.99."),
+            ("A loss of -$12,000.", "A loss of -$12000."),
+            ("Read pages 2-3 on COVID-19.", "Read pages 2 to 3 on COVID 19."),
+            ("See note (3).", "See note 3."),
+        ] {
+            assert!(missing(original, edited).is_empty(), "{original}");
+            assert!(added(original, edited).is_empty(), "{original}");
+        }
+    }
+
+    #[test]
+    fn time_temperature_mass_and_volume_units_are_quantities() {
+        for (original, edited, dropped) in [
+            ("Latency is 200 ms.", "Latency is 200 s.", "200 ms"),
+            ("Store below 25 °C.", "Store below 25 °F.", "25 °C"),
+            ("Store below 25°C.", "Store below 25°F.", "25 °C"),
+            ("Take 5 mg daily.", "Take 5 g daily.", "5 mg"),
+            ("Add 2 L of water.", "Add 2 mL of water.", "2 L"),
+        ] {
+            assert_eq!(missing(original, edited)["quantity"], vec![dropped], "{original}");
+        }
+        for (original, edited) in [
+            ("Latency is 200 ms.", "Latency is 200 milliseconds."),
+            ("Take 5 g daily.", "Take 5 grams daily."),
+            ("Add 2 L of water.", "Add 2 litres of water."),
+        ] {
+            assert!(missing(original, edited).is_empty(), "{original}");
+        }
+    }
+
+    #[test]
+    fn a_name_only_the_edit_has_is_listed_and_never_fails() {
+        let report = report("The plan was approved.", "The plan was approved by Jane Smith.");
+        assert!(report.lines.contains(&"check added name: Jane Smith".to_string()));
+        assert!(!report.dropped && !report.added);
     }
 }

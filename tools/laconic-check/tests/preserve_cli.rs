@@ -40,7 +40,7 @@ fn an_invented_figure_is_advisory_unless_strict() {
     assert_eq!(code, 0);
     assert_eq!(
         out,
-        "No tracked items dropped; meaning not checked.\nadded meaning word: 'must' (0 before, 1 after)\nadded number: 1,200\nlength: 3 to 6 words (200% of the original)\n"
+        "No tracked items dropped; meaning not checked.\nadded meaning word: 'must' (0 before, 1 after)\nadded number: $1,200\nlength: 3 to 6 words (200% of the original)\n"
     );
     assert_eq!(preserve(&["--strict"], &pair).0, 1);
 }
@@ -53,7 +53,7 @@ fn a_dropped_figure_fails_with_or_without_strict() {
         (code, out.as_str()),
         (
             1,
-            "dropped number: 1,200\nlength: 4 to 3 words (75% of the original)\n"
+            "dropped number: $1,200\nlength: 4 to 3 words (75% of the original)\n"
         )
     );
     assert_eq!(preserve(&["--strict"], &pair).0, 1);
@@ -158,7 +158,7 @@ fn a_file_named_strict_is_read_after_the_option_terminator() {
     assert!(
         String::from_utf8(out.stdout)
             .unwrap()
-            .contains("added number: 1,200")
+            .contains("added number: $1,200")
     );
 }
 
@@ -214,7 +214,7 @@ fn standard_input_serves_one_side_only() {
     assert!(
         String::from_utf8(out.stdout)
             .unwrap()
-            .contains("added number: 1,200")
+            .contains("added number: $1,200")
     );
     // Closed standard input, so a regression fails here instead of waiting.
     let both = Command::new(bin)

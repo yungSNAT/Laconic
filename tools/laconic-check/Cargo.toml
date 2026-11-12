@@ -1,6 +1,6 @@
 [package]
 name = "laconic-check"
-version = "0.3.0"
+version = "0.4.0"
 edition = "2024"
 license = "FSL-1.1-ALv2"
 description = "Flags Australian English and house-style candidates in Markdown prose, and checks that an edit kept numbers, code, URLs and negations."

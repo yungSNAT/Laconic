@@ -2,15 +2,15 @@ name: laconic-check
 description: Flag Australian English and house-style candidates in Markdown prose, with an annotation for each finding.
 inputs:
   version:
-    description: The laconic-check release to download, such as 0.3.0.
+    description: The laconic-check release to download, such as 0.4.0.
     required: false
-    default: 0.3.0
+    default: 0.4.0
   files:
     description: Markdown files to lint, one path a line. Defaults to every .md and .markdown file Git tracks.
     required: false
     default: ""
   args:
-    description: Further lint options, such as --warn, separated by spaces or new lines; not --json, since the Action reads text output. Options added after 0.3.0, such as --max-findings, need a later version.
+    description: Further lint options, such as --warn, separated by spaces or new lines; not --json, since the Action reads text output. Options added in 0.4.0, such as --max-findings, need 0.4.0 or later.
     required: false
     default: ""
 runs:

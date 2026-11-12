@@ -2,7 +2,7 @@
 
 This file follows the shape of [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and is built from `git log`. The plugin and `laconic-check` are versioned separately. Dates are commit dates. Numbers in brackets are pull requests.
 
-The manifests other than Claude Code's still declare plugin 0.5.0, so a build from `main` carries that version plus the Unreleased changes. `v0.4.1`, `laconic-check-v0.1.0`, `laconic-check-v0.2.0` and `laconic-check-v0.3.0` are tagged; plugin 0.5.0 has no tag or release.
+The manifests other than Claude Code's still declare plugin 0.5.0, so a build from `main` carries that version plus the Unreleased changes. `v0.4.1`, `laconic-check-v0.1.0`, `laconic-check-v0.2.0`, `laconic-check-v0.3.0` and `laconic-check-v0.4.0` are tagged; plugin 0.5.0 has no tag or release.
 
 ## [Unreleased]
 
@@ -41,7 +41,11 @@ The manifests other than Claude Code's still declare plugin 0.5.0, so a build fr
 - Pin CI agent installs and disable lifecycle scripts (#28).
 - Keep scenario prompts out of Claude CLI arguments and reject model values that could become options (#30).
 
-### laconic-check: added
+## [laconic-check 0.4.0] - 2026-11-12
+
+### Added
+
+- `preserve` checks quotations word for word, skipping elisions and reading a quotation after a colon or dash (#81).
 
 - Advise, without failing `lint`, on stacked hedges such as 'could potentially' and 'may possibly'.
 - `laconic-tools calibrate` counts each rule's findings on 150 human-written articles from jenna-russell/human_detectors, split into calibration and held-out halves. The rule reference shows the held-out rate, and a test keeps each new advisory under 5% of the held-out articles.
@@ -54,7 +58,7 @@ The manifests other than Claude Code's still declare plugin 0.5.0, so a build fr
 - `lint` options for use as a gate: `--json`, `--disable` and `--only` for rules, `--max-findings`, `--commit-msg` for Git commit messages and `--config`, with a `.laconic-check` project file. A `<!-- laconic-check-disable-next-line rule -->` comment silences the named rules on the next line, and an `unused-suppression` advisory flags one that silences nothing. An unknown option, rule name or count exits 2. README lists the exit statuses.
 - Pre-commit hooks for Markdown files and commit messages, and a composite GitHub Action that downloads a laconic-check release, checks its SHA-256 and annotates each finding.
 
-### laconic-check: fixed
+### Fixed
 
 - Link the C runtime statically in the Windows binary, which needed the VC++ redistributable.
 - Stop reading 'may' after an ordinal as the month in 'the 13th may be rooted', found by a run over 150 human articles.
@@ -124,6 +128,7 @@ The manifests other than Claude Code's still declare plugin 0.5.0, so a build fr
 For versions before 0.5.0, see the history from tag `v0.4.1`.
 
 [Unreleased]: https://github.com/yungSNAT/laconic/commits/main
+[laconic-check 0.4.0]: https://github.com/yungSNAT/laconic/releases/tag/laconic-check-v0.4.0
 [laconic-check 0.3.0]: https://github.com/yungSNAT/laconic/releases/tag/laconic-check-v0.3.0
 [laconic-check 0.2.0]: https://github.com/yungSNAT/laconic/releases/tag/laconic-check-v0.2.0
 [laconic-check 0.1.0]: https://github.com/yungSNAT/laconic/releases/tag/laconic-check-v0.1.0

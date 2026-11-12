@@ -205,7 +205,7 @@ cargo run --manifest-path tools/laconic-check/Cargo.toml -- preserve original.md
 
 Prebuilt binaries for Linux (x86_64, static), Windows (x86_64) and macOS (Apple silicon) are attached to each `laconic-check-v*` release, with SHA-256 checksums; put the binary on the PATH. Building from source needs only Rust.
 
-Releases after 0.3.0 also carry a build provenance attestation for each archive and manifests for Scoop, Homebrew, winget and the MCP Registry. Their MCP bundle, `laconic-check.mcpb`, installs in Claude Desktop in one step. Check a downloaded archive with `gh attestation verify <archive> --repo yungSNAT/Laconic`. Scoop installs straight from the release:
+Releases from 0.4.0 also carry a build provenance attestation for each archive and manifests for Scoop, Homebrew, winget and the MCP Registry. Their MCP bundle, `laconic-check.mcpb`, installs in Claude Desktop in one step. Check a downloaded archive with `gh attestation verify <archive> --repo yungSNAT/Laconic`. Scoop installs straight from the release:
 
 ```bash
 scoop install https://github.com/yungSNAT/Laconic/releases/latest/download/laconic-check.json
@@ -247,7 +247,7 @@ The Color Purple won the prize.
 | 1 | `lint` found more failing findings than allowed; `preserve` found an item dropped, or one added under `--strict`. |
 | 2 | A usage, project file or read error, or an input or output error in `mcp`. |
 
-To run it with [pre-commit](https://pre-commit.com), put `laconic-check` on the PATH and add its hooks; the commit message hook also needs `pre-commit install --hook-type commit-msg`, and a laconic-check release later than 0.3.0, which lacks `--commit-msg`:
+To run it with [pre-commit](https://pre-commit.com), put `laconic-check` on the PATH and add its hooks; the commit message hook also needs `pre-commit install --hook-type commit-msg`, and laconic-check 0.4.0 or later, as 0.3.0 lacks `--commit-msg`:
 
 ```yaml
 repos:
@@ -264,7 +264,7 @@ In GitHub Actions, the composite Action downloads a laconic-check release for th
 - uses: actions/checkout@v7
 - uses: yungSNAT/Laconic@<commit>
   with:
-    version: 0.3.0     # the laconic-check release; 0.3.0 by default
+    version: 0.4.0     # the laconic-check release; 0.4.0 by default
     files: README.md   # one path a line; default: every .md and .markdown file Git tracks
     args: --warn       # further lint options
 ```

@@ -34,6 +34,8 @@ class FactAuditAgreementTest(unittest.TestCase):
         )
         self.assertEqual({"num", "quote", "meaning", "ent"}, faa.flagged(report))
         self.assertEqual({"num"}, faa.flagged("dropped quantity: 25 °C\n"))
+        self.assertEqual({"other"}, faa.flagged("dropped month: May 2026\ndropped url: https://example.com/p\n"))
+        self.assertEqual({"other"}, faa.flagged("dropped code: `refund --all`\n"))
         self.assertEqual(set(), faa.flagged("No tracked items dropped; meaning not checked.\nadded number: 4\n"))
 
     def test_judged_documents_keep_only_the_cycle_commercial_rows(self):
@@ -45,6 +47,12 @@ class FactAuditAgreementTest(unittest.TestCase):
         ]
         self.assertEqual({("a", "s01"): {"num"}, ("a", "s02"): set()}, faa.judged_documents(rows))
 
+    def test_judged_documents_refuse_a_repeat_or_a_non_boolean_kept(self):
+        with self.assertRaisesRegex(RuntimeError, "judged twice"):
+            faa.judged_documents([judged("a", "s01", []), judged("a", "s01", [unit("num", False)])])
+        with self.assertRaisesRegex(RuntimeError, "non-boolean 'kept'"):
+            faa.judged_documents([judged("a", "s01", [unit("num", "no")])])
+
     def test_tally_counts_catches_and_failures_on_kept_documents(self):
         counts = faa.tally(
             [
@@ -53,6 +61,7 @@ class FactAuditAgreementTest(unittest.TestCase):
                 (set(), False, set()),
                 (set(), True, {"meaning"}),
                 (set(), True, {"quote", "meaning"}),
+                (set(), True, {"other", "meaning"}),
             ]
         )
         self.assertEqual(2, counts["altered"])
@@ -60,15 +69,20 @@ class FactAuditAgreementTest(unittest.TestCase):
         self.assertEqual((1, 1), (counts["num altered"], counts["num flagged"]))
         self.assertEqual((1, 0), (counts["quote altered"], counts["quote flagged"]))
         self.assertEqual((1, 0), (counts["ent altered"], counts["ent flagged"]))
-        self.assertEqual(3, counts["kept"])
+        self.assertEqual(4, counts["kept"])
         self.assertEqual(1, counts["kept passed"])
         self.assertEqual(1, counts["kept failed on meaning words only"])
         self.assertEqual(1, counts["kept failed on numbers or quotations"])
+        self.assertEqual(1, counts["kept failed on months, code or URLs"])
         text = faa.table(counts)
         self.assertIn("| Any unit altered | 2 | 2 fail |", text)
         self.assertIn("| Numbers altered | 1 | 1 report a dropped number or quantity |", text)
         self.assertIn("| Names altered | 1 | 0 list a name to check |", text)
-        self.assertIn("| Every unit kept | 3 | 1 pass; 1 fail only on meaning words; 1 fail on a number", text)
+        self.assertIn(
+            "| Every unit kept | 4 | 1 pass; 1 fail only on meaning words; 1 fail on a month, inline code or URL; "
+            "1 fail on a number",
+            text,
+        )
 
     def test_run_compares_each_pair_and_lists_the_differences(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -116,6 +130,25 @@ class FactAuditAgreementTest(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "no benchmark rewrite"):
                 faa.run("lc", cache, lambda *args: (False, set()))
 
+    def test_run_refuses_a_repeated_or_missing_rewrite(self):
+        for rows, message in (
+            ([("s01", "Pay $500."), ("s01", "Pay $500.")], "rewrite twice"),
+            ([("s01", None)], "rewrite missing"),
+        ):
+            with tempfile.TemporaryDirectory() as tmp:
+                cache = Path(tmp)
+                (cache / "fact_units.jsonl").write_text(json.dumps(judged("t", "s01", [])), encoding="utf-8")
+                (cache / "2026-10").mkdir()
+                (cache / "2026-10" / "t.jsonl").write_text(
+                    "\n".join(
+                        json.dumps({"humanizer": "t", "sample_id": sample, "input": "Pay $500.", "output": rewrite})
+                        for sample, rewrite in rows
+                    ),
+                    encoding="utf-8",
+                )
+                with self.assertRaisesRegex(RuntimeError, message):
+                    faa.run("lc", cache, lambda *args: (False, set()))
+
     def test_preserve_reads_the_report_and_refuses_a_usage_error(self):
         dropped = subprocess.CompletedProcess(args=["x"], returncode=1, stdout="dropped number: -3%\n", stderr="")
         with mock.patch.object(faa.subprocess, "run", return_value=dropped) as called:
@@ -143,6 +176,7 @@ class FactAuditAgreementTest(unittest.TestCase):
             out = io.StringIO()
             with redirect_stdout(out):
                 self.assertEqual(0, faa.main(["--laconic-check", "lc", "--cache", "c"]))
+        self.assertIn("Judged documents: 1\n", out.getvalue())
         self.assertIn("| Any unit altered | 1 | 1 fail |", out.getvalue())
         self.assertIn("differ on numbers or quotations: 1\n- t s01: missed ['num'], extra []", out.getvalue())
 

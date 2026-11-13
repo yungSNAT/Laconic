@@ -60,16 +60,26 @@ def read_jsonl(path: Path) -> list[dict[str, Any]]:
 
 
 def judged_documents(rows: list[dict[str, Any]]) -> dict[tuple[str, str], set[str]]:
-    """The kinds of unit the paper marks altered, for each (tool, sample) of the cycle."""
-    return {
-        (row["tool"], row["sample_id"]): {unit["group"] for unit in row["units"] if not unit["kept"]}
-        for row in rows
-        if row["set"] == "commercial" and row["aihb_cycle"] == CYCLE
-    }
+    """The kinds of unit the paper marks altered, for each (tool, sample) of the cycle.
+
+    A repeated document or a unit whose `kept` is not a boolean is an error, never coerced.
+    """
+    judged: dict[tuple[str, str], set[str]] = {}
+    for row in rows:
+        if row["set"] != "commercial" or row["aihb_cycle"] != CYCLE:
+            continue
+        key = (row["tool"], row["sample_id"])
+        if key in judged:
+            raise RuntimeError(f"judged twice: {key}")
+        if any(not isinstance(unit["kept"], bool) for unit in row["units"]):
+            raise RuntimeError(f"a unit of {key} has a non-boolean 'kept'")
+        judged[key] = {unit["group"] for unit in row["units"] if not unit["kept"]}
+    return judged
 
 
 def flagged(stdout: str) -> set[str]:
-    """What a `preserve` report flags, in the paper's kinds plus 'meaning' for the rest."""
+    """What a `preserve` report flags: the paper's kinds, 'meaning' for meaning words and
+    'other' for a dropped month, inline code or URL."""
     kinds = set()
     for line in stdout.splitlines():
         if line.startswith(("dropped number:", "dropped quantity:")):
@@ -78,8 +88,10 @@ def flagged(stdout: str) -> set[str]:
             kinds.add("quote")
         elif line.startswith("check name:"):
             kinds.add("ent")
-        elif line.startswith("dropped "):
+        elif line.startswith("dropped meaning word:"):
             kinds.add("meaning")
+        elif line.startswith("dropped "):
+            kinds.add("other")
     return kinds
 
 
@@ -113,6 +125,8 @@ def tally(results: list[tuple[set[str], bool, set[str]]]) -> Counter[str]:
                 counts["kept passed"] += 1
             elif kinds & {"num", "quote"}:
                 counts["kept failed on numbers or quotations"] += 1
+            elif "other" in kinds:
+                counts["kept failed on months, code or URLs"] += 1
             else:
                 counts["kept failed on meaning words only"] += 1
     return counts
@@ -129,6 +143,7 @@ def table(counts: Counter[str]) -> str:
     rows.append(
         f"| Every unit kept | {counts['kept']} | {counts['kept passed']} pass; "
         f"{counts['kept failed on meaning words only']} fail only on meaning words; "
+        f"{counts['kept failed on months, code or URLs']} fail on a month, inline code or URL; "
         f"{counts['kept failed on numbers or quotations']} fail on a number, quantity or quotation |"
     )
     return "\n".join(rows)
@@ -143,7 +158,12 @@ def run(
     for tool in sorted({tool for tool, _ in judged}):
         path = fetch(AIHB_URL.format(tool=tool), cache / CYCLE / f"{tool}.jsonl")
         for row in read_jsonl(path):
-            pairs[(row["humanizer"], row["sample_id"])] = (row["input"], row["output"] or "")
+            key = (row["humanizer"], row["sample_id"])
+            if key in pairs:
+                raise RuntimeError(f"benchmark rewrite twice: {key}")
+            if not isinstance(row["output"], str):
+                raise RuntimeError(f"benchmark rewrite missing for {key}")
+            pairs[key] = (row["input"], row["output"])
     missing = sorted(set(judged) - set(pairs))
     if missing:
         raise RuntimeError(f"no benchmark rewrite for {missing}")
@@ -165,6 +185,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--cache", type=Path, default=ROOT / "evals" / "results" / "fact-audit")
     args = parser.parse_args(argv)
     counts, differences = run(args.laconic_check, args.cache)
+    print(f"Judged documents: {counts['altered'] + counts['kept']}\n")
     print(table(counts))
     print(f"\nDocuments where the checkers differ on numbers or quotations: {len(differences)}")
     for line in differences:

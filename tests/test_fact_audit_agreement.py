@@ -8,14 +8,14 @@ import sys
 import tempfile
 import unittest
 from collections import Counter
-from contextlib import redirect_stdout
+from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "evals"))
 
-import fact_audit_agreement as faa  # noqa: E402
+import fact_audit_agreement as faa
 
 
 def unit(group, kept):
@@ -77,23 +77,26 @@ class FactAuditAgreementTest(unittest.TestCase):
     def test_judged_documents_refuse_a_repeat_or_a_non_boolean_kept(self):
         with self.assertRaisesRegex(RuntimeError, "judged twice"):
             faa.judged_documents([judged("a", "s01", []), judged("a", "s01", [unit("num", False)])])
-        with self.assertRaisesRegex(RuntimeError, "non-boolean 'kept'"):
+        with self.assertRaisesRegex(TypeError, "non-boolean 'kept'"):
             faa.judged_documents([judged("a", "s01", [unit("num", "no")])])
 
     def test_judged_documents_refuse_malformed_units(self):
-        for units, message in (
-            ("", "not a list"),
-            ({}, "not a list"),
-            (["num"], "not a list"),
-            ([unit("date", False)], "unknown group 'date'"),
+        for units, error, message in (
+            ("", TypeError, "not a list"),
+            ({}, TypeError, "not a list"),
+            (["num"], TypeError, "not a list"),
+            ([unit("date", False)], RuntimeError, "unknown group 'date'"),
         ):
-            with self.subTest(units=units), self.assertRaisesRegex(RuntimeError, message):
+            with self.subTest(units=units), self.assertRaisesRegex(error, message):
                 faa.judged_documents([judged("a", "s01", units)])
 
     def test_read_jsonl_refuses_a_blank_line(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp, "rows.jsonl")
             path.write_text('{"a": 1}\n\n{"a": 2}\n', encoding="utf-8")
+            with self.assertRaisesRegex(RuntimeError, "line 2 is blank"):
+                faa.read_jsonl(path)
+            path.write_text('{"a": 1}\n\n', encoding="utf-8")
             with self.assertRaisesRegex(RuntimeError, "line 2 is blank"):
                 faa.read_jsonl(path)
 
@@ -169,16 +172,16 @@ class FactAuditAgreementTest(unittest.TestCase):
                 faa.run("lc", cache, lambda *args: (False, set()))
 
     def test_run_refuses_a_repeated_or_missing_rewrite(self):
-        for rows, message in (
-            ([("s01", "Pay $500."), ("s01", "Pay $500.")], "rewrite twice"),
-            ([("s01", None)], "rewrite missing"),
+        for rows, error, message in (
+            ([("s01", "Pay $500."), ("s01", "Pay $500.")], RuntimeError, "rewrite twice"),
+            ([("s01", None)], TypeError, "rewrite missing"),
         ):
             with tempfile.TemporaryDirectory() as tmp:
                 cache = Path(tmp)
                 write_cache(
                     cache, [judged("t", "s01", [])], [rewrite(sample, "Pay $500.", output) for sample, output in rows]
                 )
-                with self.assertRaisesRegex(RuntimeError, message):
+                with self.assertRaisesRegex(error, message):
                     faa.run("lc", cache, lambda *args: (False, set()))
 
     def test_run_reads_no_cache_from_another_pin(self):
@@ -207,9 +210,10 @@ class FactAuditAgreementTest(unittest.TestCase):
             self.assertEqual((True, {"num"}), faa.preserve("lc", "Growth was -3%.", "Growth was 3%."))
         self.assertEqual(["lc", "preserve"], called.call_args.args[0][:2])
         broken = subprocess.CompletedProcess(args=["x"], returncode=2, stdout="", stderr="usage")
-        with mock.patch.object(faa.subprocess, "run", return_value=broken):
-            with self.assertRaisesRegex(RuntimeError, "exited 2: usage"):
-                faa.preserve("lc", "a", "b")
+        with mock.patch.object(faa.subprocess, "run", return_value=broken), self.assertRaisesRegex(
+            RuntimeError, "exited 2: usage"
+        ):
+            faa.preserve("lc", "a", "b")
 
     def test_fetch_downloads_once_into_the_cache(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -221,6 +225,13 @@ class FactAuditAgreementTest(unittest.TestCase):
                 faa.fetch("https://example.com/f", path)
             self.assertEqual(1, opened.call_count)
             self.assertEqual("{}\n", path.read_text(encoding="utf-8"))
+
+    def test_fetch_refuses_a_scheme_other_than_http(self):
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.object(faa.urllib.request, "urlopen") as opened:
+            for url in ("file:///etc/hosts", "ftp://example.com/f"):
+                with self.subTest(url=url), self.assertRaisesRegex(ValueError, "not an http or https URL"):
+                    faa.fetch(url, Path(tmp, "file.jsonl"))
+        opened.assert_not_called()
 
     def test_an_interrupted_download_is_fetched_again(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -246,10 +257,23 @@ class FactAuditAgreementTest(unittest.TestCase):
         with mock.patch.object(faa, "run", return_value=(counts, ["t s01: missed ['num'], extra []"])):
             out = io.StringIO()
             with redirect_stdout(out):
-                self.assertEqual(0, faa.main(["--laconic-check", "lc", "--cache", "c"]))
+                self.assertEqual(0, faa.main(["--laconic-check", sys.executable, "--cache", "c"]))
         self.assertIn("Judged documents: 1\n", out.getvalue())
         self.assertIn("| Any unit altered | 1 | 1 fail |", out.getvalue())
         self.assertIn("differ on numbers or quotations: 1\n- t s01: missed ['num'], extra []", out.getvalue())
+
+    def test_main_refuses_a_binary_that_is_not_an_executable_file(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            plain = Path(tmp, "laconic-check.txt")
+            plain.write_text("not a program", encoding="utf-8")
+            for binary in (str(Path(tmp, "missing")), str(plain)):
+                err = io.StringIO()
+                with self.subTest(binary=binary), mock.patch.object(faa, "run") as run, redirect_stderr(err):
+                    with self.assertRaises(SystemExit) as stopped:
+                        faa.main(["--laconic-check", binary, "--cache", tmp])
+                    self.assertEqual(2, stopped.exception.code)
+                    self.assertIn("not an executable file", err.getvalue())
+                    run.assert_not_called()
 
     def test_the_pins_are_full_commits(self):
         for pin in (faa.AIHB_REVISION, faa.FACT_AUDIT_COMMIT):

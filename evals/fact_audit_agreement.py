@@ -19,13 +19,16 @@ from __future__ import annotations
 
 import argparse
 import json
+import shutil
 import subprocess
 import sys
 import tempfile
+import urllib.parse
 import urllib.request
 from collections import Counter
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
 CYCLE = "2026-10"
@@ -48,10 +51,14 @@ KINDS = {
 
 def fetch(url: str, path: Path) -> Path:
     """Downloads `url` to `path` once; a later run reads the cached copy. The download is
-    written under another name and then renamed, so an interrupted one leaves no `path`."""
+    written under another name and then renamed, so an interrupted one leaves no `path`.
+    Only an http or https URL is opened, never a local file or another scheme."""
+    if urllib.parse.urlsplit(url).scheme not in ("http", "https"):
+        raise ValueError(f"not an http or https URL: {url}")
     if not path.is_file():
         path.parent.mkdir(parents=True, exist_ok=True)
-        with urllib.request.urlopen(url, timeout=60) as response:
+        # Bandit B310 flags every urlopen; the scheme is checked above.
+        with urllib.request.urlopen(url, timeout=60) as response:  # nosec B310
             data = response.read()
         partial = path.with_name(path.name + ".partial")
         partial.write_bytes(data)
@@ -84,12 +91,12 @@ def judged_documents(rows: list[dict[str, Any]]) -> dict[tuple[str, str], set[st
             raise RuntimeError(f"judged twice: {key}")
         units = row["units"]
         if not isinstance(units, list) or not all(isinstance(unit, dict) for unit in units):
-            raise RuntimeError(f"the units of {key} are not a list of objects")
+            raise TypeError(f"the units of {key} are not a list of objects")
         for unit in units:
             if unit.get("group") not in KINDS:
                 raise RuntimeError(f"a unit of {key} has an unknown group {unit.get('group')!r}")
             if not isinstance(unit.get("kept"), bool):
-                raise RuntimeError(f"a unit of {key} has a non-boolean 'kept'")
+                raise TypeError(f"a unit of {key} has a non-boolean 'kept'")
         judged[key] = {unit["group"] for unit in units if not unit["kept"]}
     return judged
 
@@ -113,13 +120,19 @@ def flagged(stdout: str) -> set[str]:
 
 
 def preserve(binary: str, source: str, rewrite: str) -> tuple[bool, set[str]]:
-    """Whether `preserve` fails the rewrite, and what it flags."""
+    """Whether `preserve` fails the rewrite, and what it flags. `binary` is the executable file
+    `main` resolved; exit 0 is a pass, 1 a failure and any other status an error."""
     with tempfile.TemporaryDirectory() as tmp:
         original, edited = Path(tmp, "original.md"), Path(tmp, "edited.md")
         original.write_text(source, encoding="utf-8")
         edited.write_text(rewrite, encoding="utf-8")
-        done = subprocess.run(
-            [binary, "preserve", str(original), str(edited)], capture_output=True, text=True, encoding="utf-8"
+        # Bandit B603 flags every subprocess call; this one runs the binary main resolved, with no shell.
+        done = subprocess.run(  # nosec B603
+            [binary, "preserve", str(original), str(edited)],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            check=False,
         )
     if done.returncode not in (0, 1):
         raise RuntimeError(f"preserve exited {done.returncode}: {done.stderr.strip()}")
@@ -180,7 +193,7 @@ def run(
             if key in pairs:
                 raise RuntimeError(f"benchmark rewrite twice: {key}")
             if not isinstance(row["output"], str):
-                raise RuntimeError(f"benchmark rewrite missing for {key}")
+                raise TypeError(f"benchmark rewrite missing or not text for {key}")
             pairs[key] = (row["input"], row["output"])
     missing = sorted(set(judged) - set(pairs))
     if missing:
@@ -202,7 +215,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--laconic-check", default="laconic-check", help="the laconic-check binary")
     parser.add_argument("--cache", type=Path, default=ROOT / "evals" / "results" / "fact-audit")
     args = parser.parse_args(argv)
-    counts, differences = run(args.laconic_check, args.cache)
+    binary = shutil.which(args.laconic_check)
+    if binary is None:
+        parser.error(f"--laconic-check {args.laconic_check} is not an executable file")
+    counts, differences = run(binary, args.cache)
     print(f"Judged documents: {counts['altered'] + counts['kept']}\n")
     print(table(counts))
     print(f"\nDocuments where the checkers differ on numbers or quotations: {len(differences)}")

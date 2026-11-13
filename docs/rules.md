@@ -16,7 +16,7 @@ To report a finding that should not have been flagged, use the [false-positive f
 | [`word-choice`](#word-choice) | yes | Spelling | 1.45 | 44 of 75 |
 | [`double-quotes`](#double-quotes) | yes | Percentages, quotes and titles | 0.01 | 74 of 75 |
 | [`symbol-space`](#symbol-space) | yes | Percentages, quotes and titles | 0.00 | 0 of 75 |
-| [`serial-comma`](#serial-comma) | yes | Punctuation | 0.81 | 32 of 75 |
+| [`serial-comma`](#serial-comma) | yes | Punctuation | 0.81 | 31 of 75 |
 | [`em-dash`](#em-dash) | yes | Dashes | 6.89 | 58 of 75 |
 | [`clause-dashes`](#clause-dashes) | no (advisory) | Dashes | 0.20 | 16 of 75 |
 | [`hyphen`](#hyphen) | yes | Hyphens | under 0.01 | 0 of 75 |
@@ -60,7 +60,7 @@ The rules with no Style Manual section flag writing patterns from [patterns.md](
 
 US spellings that have an Australian form, such as 'color', 'organized' and 'skeptical', and 'percent' in prose.
 
-Fails `lint`: yes. Style Manual: [Spelling](../skills/laconic-prose/references/style-manual-rules.md#spelling). Human prose: 24 findings, 0.12 per 1,000 words. Outside articles: flags 71 of 75 held out (364 findings) and 69 of 75 for calibration.
+Fails `lint`: yes. Style Manual: [Spelling](../skills/laconic-prose/references/style-manual-rules.md#spelling). Human prose: 24 findings, 0.12 per 1,000 words. Outside articles: flags 71 of 75 held out (366 findings) and 69 of 75 for calibration.
 
 Examples: `organized`, `color plates`, `the center`, `catalog`, `analyzed`, `the skeptical review`, `Prices rose 12 percent`, `[the house color guide]`.
 
@@ -92,7 +92,7 @@ Examples: `the rate to 5 %`, `the charge to $ 27.99`.
 
 A possible comma before the final 'and' or 'or' in a list. Keep it only if it prevents a misreading.
 
-Fails `lint`: yes. Style Manual: [Punctuation](../skills/laconic-prose/references/style-manual-rules.md#punctuation). Human prose: 166 findings, 0.81 per 1,000 words. Outside articles: flags 32 of 75 held out (70 findings) and 32 of 75 for calibration.
+Fails `lint`: yes. Style Manual: [Punctuation](../skills/laconic-prose/references/style-manual-rules.md#punctuation). Human prose: 166 findings, 0.81 per 1,000 words. Outside articles: flags 31 of 75 held out (69 findings) and 32 of 75 for calibration.
 
 Example: `logs, metrics, and traces`.
 
@@ -100,7 +100,7 @@ Example: `logs, metrics, and traces`.
 
 Em dashes in original prose.
 
-Fails `lint`: yes. Style Manual: [Dashes](../skills/laconic-prose/references/style-manual-rules.md#dashes). Human prose: 1,415 findings, 6.89 per 1,000 words. Outside articles: flags 58 of 75 held out (245 findings) and 64 of 75 for calibration.
+Fails `lint`: yes. Style Manual: [Dashes](../skills/laconic-prose/references/style-manual-rules.md#dashes). Human prose: 1,415 findings, 6.89 per 1,000 words. Outside articles: flags 58 of 75 held out (248 findings) and 64 of 75 for calibration.
 
 Example: `after the go-ahead — finally.`.
 

@@ -3,7 +3,7 @@
 
 //! Candidate findings in the original prose of a Markdown file.
 //!
-//! Code (fenced and inline), URLs, link targets, HTML lines and quoted spans are
+//! Code (fenced and inline), URLs, link targets, HTML tags and quoted spans are
 //! masked before the rules run, so protected text never produces a finding, except
 //! that a double-quoted span in prose is itself a finding.
 
@@ -494,8 +494,10 @@ pub fn lint_counting(text: &str) -> (Vec<Finding>, usize) {
     let mut list_indent = None;
     // The indent and length of the current run of bold-label bullets.
     let mut labels = (0, 0);
-    // A leading YAML frontmatter block is metadata, not prose.
-    let mut in_frontmatter = text.starts_with("---\n") || text.starts_with("---\r\n");
+    // A leading YAML frontmatter block is metadata, not prose. Without its closing line, the
+    // opening `---` is a thematic break and the file is prose.
+    let mut in_frontmatter = (text.starts_with("---\n") || text.starts_with("---\r\n"))
+        && text.lines().skip(1).any(|line| line.trim_end() == "---");
     for (index, raw) in text.lines().enumerate() {
         let line_no = index + 1;
         let trimmed = raw.trim_start();
@@ -538,9 +540,9 @@ pub fn lint_counting(text: &str) -> (Vec<Finding>, usize) {
             });
             continue;
         }
-        if trimmed.is_empty() || trimmed.starts_with('<') || trimmed.starts_with('>') {
-            // A blank line ends the paragraph; HTML and block quotations are not
-            // original prose.
+        if trimmed.is_empty() || is_tag_line(trimmed) || trimmed.starts_with('>') {
+            // A blank line ends the paragraph; a line of HTML tags holds no prose, and block
+            // quotations are not original prose.
             if let Some(names) = names {
                 suppressions.push(Suppression {
                     line: line_no,
@@ -567,12 +569,13 @@ pub fn lint_counting(text: &str) -> (Vec<Finding>, usize) {
         }
         let list_item = marker_width.is_some();
         let in_list = list_indent.is_some();
-        // Headings, table rows, thematic breaks, setext underlines and indented code
-        // lines are one line each; a list item opens a block that its wrapped lines
-        // continue.
+        // Headings, table rows, lines that open with an HTML tag (`<b>Title</b>`), thematic
+        // breaks, setext underlines and indented code lines are one line each; a list item
+        // opens a block that its wrapped lines continue.
         let indented_code = paragraph.lines.is_empty() && indent >= 4 && !in_list;
         let single_line = trimmed.starts_with('#')
             || trimmed.starts_with('|')
+            || trimmed.starts_with('<')
             || is_break_line(trimmed)
             || indented_code;
         if single_line || list_item {
@@ -689,6 +692,138 @@ fn is_break_line(trimmed: &str) -> bool {
     marks.len() >= 3
         && matches!(marks[0], '-' | '*' | '_' | '=')
         && marks.iter().all(|&c| c == marks[0])
+}
+
+/// A line of HTML tags and comments only, such as `<p align="center">` or `</details>`. A tag
+/// left open runs on to the next line, so the rest of the line is inside it.
+fn is_tag_line(trimmed: &str) -> bool {
+    if !trimmed.starts_with('<') {
+        return false;
+    }
+    let chars: Vec<char> = trimmed.chars().collect();
+    let mut i = 0;
+    while i < chars.len() {
+        if chars[i].is_whitespace() {
+            i += 1;
+        } else {
+            match tag_end(&chars, i, true) {
+                Some(end) => i = end,
+                None => return false,
+            }
+        }
+    }
+    true
+}
+
+/// The index after the HTML tag, comment or autolink (`<b>`, `</b>`, `<!-- -->`,
+/// `<https://...>`) that opens at `i`, following CommonMark's raw HTML syntax, or `None` when
+/// the `<` there is text, as in 'x<y' or '\<b>'. With `open_at_end`, a tag or comment still
+/// open where `chars` ends runs to the end.
+fn tag_end(chars: &[char], i: usize, open_at_end: bool) -> Option<usize> {
+    let at = |j: usize| chars.get(j).copied();
+    // An odd run of backslashes escapes the '<'.
+    let backslashes = chars[..i].iter().rev().take_while(|&&c| c == '\\').count();
+    if at(i) != Some('<') || backslashes % 2 == 1 {
+        return None;
+    }
+    let open = || open_at_end.then_some(chars.len());
+    if starts_with(chars, i, "<!--") {
+        return (i + 4..chars.len())
+            .find(|&j| starts_with(chars, j, "-->"))
+            .map_or_else(open, |j| Some(j + 3));
+    }
+    if let Some(end) = autolink_end(chars, i) {
+        return Some(end);
+    }
+    let closing = at(i + 1) == Some('/');
+    let mut j = i + 1 + usize::from(closing);
+    if !at(j).is_some_and(|c| c.is_ascii_alphabetic()) {
+        return None;
+    }
+    while at(j).is_some_and(|c| c.is_ascii_alphanumeric() || c == '-') {
+        j += 1;
+    }
+    // Attributes, each after whitespace: a name, then optionally '=' and a value.
+    let mut spaced = false;
+    loop {
+        while at(j).is_some_and(char::is_whitespace) {
+            j += 1;
+            spaced = true;
+        }
+        match at(j) {
+            None => return open(),
+            Some('>') => return Some(j + 1),
+            Some('/') if !closing && at(j + 1) == Some('>') => return Some(j + 2),
+            Some(c) if closing || !spaced || !(c.is_ascii_alphabetic() || c == '_' || c == ':') => {
+                return None;
+            }
+            Some(_) => {}
+        }
+        while at(j).is_some_and(|c| c.is_ascii_alphanumeric() || "_.:-".contains(c)) {
+            j += 1;
+        }
+        spaced = false;
+        let mut k = j;
+        while at(k).is_some_and(char::is_whitespace) {
+            k += 1;
+        }
+        if at(k) != Some('=') {
+            continue;
+        }
+        j = k + 1;
+        while at(j).is_some_and(char::is_whitespace) {
+            j += 1;
+        }
+        match at(j) {
+            None => return open(),
+            Some(quote @ ('"' | '\'')) => match find(chars, j + 1, |c| c == quote) {
+                Some(end) => j = end + 1,
+                None => return open(),
+            },
+            Some(_) => {
+                let start = j;
+                while at(j).is_some_and(|c| !c.is_whitespace() && !"\"'=<>`".contains(c)) {
+                    j += 1;
+                }
+                if j == start {
+                    return None;
+                }
+            }
+        }
+    }
+}
+
+/// The index after a CommonMark autolink opening at `i`: `<scheme:...>`, with a scheme of 2 to
+/// 32 characters, or `<user@host>`.
+fn autolink_end(chars: &[char], i: usize) -> Option<usize> {
+    let end = find(chars, i + 1, |c| {
+        c == '<' || c == '>' || c.is_whitespace() || c.is_ascii_control()
+    })?;
+    if chars[end] != '>' {
+        return None;
+    }
+    let link = &chars[i + 1..end];
+    let uri = link.iter().position(|&c| c == ':').is_some_and(|colon| {
+        (2..=32).contains(&colon)
+            && link[0].is_ascii_alphabetic()
+            && link[1..colon]
+                .iter()
+                .all(|&c| c.is_ascii_alphanumeric() || "+.-".contains(c))
+    });
+    let email = link.iter().position(|&c| c == '@').is_some_and(|at| {
+        let (user, host) = (&link[..at], &link[at + 1..]);
+        !user.is_empty()
+            && user
+                .iter()
+                .all(|&c| c.is_ascii_alphanumeric() || ".!#$%&'*+/=?^_`{|}~-".contains(c))
+            && host.split(|&c| c == '.').all(|label| {
+                (1..=63).contains(&label.len())
+                    && label.iter().all(|&c| c.is_ascii_alphanumeric() || c == '-')
+                    && label[0] != '-'
+                    && label[label.len() - 1] != '-'
+            })
+    });
+    (uri || email).then_some(end + 1)
 }
 
 fn indent_columns(whitespace: &str) -> usize {
@@ -1114,6 +1249,14 @@ fn mask(chars: &[char]) -> (Vec<char>, Vec<usize>) {
         {
             blank(&mut out, i + 1, end + 1);
             i = end + 1;
+            continue;
+        }
+        // An HTML tag's name and attributes are markup; the text between tags is prose.
+        if c == '<'
+            && let Some(end) = tag_end(chars, i, false)
+        {
+            blank(&mut out, i, end);
+            i = end;
             continue;
         }
         if c == '"' || c == '\u{201c}' {
@@ -2259,6 +2402,68 @@ mod tests {
     fn skips_frontmatter_and_compound_final_items() {
         assert!(lint("---\ntags: \"A, B\"\n---\nFine text.").is_empty());
         assert!(rules("Read the draft, the notes, and the facts or figures.").is_empty());
+    }
+
+    #[test]
+    fn lints_a_file_whose_frontmatter_never_closes() {
+        assert_eq!(rules("---\nThe color is red.\n"), ["us-spelling"]);
+        assert_eq!(
+            rules("---\r\ntitle: x\r\nThe color is red.\r\n"),
+            ["us-spelling"]
+        );
+    }
+
+    #[test]
+    fn lints_the_text_between_html_tags_but_not_the_tags() {
+        assert_eq!(rules("<sub>The color is red.</sub>\n"), ["us-spelling"]);
+        let found = lint("<p align=\"center\"><b>The</b> color is red.</p>\n");
+        assert_eq!(
+            found
+                .iter()
+                .map(|f| (f.column, f.rule.name()))
+                .collect::<Vec<_>>(),
+            [(30, "us-spelling")]
+        );
+        assert_eq!(rules("See <a href=\"x\">the color</a>.\n"), ["us-spelling"]);
+        assert_eq!(rules("<3 the color.\n"), ["us-spelling"]);
+        // Only CommonMark's tag syntax is markup: a comparison, an escaped '<' and a '>' in a
+        // quoted attribute leave the prose visible and the attribute masked.
+        for text in [
+            "If x<y, the color is y>z.\n",
+            "Type \\<b the color> here.\n",
+            "See <a title=\"x > y\">the color</a>.\n",
+            "See <a title='x > color'>the color</a>.\n",
+            // Neither an email address nor a scheme of 2 or more characters.
+            "<color@>\n",
+            "<c:color>\n",
+        ] {
+            assert_eq!(rules(text), ["us-spelling"], "{text:?}");
+        }
+        // An odd run of backslashes escapes the '<'; an even run escapes only itself.
+        assert_eq!(rules("\\<img alt=\"color\">\n"), ["double-quotes"]);
+        assert!(rules("\\\\<img alt=\"color\">\n").is_empty());
+        // An email autolink may hold a slash before its '@'.
+        assert!(rules("Mail <colour/color@example.com> now.\n").is_empty());
+        // A line that opens with a tag stands alone, as a heading does.
+        assert_eq!(
+            rules(
+                "<b>Isoflavones and Anthocyanins</b>\nIsoflavones, sometimes called \
+                 phytoestrogens, are found in soy, lentils, and legumes.\n"
+            ),
+            ["serial-comma"]
+        );
+        for tags in [
+            "<p align=\"center\">\n",
+            "<img src=\"a.png\" alt=\"A color chart\">\n",
+            "  </details> <br>\n",
+            "<!-- -->\n",
+            "<!-- the color -->\n",
+            "<https://example.com/color>\n",
+            "<img src=\"a.png\"\n",
+            "<img alt=\"a > b\" title=\"color\" />\n",
+        ] {
+            assert!(lint(tags).is_empty(), "{tags:?}: {:?}", lint(tags));
+        }
     }
 
     #[test]

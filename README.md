@@ -264,7 +264,7 @@ In GitHub Actions, the composite Action downloads a laconic-check release for th
 - uses: actions/checkout@v7
 - uses: yungSNAT/Laconic@<commit>
   with:
-    version: 0.4.0     # the laconic-check release; 0.4.0 by default
+    version: 0.5.0     # the laconic-check release; 0.5.0 by default
     files: README.md   # one path a line; default: every .md and .markdown file Git tracks
     args: --warn       # further lint options
 ```

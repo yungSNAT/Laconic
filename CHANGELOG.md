@@ -2,7 +2,7 @@
 
 This file follows the shape of [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and is built from `git log`. The plugin and `laconic-check` are versioned separately. Dates are commit dates. Numbers in brackets are pull requests.
 
-The manifests other than Claude Code's still declare plugin 0.5.0, so a build from `main` carries that version plus the Unreleased changes. `v0.4.1`, `laconic-check-v0.1.0`, `laconic-check-v0.2.0`, `laconic-check-v0.3.0` and `laconic-check-v0.4.0` are tagged; plugin 0.5.0 has no tag or release.
+The manifests other than Claude Code's still declare plugin 0.5.0, so a build from `main` carries that version plus the Unreleased changes. `v0.4.1`, `laconic-check-v0.1.0`, `laconic-check-v0.2.0`, `laconic-check-v0.3.0`, `laconic-check-v0.4.0` and `laconic-check-v0.5.0` are tagged; plugin 0.5.0 has no tag or release.
 
 ## [Unreleased]
 
@@ -40,6 +40,22 @@ The manifests other than Claude Code's still declare plugin 0.5.0, so a build fr
 
 - Pin CI agent installs and disable lifecycle scripts (#28).
 - Keep scenario prompts out of Claude CLI arguments and reject model values that could become options (#30).
+
+## [laconic-check 0.5.0] - 2026-11-13
+
+### Added
+
+- `preserve` lists names of 2 or 3 capitalised words that an edit added on a new `check added name:` line, which never fails, and reads ms, mg, g, L, mL, °C and °F, and 'degrees Celsius' and 'degrees Fahrenheit', as units (#105).
+
+### Changed
+
+- `preserve` keeps a number's sign, accounting brackets and currency, so '-3%' to '3%', '(1,200)' to '1,200' and '$500' to '£500' now fail. Its report lines change with them: a dropped '$1,200' was 'dropped number: 1,200' and is now 'dropped number: $1,200', and a bracketed '(1,200)' is '-1,200', so a script that parses the report sees new values (#105).
+- `preserve` reads brackets as a negative sign only around money or a comma-grouped figure, '($250)' or '(1,200)'. Other bracketed numbers, such as '(62%)' and '(2.5)', are asides, so '(5%)' to '5%' passes and '(5%)' to '-5%' fails as a sign change.
+
+### Fixed
+
+- `--version` and `--help` print to standard output and exit 0; they printed usage to standard error and exited 2 (#104).
+- `preserve` reads every negative contraction, such as 'didn't' and 'wasn't', as 'not', keeps the modal in 'can't' and 'won't', and skips bold ordered list markers such as '**1.**' (#105).
 
 ## [laconic-check 0.4.0] - 2026-11-12
 
@@ -128,6 +144,7 @@ The manifests other than Claude Code's still declare plugin 0.5.0, so a build fr
 For versions before 0.5.0, see the history from tag `v0.4.1`.
 
 [Unreleased]: https://github.com/yungSNAT/laconic/commits/main
+[laconic-check 0.5.0]: https://github.com/yungSNAT/laconic/releases/tag/laconic-check-v0.5.0
 [laconic-check 0.4.0]: https://github.com/yungSNAT/laconic/releases/tag/laconic-check-v0.4.0
 [laconic-check 0.3.0]: https://github.com/yungSNAT/laconic/releases/tag/laconic-check-v0.3.0
 [laconic-check 0.2.0]: https://github.com/yungSNAT/laconic/releases/tag/laconic-check-v0.2.0

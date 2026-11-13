@@ -273,13 +273,13 @@ In GitHub Actions, the composite Action downloads a laconic-check release for th
 
 On 13 November 2026, `preserve` ran on the 363 rewrites by 11 commercial humanisers in the 2026-10 cycle of the [AI Humanizer Benchmark](https://huggingface.co/datasets/ai-humanizer-benchmark/ai-humanizer-benchmark), and its results were compared with the per-document fact judgements published with the paper [Humanized but Still True?](https://arxiv.org/abs/2611.00359). [evals/README.md](evals/README.md#fact-audit-agreement) gives the pinned revisions and the command:
 
-| Documents the paper marks as | Documents | laconic-check 0.4.0 | Unreleased |
+| Documents the paper marks as | Documents | laconic-check 0.4.0 | Unreleased (`1f66424`) |
 | --- | --- | --- | --- |
 | Any unit altered | 105 | 105 fail | 105 fail |
 | Numbers altered | 47 | 44 report a dropped number or quantity | 43 |
 | Quotations of 3 or more words altered | 58 | 58 report a dropped quotation | 58 |
 | Names altered | 28 | 20 list a name to check | 20 |
-| Every unit kept | 258 | 17 pass; 224 fail only on meaning words; 17 fail on a number, quantity or quotation | 23 pass; 222; 13 |
+| Every unit kept | 258 | 17 pass; 224 fail only on meaning words; 0 fail on a month, inline code or URL; 17 fail on a number, quantity or quotation | 23 pass; 222; 0; 13 |
 
 `laconic-check mcp` serves `lint` and `preserve` as MCP tools over standard input and output, with nothing else to install:
 

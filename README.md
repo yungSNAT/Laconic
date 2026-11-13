@@ -273,7 +273,7 @@ In GitHub Actions, the composite Action downloads a laconic-check release for th
 
 On 13 November 2026, `preserve` ran on the 363 rewrites by 11 commercial humanisers in the 2026-10 cycle of the [AI Humanizer Benchmark](https://huggingface.co/datasets/ai-humanizer-benchmark/ai-humanizer-benchmark), and its results were compared with the per-document fact judgements published with the paper [Humanized but Still True?](https://arxiv.org/abs/2611.00359). [evals/README.md](evals/README.md#fact-audit-agreement) gives the pinned revisions and the command:
 
-| Documents the paper marks as | Documents | laconic-check 0.4.0 | Unreleased (`882cb7e`) |
+| Documents the paper marks as | Documents | laconic-check 0.4.0 | laconic-check 0.5.0 |
 | --- | --- | --- | --- |
 | Any unit altered | 105 | 105 fail | 105 fail |
 | Numbers altered | 47 | 44 report a dropped number or quantity | 43 |

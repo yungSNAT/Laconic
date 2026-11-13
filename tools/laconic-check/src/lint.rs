@@ -3,7 +3,7 @@
 
 //! Candidate findings in the original prose of a Markdown file.
 //!
-//! Code (fenced and inline), URLs, link targets, HTML lines and quoted spans are
+//! Code (fenced and inline), URLs, link targets, HTML tags and quoted spans are
 //! masked before the rules run, so protected text never produces a finding, except
 //! that a double-quoted span in prose is itself a finding.
 
@@ -494,8 +494,10 @@ pub fn lint_counting(text: &str) -> (Vec<Finding>, usize) {
     let mut list_indent = None;
     // The indent and length of the current run of bold-label bullets.
     let mut labels = (0, 0);
-    // A leading YAML frontmatter block is metadata, not prose.
-    let mut in_frontmatter = text.starts_with("---\n") || text.starts_with("---\r\n");
+    // A leading YAML frontmatter block is metadata, not prose. Without its closing line, the
+    // opening `---` is a thematic break and the file is prose.
+    let mut in_frontmatter = (text.starts_with("---\n") || text.starts_with("---\r\n"))
+        && text.lines().skip(1).any(|line| line.trim_end() == "---");
     for (index, raw) in text.lines().enumerate() {
         let line_no = index + 1;
         let trimmed = raw.trim_start();
@@ -538,9 +540,9 @@ pub fn lint_counting(text: &str) -> (Vec<Finding>, usize) {
             });
             continue;
         }
-        if trimmed.is_empty() || trimmed.starts_with('<') || trimmed.starts_with('>') {
-            // A blank line ends the paragraph; HTML and block quotations are not
-            // original prose.
+        if trimmed.is_empty() || is_tag_line(trimmed) || trimmed.starts_with('>') {
+            // A blank line ends the paragraph; a line of HTML tags holds no prose, and block
+            // quotations are not original prose.
             if let Some(names) = names {
                 suppressions.push(Suppression {
                     line: line_no,
@@ -689,6 +691,48 @@ fn is_break_line(trimmed: &str) -> bool {
     marks.len() >= 3
         && matches!(marks[0], '-' | '*' | '_' | '=')
         && marks.iter().all(|&c| c == marks[0])
+}
+
+/// A line of HTML tags and comments only, such as `<p align="center">` or `</details>`. A tag
+/// left open runs on to the next line, so the rest of the line is inside it.
+fn is_tag_line(trimmed: &str) -> bool {
+    let chars: Vec<char> = trimmed.chars().collect();
+    let mut i = 0;
+    while i < chars.len() {
+        if chars[i].is_whitespace() {
+            i += 1;
+        } else if !opens_tag(&chars, i) {
+            return false;
+        } else {
+            match tag_close(&chars, i) {
+                Some(end) => i = end,
+                None => return true,
+            }
+        }
+    }
+    true
+}
+
+/// True when an HTML comment, or a tag or autolink (`<b>`, `</b>`, `<https://...>`), opens at `i`.
+fn opens_tag(chars: &[char], i: usize) -> bool {
+    let name = if chars.get(i + 1) == Some(&'/') {
+        i + 2
+    } else {
+        i + 1
+    };
+    chars.get(i) == Some(&'<')
+        && (starts_with(chars, i, "<!--") || chars.get(name).is_some_and(char::is_ascii_alphabetic))
+}
+
+/// The index after the `>` that closes the tag opening at `i`, or the `-->` of a comment.
+fn tag_close(chars: &[char], i: usize) -> Option<usize> {
+    if starts_with(chars, i, "<!--") {
+        (i + 4..chars.len())
+            .find(|&j| starts_with(chars, j, "-->"))
+            .map(|j| j + 3)
+    } else {
+        find(chars, i + 1, |x| x == '>').map(|j| j + 1)
+    }
 }
 
 fn indent_columns(whitespace: &str) -> usize {
@@ -1114,6 +1158,14 @@ fn mask(chars: &[char]) -> (Vec<char>, Vec<usize>) {
         {
             blank(&mut out, i + 1, end + 1);
             i = end + 1;
+            continue;
+        }
+        // An HTML tag's name and attributes are markup; the text between tags is prose.
+        if opens_tag(chars, i)
+            && let Some(end) = tag_close(chars, i)
+        {
+            blank(&mut out, i, end);
+            i = end;
             continue;
         }
         if c == '"' || c == '\u{201c}' {
@@ -2259,6 +2311,38 @@ mod tests {
     fn skips_frontmatter_and_compound_final_items() {
         assert!(lint("---\ntags: \"A, B\"\n---\nFine text.").is_empty());
         assert!(rules("Read the draft, the notes, and the facts or figures.").is_empty());
+    }
+
+    #[test]
+    fn lints_a_file_whose_frontmatter_never_closes() {
+        assert_eq!(rules("---\nThe color is red.\n"), ["us-spelling"]);
+        assert_eq!(rules("---\r\ntitle: x\r\nThe color is red.\r\n"), ["us-spelling"]);
+    }
+
+    #[test]
+    fn lints_the_text_between_html_tags_but_not_the_tags() {
+        assert_eq!(rules("<sub>The color is red.</sub>\n"), ["us-spelling"]);
+        let found = lint("<p align=\"center\"><b>The</b> color is red.</p>\n");
+        assert_eq!(
+            found
+                .iter()
+                .map(|f| (f.column, f.rule.name()))
+                .collect::<Vec<_>>(),
+            [(30, "us-spelling")]
+        );
+        assert_eq!(rules("See <a href=\"x\">the color</a>.\n"), ["us-spelling"]);
+        assert_eq!(rules("<3 the color.\n"), ["us-spelling"]);
+        for tags in [
+            "<p align=\"center\">\n",
+            "<img src=\"a.png\" alt=\"A color chart\">\n",
+            "  </details> <br>\n",
+            "<!-- -->\n",
+            "<!-- the color -->\n",
+            "<https://example.com/color>\n",
+            "<img src=\"a.png\"\n",
+        ] {
+            assert!(lint(tags).is_empty(), "{tags:?}: {:?}", lint(tags));
+        }
     }
 
     #[test]

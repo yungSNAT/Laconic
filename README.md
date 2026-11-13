@@ -279,7 +279,7 @@ On 13 November 2026, `preserve` ran on the 363 rewrites by 11 commercial humanis
 | Numbers altered | 47 | 44 report a dropped number or quantity | 43 |
 | Quotations of 3 or more words altered | 58 | 58 report a dropped quotation | 58 |
 | Names altered | 28 | 20 list a name to check | 20 |
-| Every unit kept | 258 | 17 pass; 224 fail only on meaning words; 17 fail on a number, quantity or quotation | 23 pass; 217; 18 |
+| Every unit kept | 258 | 17 pass; 224 fail only on meaning words; 17 fail on a number, quantity or quotation | 23 pass; 222; 13 |
 
 `laconic-check mcp` serves `lint` and `preserve` as MCP tools over standard input and output, with nothing else to install:
 

@@ -77,6 +77,27 @@ jobs:
       - name: Validate evaluation cases
         run: python scripts/run_evals.py validate
 
+  # The Cargo tests on Windows and macOS, so a platform failure shows on the PR rather than
+  # at release.
+  cargo-test:
+    name: cargo test (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Test laconic-check
+        working-directory: tools/laconic-check
+        run: cargo test --locked
+      - name: Test laconic-tools
+        working-directory: tools/laconic-tools
+        run: cargo test --locked
+
   # The upload runs apart from the tests so the OIDC token is never available
   # whilst test code runs.
   codecov:

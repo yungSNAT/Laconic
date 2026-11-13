@@ -569,12 +569,13 @@ pub fn lint_counting(text: &str) -> (Vec<Finding>, usize) {
         }
         let list_item = marker_width.is_some();
         let in_list = list_indent.is_some();
-        // Headings, table rows, thematic breaks, setext underlines and indented code
-        // lines are one line each; a list item opens a block that its wrapped lines
-        // continue.
+        // Headings, table rows, lines that open with an HTML tag (`<b>Title</b>`), thematic
+        // breaks, setext underlines and indented code lines are one line each; a list item
+        // opens a block that its wrapped lines continue.
         let indented_code = paragraph.lines.is_empty() && indent >= 4 && !in_list;
         let single_line = trimmed.starts_with('#')
             || trimmed.starts_with('|')
+            || trimmed.starts_with('<')
             || is_break_line(trimmed)
             || indented_code;
         if single_line || list_item {
@@ -2316,7 +2317,10 @@ mod tests {
     #[test]
     fn lints_a_file_whose_frontmatter_never_closes() {
         assert_eq!(rules("---\nThe color is red.\n"), ["us-spelling"]);
-        assert_eq!(rules("---\r\ntitle: x\r\nThe color is red.\r\n"), ["us-spelling"]);
+        assert_eq!(
+            rules("---\r\ntitle: x\r\nThe color is red.\r\n"),
+            ["us-spelling"]
+        );
     }
 
     #[test]
@@ -2332,6 +2336,14 @@ mod tests {
         );
         assert_eq!(rules("See <a href=\"x\">the color</a>.\n"), ["us-spelling"]);
         assert_eq!(rules("<3 the color.\n"), ["us-spelling"]);
+        // A line that opens with a tag stands alone, as a heading does.
+        assert_eq!(
+            rules(
+                "<b>Isoflavones and Anthocyanins</b>\nIsoflavones, sometimes called \
+                 phytoestrogens, are found in soy, lentils, and legumes.\n"
+            ),
+            ["serial-comma"]
+        );
         for tags in [
             "<p align=\"center\">\n",
             "<img src=\"a.png\" alt=\"A color chart\">\n",

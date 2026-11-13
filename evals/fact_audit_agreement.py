@@ -47,22 +47,33 @@ KINDS = {
 
 
 def fetch(url: str, path: Path) -> Path:
-    """Downloads `url` to `path` once; a later run reads the cached copy."""
+    """Downloads `url` to `path` once; a later run reads the cached copy. The download is
+    written under another name and then renamed, so an interrupted one leaves no `path`."""
     if not path.is_file():
         path.parent.mkdir(parents=True, exist_ok=True)
         with urllib.request.urlopen(url, timeout=60) as response:
-            path.write_bytes(response.read())
+            data = response.read()
+        partial = path.with_name(path.name + ".partial")
+        partial.write_bytes(data)
+        partial.replace(path)
     return path
 
 
 def read_jsonl(path: Path) -> list[dict[str, Any]]:
-    return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
+    """The rows of a JSON Lines file; a blank line is an error, as it may be a lost row."""
+    rows = []
+    for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+        if not line.strip():
+            raise RuntimeError(f"{path}: line {number} is blank")
+        rows.append(json.loads(line))
+    return rows
 
 
 def judged_documents(rows: list[dict[str, Any]]) -> dict[tuple[str, str], set[str]]:
     """The kinds of unit the paper marks altered, for each (tool, sample) of the cycle.
 
-    A repeated document or a unit whose `kept` is not a boolean is an error, never coerced.
+    A repeated document, units that are not a list of objects, a unit of a group other than
+    the paper's 3 or a `kept` that is not a boolean is an error, never coerced.
     """
     judged: dict[tuple[str, str], set[str]] = {}
     for row in rows:
@@ -71,9 +82,15 @@ def judged_documents(rows: list[dict[str, Any]]) -> dict[tuple[str, str], set[st
         key = (row["tool"], row["sample_id"])
         if key in judged:
             raise RuntimeError(f"judged twice: {key}")
-        if any(not isinstance(unit["kept"], bool) for unit in row["units"]):
-            raise RuntimeError(f"a unit of {key} has a non-boolean 'kept'")
-        judged[key] = {unit["group"] for unit in row["units"] if not unit["kept"]}
+        units = row["units"]
+        if not isinstance(units, list) or not all(isinstance(unit, dict) for unit in units):
+            raise RuntimeError(f"the units of {key} are not a list of objects")
+        for unit in units:
+            if unit.get("group") not in KINDS:
+                raise RuntimeError(f"a unit of {key} has an unknown group {unit.get('group')!r}")
+            if not isinstance(unit.get("kept"), bool):
+                raise RuntimeError(f"a unit of {key} has a non-boolean 'kept'")
+        judged[key] = {unit["group"] for unit in units if not unit["kept"]}
     return judged
 
 
@@ -152,11 +169,12 @@ def table(counts: Counter[str]) -> str:
 def run(
     binary: str, cache: Path, check: Callable[[str, str, str], tuple[bool, set[str]]] = preserve
 ) -> tuple[Counter[str], list[str]]:
-    """The tally over every judged document, and the ids where the 2 checkers differ."""
-    judged = judged_documents(read_jsonl(fetch(FACT_AUDIT_URL, cache / "fact_units.jsonl")))
+    """The tally over every judged document, and the ids where the 2 checkers differ. Each
+    download is cached under its pin, so a changed pin downloads afresh."""
+    judged = judged_documents(read_jsonl(fetch(FACT_AUDIT_URL, cache / FACT_AUDIT_COMMIT / "fact_units.jsonl")))
     pairs: dict[tuple[str, str], tuple[str, str]] = {}
     for tool in sorted({tool for tool, _ in judged}):
-        path = fetch(AIHB_URL.format(tool=tool), cache / CYCLE / f"{tool}.jsonl")
+        path = fetch(AIHB_URL.format(tool=tool), cache / AIHB_REVISION / CYCLE / f"{tool}.jsonl")
         for row in read_jsonl(path):
             key = (row["humanizer"], row["sample_id"])
             if key in pairs:

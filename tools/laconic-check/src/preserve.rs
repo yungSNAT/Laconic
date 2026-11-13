@@ -98,7 +98,16 @@ const QUANTITY_WORDS: &[(&[&str], &str)] = &[
     (&["lb", "lbs", "pound", "pounds"], "lb"),
     (&["mg", "milligram", "milligrams"], "mg"),
     (&["gram", "grams"], "g"),
-    (&["ml", "millilitre", "millilitres", "milliliter", "milliliters"], "mL"),
+    (
+        &[
+            "ml",
+            "millilitre",
+            "millilitres",
+            "milliliter",
+            "milliliters",
+        ],
+        "mL",
+    ),
     (&["litre", "litres", "liter", "liters"], "L"),
     (&["°c", "celsius"], "°C"),
     (&["°f", "fahrenheit"], "°F"),
@@ -1354,7 +1363,10 @@ Priya said.",
     #[test]
     fn ordinal_words_are_numbers_unless_they_order_the_text() {
         assert_eq!(
-            missing("Coaching for first-time triathletes.", "Coaching for triathletes.")["number"],
+            missing(
+                "Coaching for first-time triathletes.",
+                "Coaching for triathletes."
+            )["number"],
             vec!["1"]
         );
         assert!(missing("It came first.", "It came 1st.").is_empty());
@@ -1372,10 +1384,16 @@ Priya said.",
 
     #[test]
     fn every_negative_contraction_counts_as_not() {
-        for original in ["The build didn't pass.", "The fee wasn't paid.", "It won't ship."] {
+        for original in [
+            "The build didn't pass.",
+            "The fee wasn't paid.",
+            "It won't ship.",
+        ] {
             assert_eq!(
-                missing(original, &original.replace("n't", "").replace("wo ", "will "))
-                    ["meaning word"],
+                missing(
+                    original,
+                    &original.replace("n't", "").replace("wo ", "will ")
+                )["meaning word"],
                 vec!["'not' (1 before, 0 after)"],
                 "{original}"
             );
@@ -1399,15 +1417,25 @@ Priya said.",
             ("A loss of ($250).", "A loss of $250.", "-$250"),
             ("A refund of $250.", "A refund of ($250).", "$250"),
         ] {
-            assert_eq!(missing(original, edited)["number"], vec![dropped], "{original}");
+            assert_eq!(
+                missing(original, edited)["number"],
+                vec![dropped],
+                "{original}"
+            );
         }
-        assert_eq!(added("It costs $500.", "It costs £500.")["number"], vec!["£500"]);
+        assert_eq!(
+            added("It costs $500.", "It costs £500.")["number"],
+            vec!["£500"]
+        );
         for (original, edited) in [
             ("Growth was \u{2212}3%.", "Growth was -3%."),
             ("A loss of (1,200).", "A loss of -1,200."),
             ("It costs $ 27.99.", "It costs $27.99."),
             ("A loss of -$12,000.", "A loss of -$12000."),
-            ("Read pages 2-3 on COVID-19.", "Read pages 2 to 3 on COVID 19."),
+            (
+                "Read pages 2-3 on COVID-19.",
+                "Read pages 2 to 3 on COVID 19.",
+            ),
             ("See note (3).", "See note 3."),
         ] {
             assert!(missing(original, edited).is_empty(), "{original}");
@@ -1424,7 +1452,11 @@ Priya said.",
             ("Take 5 mg daily.", "Take 5 g daily.", "5 mg"),
             ("Add 2 L of water.", "Add 2 mL of water.", "2 L"),
         ] {
-            assert_eq!(missing(original, edited)["quantity"], vec![dropped], "{original}");
+            assert_eq!(
+                missing(original, edited)["quantity"],
+                vec![dropped],
+                "{original}"
+            );
         }
         for (original, edited) in [
             ("Latency is 200 ms.", "Latency is 200 milliseconds."),
@@ -1437,8 +1469,15 @@ Priya said.",
 
     #[test]
     fn a_name_only_the_edit_has_is_listed_and_never_fails() {
-        let report = report("The plan was approved.", "The plan was approved by Jane Smith.");
-        assert!(report.lines.contains(&"check added name: Jane Smith".to_string()));
+        let report = report(
+            "The plan was approved.",
+            "The plan was approved by Jane Smith.",
+        );
+        assert!(
+            report
+                .lines
+                .contains(&"check added name: Jane Smith".to_string())
+        );
         assert!(!report.dropped && !report.added);
     }
 }

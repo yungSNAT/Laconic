@@ -205,12 +205,16 @@ fn commit_message(text: &str) -> String {
 }
 
 fn run_lint(options: &Options) -> ExitCode {
-    let (mut findings, mut failing, mut suppressed) = (Vec::new(), 0, 0);
+    let (mut findings, mut failing, mut suppressed, mut unread) = (Vec::new(), 0, 0, false);
     for file in &options.files {
+        // `read` reports an unreadable file; the rest are still linted, and lint exits 2.
         let text = match read(file) {
             Ok(t) if options.commit_msg => commit_message(&t),
             Ok(t) => t,
-            Err(code) => return code,
+            Err(_) => {
+                unread = true;
+                continue;
+            }
         };
         let (found, silenced) = lint::lint_counting(&text);
         suppressed += silenced;
@@ -251,7 +255,9 @@ fn run_lint(options: &Options) -> ExitCode {
         ]);
         println!("{}", mcp::to_string(&report));
     }
-    if failing > options.max_findings && !options.warn {
+    if unread {
+        ExitCode::from(2)
+    } else if failing > options.max_findings && !options.warn {
         ExitCode::from(1)
     } else {
         ExitCode::SUCCESS

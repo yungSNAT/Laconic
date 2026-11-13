@@ -54,6 +54,7 @@ The manifests other than Claude Code's still declare plugin 0.5.0, so a build fr
 ### Fixed
 
 - `--version` and `--help` print to standard output and exit 0; they printed usage to standard error and exited 2 (#104).
+- `lint` reads a file whose frontmatter never closes, and prose on a line that opens with an HTML tag, such as `<sub>Note</sub>`; it skipped both without saying so. Attribute values inside tags no longer give findings (#109).
 - `preserve` reads every negative contraction, such as 'didn't' and 'wasn't', as 'not', keeps the modal in 'can't' and 'won't', and skips bold ordered list markers such as '**1.**' (#105).
 
 ## [laconic-check 0.4.0] - 2026-11-12

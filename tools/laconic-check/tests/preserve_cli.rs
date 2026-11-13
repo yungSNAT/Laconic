@@ -93,6 +93,46 @@ fn a_dropped_name_is_advisory_even_with_strict() {
 }
 
 #[test]
+fn an_added_name_is_listed_and_passes_strict() {
+    let pair = files(
+        "added-name",
+        "The plan was approved.",
+        "The plan was approved by Jane Smith.",
+    );
+    assert_eq!(
+        preserve(&["--strict"], &pair),
+        (
+            0,
+            "No tracked items dropped; meaning not checked.\ncheck added name: Jane Smith\nlength: 4 to 7 words (175% of the original)\n".into()
+        )
+    );
+}
+
+#[test]
+fn a_bracketed_percentage_or_a_temperature_in_degrees_fails_when_changed() {
+    for (name, original, edited, expected) in [
+        (
+            "percent",
+            "Margin was (5%).",
+            "Margin was 5%.",
+            "dropped number: -5%\nadded number: 5%\nlength: 3 to 3 words (100% of the original)\n",
+        ),
+        (
+            "degrees",
+            "Store below 25 degrees Celsius.",
+            "Store below 25 degrees Fahrenheit.",
+            "dropped quantity: 25 °C\nadded quantity: 25 °F\nlength: 5 to 5 words (100% of the original)\n",
+        ),
+    ] {
+        assert_eq!(
+            preserve(&[], &files(name, original, edited)),
+            (1, expected.into()),
+            "{original}"
+        );
+    }
+}
+
+#[test]
 fn a_missing_file_argument_is_a_usage_error() {
     let out = Command::new(env!("CARGO_BIN_EXE_laconic-check"))
         .args(["preserve", "--strict", "only-one.md"])

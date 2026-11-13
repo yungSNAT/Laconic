@@ -436,23 +436,26 @@ fn number_value(token: &str) -> String {
 }
 
 /// The text without ordered list markers, which number the layout and not the content,
-/// including a marker inside bold or strong emphasis ('**1. Plan**').
+/// including a marker inside bold or strong emphasis ('**1. Plan**', '**1.** Plan').
 /// shortcut: a hard-wrapped line starting '12. ' reads as a marker, so markers stop at
 /// 2 digits; a longer list reports its later markers as numbers.
 fn without_list_markers(text: &str) -> String {
     text.lines()
         .map(|line| {
             let body = line.trim_start();
-            let body = body
-                .strip_prefix("**")
-                .or_else(|| body.strip_prefix("__"))
-                .unwrap_or(body);
+            let (body, close) = ["**", "__"]
+                .iter()
+                .find_map(|mark| Some((body.strip_prefix(mark)?, *mark)))
+                .unwrap_or((body, ""));
             let digits = body.len() - body.trim_start_matches(|c: char| c.is_ascii_digit()).len();
-            let marker = (1..=2).contains(&digits)
-                && [". ", ".\t", ") ", ")\t"]
-                    .iter()
-                    .any(|marker| body[digits..].starts_with(marker));
-            if marker { &body[digits + 2..] } else { line }
+            let text = body[digits..]
+                .strip_prefix(['.', ')'])
+                .map(|rest| rest.strip_prefix(close).unwrap_or(rest))
+                .and_then(|rest| rest.strip_prefix([' ', '\t']));
+            match text {
+                Some(text) if (1..=2).contains(&digits) => text,
+                _ => line,
+            }
         })
         .collect::<Vec<_>>()
         .join("\n")
@@ -1311,6 +1314,13 @@ Priya said.",
         let edited = "1. Start early\n2. Keep it quiet";
         assert!(missing(original, edited).is_empty());
         assert!(added(original, edited).is_empty());
+        let closed = "**1.** Start early\n\n__2)__ Keep it quiet";
+        assert!(missing(closed, edited).is_empty());
+        assert!(added(closed, edited).is_empty());
+        assert_eq!(
+            missing("**1.** Pay $500 now", "1. Pay $400 now")["number"],
+            vec!["$500"]
+        );
         assert_eq!(
             missing("**1. Pay $500 now**", "1. Pay $400 now")["number"],
             vec!["$500"]

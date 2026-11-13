@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: FSL-1.1-ALv2
 
 //! `check-pi`: smoke-tests the Pi or OMP package over the agent's RPC mode, without a model
-//! request. CI runs it after installing Pi from `.github/ci/pi`.
+//! request. CI runs it after installing Pi from `ci/pi`.
 
 use serde_json::{Value, json};
 use std::fs;

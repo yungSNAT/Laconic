@@ -9,11 +9,11 @@ updates:
       codeql-action:
         patterns:
           - "github/codeql-action*"
-  # The pinned CLIs behind the load checks; see .github/ci/README.md.
+  # The pinned CLIs behind the load checks; see ci/README.md.
   - package-ecosystem: npm
     directories:
-      - /.github/ci/claude-code
-      - /.github/ci/pi
+      - /ci/claude-code
+      - /ci/pi
     schedule:
       interval: weekly
   # The fuzz targets' libFuzzer bindings; laconic-check itself has no dependencies.
@@ -23,6 +23,6 @@ updates:
       interval: weekly
   # Coverage for the Codecov upload, pinned by hash in requirements-coverage.txt.
   - package-ecosystem: pip
-    directory: /.github/ci
+    directory: /ci
     schedule:
       interval: weekly

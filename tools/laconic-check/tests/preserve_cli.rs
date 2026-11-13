@@ -40,7 +40,7 @@ fn an_invented_figure_is_advisory_unless_strict() {
     assert_eq!(code, 0);
     assert_eq!(
         out,
-        "No tracked items dropped; meaning not checked.\nadded meaning word: 'must' (0 before, 1 after)\nadded number: 1,200\nlength: 3 to 6 words (200% of the original)\n"
+        "No tracked items dropped; meaning not checked.\nadded meaning word: 'must' (0 before, 1 after)\nadded number: $1,200\nlength: 3 to 6 words (200% of the original)\n"
     );
     assert_eq!(preserve(&["--strict"], &pair).0, 1);
 }
@@ -53,7 +53,7 @@ fn a_dropped_figure_fails_with_or_without_strict() {
         (code, out.as_str()),
         (
             1,
-            "dropped number: 1,200\nlength: 4 to 3 words (75% of the original)\n"
+            "dropped number: $1,200\nlength: 4 to 3 words (75% of the original)\n"
         )
     );
     assert_eq!(preserve(&["--strict"], &pair).0, 1);
@@ -90,6 +90,46 @@ fn a_dropped_name_is_advisory_even_with_strict() {
             "No tracked items dropped; meaning not checked.\ncheck name: Priya Nair\nlength: 5 to 4 words (80% of the original)\n".into()
         )
     );
+}
+
+#[test]
+fn an_added_name_is_listed_and_passes_strict() {
+    let pair = files(
+        "added-name",
+        "The plan was approved.",
+        "The plan was approved by Jane Smith.",
+    );
+    assert_eq!(
+        preserve(&["--strict"], &pair),
+        (
+            0,
+            "No tracked items dropped; meaning not checked.\ncheck added name: Jane Smith\nlength: 4 to 7 words (175% of the original)\n".into()
+        )
+    );
+}
+
+#[test]
+fn a_bracketed_percentage_or_a_temperature_in_degrees_fails_when_changed() {
+    for (name, original, edited, expected) in [
+        (
+            "percent",
+            "Margin was (5%).",
+            "Margin was 5%.",
+            "dropped number: -5%\nadded number: 5%\nlength: 3 to 3 words (100% of the original)\n",
+        ),
+        (
+            "degrees",
+            "Store below 25 degrees Celsius.",
+            "Store below 25 degrees Fahrenheit.",
+            "dropped quantity: 25 °C\nadded quantity: 25 °F\nlength: 5 to 5 words (100% of the original)\n",
+        ),
+    ] {
+        assert_eq!(
+            preserve(&[], &files(name, original, edited)),
+            (1, expected.into()),
+            "{original}"
+        );
+    }
 }
 
 #[test]
@@ -158,7 +198,7 @@ fn a_file_named_strict_is_read_after_the_option_terminator() {
     assert!(
         String::from_utf8(out.stdout)
             .unwrap()
-            .contains("added number: 1,200")
+            .contains("added number: $1,200")
     );
 }
 
@@ -214,7 +254,7 @@ fn standard_input_serves_one_side_only() {
     assert!(
         String::from_utf8(out.stdout)
             .unwrap()
-            .contains("added number: 1,200")
+            .contains("added number: $1,200")
     );
     // Closed standard input, so a regression fails here instead of waiting.
     let both = Command::new(bin)

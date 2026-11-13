@@ -114,8 +114,8 @@ fn a_bracketed_percentage_or_a_temperature_in_degrees_fails_when_changed() {
         (
             "percent",
             "Margin was (5%).",
-            "Margin was 5%.",
-            "dropped number: -5%\nadded number: 5%\nlength: 3 to 3 words (100% of the original)\n",
+            "Margin was -5%.",
+            "dropped number: 5%\nadded number: -5%\nlength: 3 to 3 words (100% of the original)\n",
         ),
         (
             "degrees",
@@ -130,6 +130,22 @@ fn a_bracketed_percentage_or_a_temperature_in_degrees_fails_when_changed() {
             "{original}"
         );
     }
+}
+
+#[test]
+fn a_bracketed_aside_keeps_its_value_when_unbracketed() {
+    let pair = files(
+        "aside",
+        "Turnout was high (62%) this year.",
+        "Turnout was high at 62% this year.",
+    );
+    assert_eq!(
+        preserve(&[], &pair),
+        (
+            0,
+            "No tracked items dropped; meaning not checked.\nlength: 6 to 7 words (117% of the original)\n".into()
+        )
+    );
 }
 
 #[test]

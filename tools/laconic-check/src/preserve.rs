@@ -616,46 +616,7 @@ fn numbers(text: &str) -> Vec<String> {
             }
         })
     }));
-    out.extend(ordinals(&text));
     out
-}
-
-/// Ordinal words count as their numerals, so 'first' matches '1st' and a dropped 'first'
-/// in 'first-time buyers' reports. 'second' is left out because it is also a unit of
-/// time, and an ordinal before a comma ('First, ...') orders the text, not the facts.
-const ORDINAL_WORDS: &[(&str, &str)] = &[
-    ("first", "1"),
-    ("third", "3"),
-    ("fourth", "4"),
-    ("fifth", "5"),
-    ("sixth", "6"),
-    ("seventh", "7"),
-    ("eighth", "8"),
-    ("ninth", "9"),
-    ("tenth", "10"),
-];
-
-/// Ordinal words in prose, except those that order the text.
-fn ordinals(text: &str) -> Vec<String> {
-    prose(text)
-        .split_whitespace()
-        .filter_map(|token| {
-            let body = token.trim_start_matches(|c: char| !c.is_alphanumeric());
-            let word: String = body
-                .chars()
-                .take_while(|c| c.is_alphabetic())
-                .collect::<String>()
-                .to_lowercase();
-            let rest = &body[word.len()..];
-            if rest.starts_with(',') {
-                return None;
-            }
-            ORDINAL_WORDS
-                .iter()
-                .find(|(w, _)| *w == word)
-                .map(|(_, n)| n.to_string())
-        })
-        .collect()
 }
 
 /// The sign and currency before the digits at `digit`: whether a minus sign makes the
@@ -1356,28 +1317,6 @@ Priya said.",
         );
         assert_eq!(
             missing("**3 of 4** passed.", "**2 of 4** passed.")["number"],
-            vec!["3"]
-        );
-    }
-
-    #[test]
-    fn ordinal_words_are_numbers_unless_they_order_the_text() {
-        assert_eq!(
-            missing(
-                "Coaching for first-time triathletes.",
-                "Coaching for triathletes."
-            )["number"],
-            vec!["1"]
-        );
-        assert!(missing("It came first.", "It came 1st.").is_empty());
-        assert!(added("It came first.", "It came 1st.").is_empty());
-        assert!(missing("First, run it.", "Run it.").is_empty());
-        assert_eq!(
-            missing("Pay the first instalment.", "Pay the third instalment.")["number"],
-            vec!["1"]
-        );
-        assert_eq!(
-            added("Pay the first instalment.", "Pay the third instalment.")["number"],
             vec!["3"]
         );
     }

@@ -41,6 +41,11 @@ The manifests other than Claude Code's still declare plugin 0.5.0, so a build fr
 - Pin CI agent installs and disable lifecycle scripts (#28).
 - Keep scenario prompts out of Claude CLI arguments and reject model values that could become options (#30).
 
+### laconic-check: fixed
+
+- `preserve` reads 'dollars', 'euros' and 'yen' after a number as its currency, so '$30 billion' to '30 billion dollars' no longer fails, and reads every mark in the Unicode Currency Symbols block, so '₹500' to '₩500' now fails. 'Pounds' is money when either text writes '£', so '£5' to '5 pounds' no longer fails or lists an added '5 lb'.
+- `preserve` reads both bounds of a range in its unit, so '45 to 60 minutes' to '45-60 minutes' or '45–60 minutes' no longer reports 'dropped quantity: 60 minute', and '30 to 60 grams' to '30-60 grams' no longer reports '60 g'.
+
 ## [laconic-check 0.5.0] - 2026-11-13
 
 ### Added

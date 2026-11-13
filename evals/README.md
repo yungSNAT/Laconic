@@ -119,9 +119,9 @@ cargo build --release --manifest-path tools/laconic-check/Cargo.toml
 python3 evals/fact_audit_agreement.py --laconic-check tools/laconic-check/target/release/laconic-check
 ```
 
-Measured on 13 November 2026 over the 363 rewrites the paper judged (11 commercial humanisers, 33 texts each), benchmark revision `6306b2043736dd958cf39ee1d9a64956c54dd78a` and `humanizer-fact-audit` commit `e665dda0506a64c834886c94d8f328d447119a07`. A document counts under a kind when the paper marks at least one of its units of that kind altered, and `preserve` counts as reporting it when it reports any dropped item of that kind, not necessarily the same unit, so '43 of 47' is not a recall figure. The 'Unreleased' column is commit `1f66424` of the `preserve` change:
+Measured on 13 November 2026 over the 363 rewrites the paper judged (11 commercial humanisers, 33 texts each), benchmark revision `6306b2043736dd958cf39ee1d9a64956c54dd78a` and `humanizer-fact-audit` commit `e665dda0506a64c834886c94d8f328d447119a07`. A document counts under a kind when the paper marks at least one of its units of that kind altered, and `preserve` counts as reporting it when it reports any dropped item of that kind, not necessarily the same unit, so '43 of 47' is not a recall figure. The 'Unreleased' column is commit `882cb7e` of the `preserve` change. Both versions ran on Linux (x86_64), 0.4.0 as its release binary:
 
-| Documents the paper marks as | Documents | laconic-check 0.4.0 | Unreleased (`1f66424`) |
+| Documents the paper marks as | Documents | laconic-check 0.4.0 | Unreleased (`882cb7e`) |
 | --- | --- | --- | --- |
 | Any unit altered | 105 | 105 fail | 105 fail |
 | Numbers altered | 47 | 44 report a dropped number or quantity | 43 |

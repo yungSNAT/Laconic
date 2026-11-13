@@ -45,3 +45,34 @@ jobs:
         env:
           OUTCOME: ${{ steps.fault.outcome }}
         run: test "$OUTCOME" = failure
+      # Over 32,767 characters of paths, more than one Windows command line holds. A seeded
+      # fault sorts first and another last, so each lint call sees one.
+      - name: Track enough Markdown files to need 2 lint calls
+        shell: bash
+        run: |
+          mkdir -p many
+          for i in $(seq 1 600); do
+            cp tools/laconic-check/action/tests/clean.md "many/a-clean-file-with-a-long-name-to-fill-a-command-line-$i.md"
+          done
+          cp tools/laconic-check/action/tests/fault.md many/0-fault.md
+          cp tools/laconic-check/action/tests/fault.md many/z-fault.md
+          git add many
+          { echo 'MANY<<EOF'; git ls-files many; echo EOF; } >> "$GITHUB_ENV"
+      # The released binary may disagree with this checkout's prose, so one rare rule keeps the
+      # log short and --warn keeps the step's status to lint's errors.
+      - name: With no files, every tracked Markdown file is linted
+        uses: ./
+        with:
+          args: --warn --only weekday
+      - name: Findings from different lint calls count against one --max-findings
+        id: limit
+        continue-on-error: true
+        uses: ./
+        with:
+          files: ${{ env.MANY }}
+          args: --max-findings 1
+      - name: Check the 2 findings failed the step
+        shell: bash
+        env:
+          OUTCOME: ${{ steps.limit.outcome }}
+        run: test "$OUTCOME" = failure

@@ -697,42 +697,101 @@ fn is_break_line(trimmed: &str) -> bool {
 /// A line of HTML tags and comments only, such as `<p align="center">` or `</details>`. A tag
 /// left open runs on to the next line, so the rest of the line is inside it.
 fn is_tag_line(trimmed: &str) -> bool {
+    if !trimmed.starts_with('<') {
+        return false;
+    }
     let chars: Vec<char> = trimmed.chars().collect();
     let mut i = 0;
     while i < chars.len() {
         if chars[i].is_whitespace() {
             i += 1;
-        } else if !opens_tag(&chars, i) {
-            return false;
         } else {
-            match tag_close(&chars, i) {
+            match tag_end(&chars, i, true) {
                 Some(end) => i = end,
-                None => return true,
+                None => return false,
             }
         }
     }
     true
 }
 
-/// True when an HTML comment, or a tag or autolink (`<b>`, `</b>`, `<https://...>`), opens at `i`.
-fn opens_tag(chars: &[char], i: usize) -> bool {
-    let name = if chars.get(i + 1) == Some(&'/') {
-        i + 2
-    } else {
-        i + 1
-    };
-    chars.get(i) == Some(&'<')
-        && (starts_with(chars, i, "<!--") || chars.get(name).is_some_and(char::is_ascii_alphabetic))
-}
-
-/// The index after the `>` that closes the tag opening at `i`, or the `-->` of a comment.
-fn tag_close(chars: &[char], i: usize) -> Option<usize> {
+/// The index after the HTML tag, comment or autolink (`<b>`, `</b>`, `<!-- -->`,
+/// `<https://...>`) that opens at `i`, following CommonMark's raw HTML syntax, or `None` when
+/// the `<` there is text, as in 'x<y' or '\<b>'. With `open_at_end`, a tag or comment still
+/// open where `chars` ends runs to the end.
+fn tag_end(chars: &[char], i: usize, open_at_end: bool) -> Option<usize> {
+    let at = |j: usize| chars.get(j).copied();
+    if at(i) != Some('<') || (i > 0 && chars[i - 1] == '\\') {
+        return None;
+    }
+    let open = || open_at_end.then_some(chars.len());
     if starts_with(chars, i, "<!--") {
-        (i + 4..chars.len())
+        return (i + 4..chars.len())
             .find(|&j| starts_with(chars, j, "-->"))
-            .map(|j| j + 3)
-    } else {
-        find(chars, i + 1, |x| x == '>').map(|j| j + 1)
+            .map_or_else(open, |j| Some(j + 3));
+    }
+    let closing = at(i + 1) == Some('/');
+    let mut j = i + 1 + usize::from(closing);
+    if !at(j).is_some_and(|c| c.is_ascii_alphabetic()) {
+        return None;
+    }
+    while at(j).is_some_and(|c| c.is_ascii_alphanumeric() || c == '-') {
+        j += 1;
+    }
+    // An autolink: no spaces or angle brackets, and a scheme's ':' or an address's '@'.
+    if !closing && at(j).is_some_and(|c| !c.is_whitespace() && c != '>' && c != '/') {
+        let end = find(chars, i + 1, |c| c.is_whitespace() || c == '<' || c == '>')?;
+        let link = &chars[i + 1..end];
+        return (chars[end] == '>' && (link.contains(&':') || link.contains(&'@')))
+            .then_some(end + 1);
+    }
+    // Attributes, each after whitespace: a name, then optionally '=' and a value.
+    let mut spaced = false;
+    loop {
+        while at(j).is_some_and(char::is_whitespace) {
+            j += 1;
+            spaced = true;
+        }
+        match at(j) {
+            None => return open(),
+            Some('>') => return Some(j + 1),
+            Some('/') if !closing && at(j + 1) == Some('>') => return Some(j + 2),
+            Some(c) if closing || !spaced || !(c.is_ascii_alphabetic() || c == '_' || c == ':') => {
+                return None;
+            }
+            Some(_) => {}
+        }
+        while at(j).is_some_and(|c| c.is_ascii_alphanumeric() || "_.:-".contains(c)) {
+            j += 1;
+        }
+        spaced = false;
+        let mut k = j;
+        while at(k).is_some_and(char::is_whitespace) {
+            k += 1;
+        }
+        if at(k) != Some('=') {
+            continue;
+        }
+        j = k + 1;
+        while at(j).is_some_and(char::is_whitespace) {
+            j += 1;
+        }
+        match at(j) {
+            None => return open(),
+            Some(quote @ ('"' | '\'')) => match find(chars, j + 1, |c| c == quote) {
+                Some(end) => j = end + 1,
+                None => return open(),
+            },
+            Some(_) => {
+                let start = j;
+                while at(j).is_some_and(|c| !c.is_whitespace() && !"\"'=<>`".contains(c)) {
+                    j += 1;
+                }
+                if j == start {
+                    return None;
+                }
+            }
+        }
     }
 }
 
@@ -1162,8 +1221,8 @@ fn mask(chars: &[char]) -> (Vec<char>, Vec<usize>) {
             continue;
         }
         // An HTML tag's name and attributes are markup; the text between tags is prose.
-        if opens_tag(chars, i)
-            && let Some(end) = tag_close(chars, i)
+        if c == '<'
+            && let Some(end) = tag_end(chars, i, false)
         {
             blank(&mut out, i, end);
             i = end;

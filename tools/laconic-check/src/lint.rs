@@ -5,7 +5,8 @@
 //!
 //! Code (fenced and inline), URLs, link targets, HTML tags and quoted spans are
 //! masked before the rules run, so protected text never produces a finding, except
-//! that a double-quoted span in prose is itself a finding.
+//! that a double-quoted span in prose is itself a finding. Block quotations are skipped, except
+//! the body of a GitHub alert (`> [!NOTE]`), which is the author's prose.
 
 use std::collections::HashMap;
 use std::sync::OnceLock;
@@ -494,6 +495,8 @@ pub fn lint_counting(text: &str) -> (Vec<Finding>, usize) {
     let mut list_indent = None;
     // The indent and length of the current run of bold-label bullets.
     let mut labels = (0, 0);
+    // Whether the previous line was a block quotation, and whether that quotation is an alert.
+    let (mut in_quote, mut alert) = (false, false);
     // A leading YAML frontmatter block is metadata, not prose. Without its closing line, the
     // opening `---` is a thematic break and the file is prose.
     let mut in_frontmatter = (text.starts_with("---\n") || text.starts_with("---\r\n"))
@@ -507,6 +510,19 @@ pub fn lint_counting(text: &str) -> (Vec<Finding>, usize) {
             }
             continue;
         }
+        // The body of a GitHub alert, a quotation that opens with a line such as `> [!NOTE]`,
+        // is the author's prose: it is read with its `>` as a space, so columns still match.
+        let quote = trimmed.starts_with('>');
+        let opens_alert = quote && !in_quote && is_alert_marker(&trimmed[1..]);
+        in_quote = quote;
+        alert = opens_alert || (alert && quote);
+        let dequoted;
+        let (raw, trimmed) = if alert && !opens_alert {
+            dequoted = raw.replacen('>', " ", 1);
+            (dequoted.as_str(), trimmed[1..].trim_start())
+        } else {
+            (raw, trimmed)
+        };
         // A suppression silences the next non-blank line that is not itself a suppression.
         // Four columns beyond the current list item's content start form indented code.
         let indent = raw.len() - trimmed.len();
@@ -541,8 +557,8 @@ pub fn lint_counting(text: &str) -> (Vec<Finding>, usize) {
             continue;
         }
         if trimmed.is_empty() || is_tag_line(trimmed) || trimmed.starts_with('>') {
-            // A blank line ends the paragraph; a line of HTML tags holds no prose, and block
-            // quotations are not original prose.
+            // A blank line ends the paragraph; a line of HTML tags holds no prose, and other
+            // block quotations and an alert's marker line are not original prose.
             if let Some(names) = names {
                 suppressions.push(Suppression {
                     line: line_no,
@@ -692,6 +708,21 @@ fn is_break_line(trimmed: &str) -> bool {
     marks.len() >= 3
         && matches!(marks[0], '-' | '*' | '_' | '=')
         && marks.iter().all(|&c| c == marks[0])
+}
+
+/// The rest of a quotation's first line after its `>`, when it marks a GitHub alert: `[!NOTE]`,
+/// `[!TIP]`, `[!IMPORTANT]`, `[!WARNING]` or `[!CAUTION]`, in any case.
+fn is_alert_marker(rest: &str) -> bool {
+    let marker = rest.trim();
+    [
+        "[!NOTE]",
+        "[!TIP]",
+        "[!IMPORTANT]",
+        "[!WARNING]",
+        "[!CAUTION]",
+    ]
+    .iter()
+    .any(|kind| marker.eq_ignore_ascii_case(kind))
 }
 
 /// A line of HTML tags and comments only, such as `<p align="center">` or `</details>`. A tag
@@ -2463,6 +2494,28 @@ mod tests {
             "<img alt=\"a > b\" title=\"color\" />\n",
         ] {
             assert!(lint(tags).is_empty(), "{tags:?}: {:?}", lint(tags));
+        }
+    }
+
+    #[test]
+    fn lints_the_body_of_a_github_alert_but_not_other_quotations() {
+        let found = lint("> [!Note]\n> The color is red.\n>\n> - The flavor is sweet.\n");
+        assert_eq!(
+            found
+                .iter()
+                .map(|f| (f.line, f.column, f.rule.name()))
+                .collect::<Vec<_>>(),
+            [(2, 7, "us-spelling"), (4, 9, "us-spelling")]
+        );
+        // A plain quotation, one nested in an alert, a marker that does not open its
+        // quotation and a quotation after the alert's end are not the author's prose.
+        for quoted in [
+            "> The color is red.\n",
+            "> [!TIP]\n> > The color is red.\n",
+            "> Quoted.\n> [!NOTE]\n> The color is red.\n",
+            "> [!WARNING]\n> Fine.\n\n> The color is red.\n",
+        ] {
+            assert!(lint(quoted).is_empty(), "{quoted:?}: {:?}", lint(quoted));
         }
     }
 

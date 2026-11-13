@@ -119,9 +119,9 @@ cargo build --release --manifest-path tools/laconic-check/Cargo.toml
 python3 evals/fact_audit_agreement.py --laconic-check tools/laconic-check/target/release/laconic-check
 ```
 
-Measured on 13 November 2026 over the 363 rewrites the paper judged (11 commercial humanisers, 33 texts each), benchmark revision `6306b2043736dd958cf39ee1d9a64956c54dd78a` and `humanizer-fact-audit` commit `e665dda0506a64c834886c94d8f328d447119a07`. A document counts under a kind when the paper marks at least one of its units of that kind altered, and `preserve` counts as reporting it when it reports any dropped item of that kind, not necessarily the same unit, so '43 of 47' is not a recall figure. The 'Unreleased' column is commit `882cb7e` of the `preserve` change. Both versions ran on Linux (x86_64), 0.4.0 as its release binary:
+Measured on 13 November 2026 over the 363 rewrites the paper judged (11 commercial humanisers, 33 texts each), benchmark revision `6306b2043736dd958cf39ee1d9a64956c54dd78a` and `humanizer-fact-audit` commit `e665dda0506a64c834886c94d8f328d447119a07`. A document counts under a kind when the paper marks at least one of its units of that kind altered, and `preserve` counts as reporting it when it reports any dropped item of that kind, not necessarily the same unit, so '43 of 47' is not a recall figure. Both versions ran on Linux (x86_64) as release binaries; the 0.5.0 counts, rerun on 14 November, match those first measured on commit `882cb7e` before its release:
 
-| Documents the paper marks as | Documents | laconic-check 0.4.0 | Unreleased (`882cb7e`) |
+| Documents the paper marks as | Documents | laconic-check 0.4.0 | laconic-check 0.5.0 |
 | --- | --- | --- | --- |
 | Any unit altered | 105 | 105 fail | 105 fail |
 | Numbers altered | 47 | 44 report a dropped number or quantity | 43 |
@@ -129,7 +129,7 @@ Measured on 13 November 2026 over the 363 rewrites the paper judged (11 commerci
 | Names altered | 28 | 20 list a name to check | 20 |
 | Every unit kept | 258 | 17 pass; 224 fail only on meaning words; 0 fail on a month, inline code or URL; 17 fail on a number, quantity or quotation | 23 pass; 222; 0; 13 |
 
-Both versions fail every document the paper marks altered. In each of the 4 documents whose altered number the unreleased version misses, the altered unit is a 'first', and `preserve` does not read ordinal words, so neither version can see it. 0.4.0 reported one of the 4, cleverhumanizer's s17, for a wrong reason: it read the source's bold list markers ('**1.**') as numbers the rewrite dropped. The unreleased version reads them as layout, so it no longer reports a number in that document, which still fails on dropped meaning words ('not' 6 times to 2). It also stops reporting bold markers in 7 documents the paper marks fully kept.
+Both versions fail every document the paper marks altered. In each of the 4 documents whose altered number 0.5.0 misses, the altered unit is a 'first', and `preserve` does not read ordinal words, so neither version can see it. 0.4.0 reported one of the 4, cleverhumanizer's s17, for a wrong reason: it read the source's bold list markers ('**1.**') as numbers the rewrite dropped. 0.5.0 reads them as layout, so it no longer reports a number in that document, which still fails on dropped meaning words ('not' 6 times to 2). It also stops reporting bold markers in 7 documents the paper marks fully kept.
 
 The paper's judgements are the reference here, so the table measures agreement with them, not the accuracy of either checker. `preserve` never fails on a name, and it also fails on words such as 'not', 'must' and 'before', which the paper does not judge. The texts are CC BY 4.0 (AI Humanizer Benchmark); `humanizer-fact-audit` is by Ziyuan Wang, Genliang Zhu and Xiaobo Chen, its code MIT and its data CC BY 4.0. Nothing from either is stored in this repository.
 

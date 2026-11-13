@@ -612,9 +612,10 @@ fn numbers(text: &str) -> Vec<String> {
             let percent = !token.ends_with('%') && starts_with_percent(&after);
             let token = if percent { token + "%" } else { token };
             let (start, mut negative, currency) = number_prefix(&chars, i);
-            // Accounting brackets mark a negative amount: '(1,200)', '($250)' or '(5%)'. A
-            // bare whole number in brackets, such as a note '(3)', is an aside, not an amount.
-            let amount = !currency.is_empty() || token.contains([',', '.']) || token.ends_with('%');
+            // Accounting brackets mark a negative amount of money or a grouped figure: '($250)'
+            // or '(1,200)'. Any other number in brackets, such as a note '(3)', a share '(62%)'
+            // or '(1,200%)', or a ratio '(2.5)', is an aside, not an amount.
+            let amount = !currency.is_empty() || (token.contains(',') && !token.ends_with('%'));
             if start > 0 && chars[start - 1] == '(' && chars.get(j) == Some(&')') && amount {
                 negative = true;
             }
@@ -1418,7 +1419,7 @@ Priya said.",
             ("A loss of (1,200).", "A loss of 1,200.", "-1,200"),
             ("A loss of ($250).", "A loss of $250.", "-$250"),
             ("A refund of $250.", "A refund of ($250).", "$250"),
-            ("Margin was (5%).", "Margin was 5%.", "-5%"),
+            ("Margin was (5%).", "Margin was -5%.", "5%"),
         ] {
             assert_eq!(
                 missing(original, edited)["number"],
@@ -1433,6 +1434,7 @@ Priya said.",
         for (original, edited) in [
             ("Growth was \u{2212}3%.", "Growth was -3%."),
             ("A loss of (1,200).", "A loss of -1,200."),
+            ("A loss of ($250).", "A loss of -$250."),
             ("It costs $ 27.99.", "It costs $27.99."),
             ("A loss of -$12,000.", "A loss of -$12000."),
             (
@@ -1440,6 +1442,13 @@ Priya said.",
                 "Read pages 2 to 3 on COVID 19.",
             ),
             ("See note (3).", "See note 3."),
+            ("Margin was (5%).", "Margin was 5%."),
+            (
+                "Turnout was high (62%) this year.",
+                "Turnout was high at 62% this year.",
+            ),
+            ("The ratio (2.5) held.", "The ratio 2.5 held."),
+            ("Growth was (1,200%).", "Growth was 1,200%."),
         ] {
             assert!(missing(original, edited).is_empty(), "{original}");
             assert!(added(original, edited).is_empty(), "{original}");

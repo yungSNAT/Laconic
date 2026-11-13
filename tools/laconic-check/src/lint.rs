@@ -721,7 +721,9 @@ fn is_tag_line(trimmed: &str) -> bool {
 /// open where `chars` ends runs to the end.
 fn tag_end(chars: &[char], i: usize, open_at_end: bool) -> Option<usize> {
     let at = |j: usize| chars.get(j).copied();
-    if at(i) != Some('<') || (i > 0 && chars[i - 1] == '\\') {
+    // An odd run of backslashes escapes the '<'.
+    let backslashes = chars[..i].iter().rev().take_while(|&&c| c == '\\').count();
+    if at(i) != Some('<') || backslashes % 2 == 1 {
         return None;
     }
     let open = || open_at_end.then_some(chars.len());
@@ -730,6 +732,9 @@ fn tag_end(chars: &[char], i: usize, open_at_end: bool) -> Option<usize> {
             .find(|&j| starts_with(chars, j, "-->"))
             .map_or_else(open, |j| Some(j + 3));
     }
+    if let Some(end) = autolink_end(chars, i) {
+        return Some(end);
+    }
     let closing = at(i + 1) == Some('/');
     let mut j = i + 1 + usize::from(closing);
     if !at(j).is_some_and(|c| c.is_ascii_alphabetic()) {
@@ -737,13 +742,6 @@ fn tag_end(chars: &[char], i: usize, open_at_end: bool) -> Option<usize> {
     }
     while at(j).is_some_and(|c| c.is_ascii_alphanumeric() || c == '-') {
         j += 1;
-    }
-    // An autolink: no spaces or angle brackets, and a scheme's ':' or an address's '@'.
-    if !closing && at(j).is_some_and(|c| !c.is_whitespace() && c != '>' && c != '/') {
-        let end = find(chars, i + 1, |c| c.is_whitespace() || c == '<' || c == '>')?;
-        let link = &chars[i + 1..end];
-        return (chars[end] == '>' && (link.contains(&':') || link.contains(&'@')))
-            .then_some(end + 1);
     }
     // Attributes, each after whitespace: a name, then optionally '=' and a value.
     let mut spaced = false;
@@ -793,6 +791,39 @@ fn tag_end(chars: &[char], i: usize, open_at_end: bool) -> Option<usize> {
             }
         }
     }
+}
+
+/// The index after a CommonMark autolink opening at `i`: `<scheme:...>`, with a scheme of 2 to
+/// 32 characters, or `<user@host>`.
+fn autolink_end(chars: &[char], i: usize) -> Option<usize> {
+    let end = find(chars, i + 1, |c| {
+        c == '<' || c == '>' || c.is_whitespace() || c.is_ascii_control()
+    })?;
+    if chars[end] != '>' {
+        return None;
+    }
+    let link = &chars[i + 1..end];
+    let uri = link.iter().position(|&c| c == ':').is_some_and(|colon| {
+        (2..=32).contains(&colon)
+            && link[0].is_ascii_alphabetic()
+            && link[1..colon]
+                .iter()
+                .all(|&c| c.is_ascii_alphanumeric() || "+.-".contains(c))
+    });
+    let email = link.iter().position(|&c| c == '@').is_some_and(|at| {
+        let (user, host) = (&link[..at], &link[at + 1..]);
+        !user.is_empty()
+            && user
+                .iter()
+                .all(|&c| c.is_ascii_alphanumeric() || ".!#$%&'*+/=?^_`{|}~-".contains(c))
+            && host.split(|&c| c == '.').all(|label| {
+                (1..=63).contains(&label.len())
+                    && label.iter().all(|&c| c.is_ascii_alphanumeric() || c == '-')
+                    && label[0] != '-'
+                    && label[label.len() - 1] != '-'
+            })
+    });
+    (uri || email).then_some(end + 1)
 }
 
 fn indent_columns(whitespace: &str) -> usize {

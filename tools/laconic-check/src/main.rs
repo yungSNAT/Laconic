@@ -17,13 +17,13 @@ use std::process::ExitCode;
 use laconic_check::mcp::Json;
 use laconic_check::{lint, mcp, preserve};
 
-fn usage() -> ExitCode {
+fn usage_text() -> String {
     let advisory: Vec<&str> = lint::RULES
         .iter()
         .filter(|r| r.advisory)
         .map(|r| r.name)
         .collect();
-    eprintln!(
+    format!(
         "usage:\n  laconic-check lint [options] <file.md | ->...\n  laconic-check preserve [--strict] <original> <edited>\n  laconic-check mcp\n\n\
          lint options:\n  \
            --json              print one JSON document instead of a line a finding\n  \
@@ -39,10 +39,15 @@ fn usage() -> ExitCode {
          preserve exits 1 when the edit dropped a protected item. It also lists items the\n\
          edit added, which fail only with --strict (for a rewrite that must add nothing),\n\
          and names to check, which never fail. A clean result does not check meaning.\n\
-         mcp serves lint and preserve as MCP tools over standard input and output.",
+         mcp serves lint and preserve as MCP tools over standard input and output.\n\
+         --version prints the version and --help this text.",
         advisory.join(", "),
         lint::RULES_URL
-    );
+    )
+}
+
+fn usage() -> ExitCode {
+    eprintln!("{}", usage_text());
     ExitCode::from(2)
 }
 
@@ -296,6 +301,14 @@ fn main() -> ExitCode {
             }
         }
         Some("mcp") if args.len() == 1 => serve(),
+        Some("--version") if args.len() == 1 => {
+            println!("laconic-check {}", env!("CARGO_PKG_VERSION"));
+            ExitCode::SUCCESS
+        }
+        Some("--help") if args.len() == 1 => {
+            println!("{}", usage_text());
+            ExitCode::SUCCESS
+        }
         _ => usage(),
     }
 }

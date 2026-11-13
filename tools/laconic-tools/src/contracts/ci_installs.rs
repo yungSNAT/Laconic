@@ -13,7 +13,7 @@ use std::fs;
 use std::path::PathBuf;
 
 const WORKFLOWS: [&str; 2] = ["plugin-load-check.yml", "pi-load-check.yml"];
-const PIP_LINE: &str = "        run: python -m pip install --only-binary=\":all:\" --require-hashes -r .github/ci/requirements-coverage.txt";
+const PIP_LINE: &str = "        run: python -m pip install --only-binary=\":all:\" --require-hashes -r ci/requirements-coverage.txt";
 
 /// `shlex.split` for a command without quotes, escapes or comments, which is all the guard
 /// expects; anything else fails rather than being split differently from a shell.
@@ -87,7 +87,7 @@ fn version_tuple(package: &Value) -> Vec<u64> {
 
 /// Packages in the Pi lockfile whose path ends with `node_modules/<name>`.
 fn pi_packages(name: &str) -> Vec<Value> {
-    let lock = read_json(&root().join(".github/ci/pi/package-lock.json"));
+    let lock = read_json(&root().join("ci/pi/package-lock.json"));
     let suffix = format!("node_modules/{name}");
     let found: Vec<Value> = lock["packages"]
         .as_object()
@@ -246,7 +246,7 @@ fn dependabot_covers_actions_and_every_ci_lockfile() {
         &blocks["github-actions"],
         "github-actions",
     );
-    let mut lockfiles: Vec<String> = fs::read_dir(root().join(".github/ci"))
+    let mut lockfiles: Vec<String> = fs::read_dir(root().join("ci"))
         .unwrap()
         .map(|entry| entry.unwrap().path())
         .filter(|p| p.join("package-lock.json").is_file())
@@ -255,16 +255,16 @@ fn dependabot_covers_actions_and_every_ci_lockfile() {
     lockfiles.sort();
     assert!(!lockfiles.is_empty());
     for directory in lockfiles {
-        let pattern = format!(r"(?m)^      - /\.github/ci/{}$", regex::escape(&directory));
+        let pattern = format!(r"(?m)^      - /ci/{}$", regex::escape(&directory));
         assert_matches(&pattern, &blocks["npm"], &directory);
     }
     // Dependabot's pip updater reads every requirements file in the directory.
-    let requirements = fs::read_dir(root().join(".github/ci"))
+    let requirements = fs::read_dir(root().join("ci"))
         .unwrap()
         .map(|entry| entry.unwrap().file_name().to_string_lossy().into_owned())
         .any(|name| name.starts_with("requirements-") && name.ends_with(".txt"));
     assert!(requirements);
-    assert_matches(r"(?m)^    directory: /\.github/ci$", &blocks["pip"], "pip");
+    assert_matches(r"(?m)^    directory: /ci$", &blocks["pip"], "pip");
     // laconic-check has no dependencies, so only the fuzz crate's lockfile lists any.
     assert!(root().join("tools/laconic-check/fuzz/Cargo.lock").is_file());
     assert_matches(
@@ -300,7 +300,7 @@ fn pip_runs_only_the_hashed_coverage_install() {
         assert!(!pip_lines(text).is_empty(), "{text}");
     }
     // Each entry of the requirements file is an exact version followed by sha256 hashes.
-    let text = read(&root().join(".github/ci/requirements-coverage.txt")).replace("\\\n", " ");
+    let text = read(&root().join("ci/requirements-coverage.txt")).replace("\\\n", " ");
     let hashed = re(r"^[\w.-]+==[\w.]+( +--hash=sha256:[0-9a-f]{64})+ *$");
     let entries: Vec<&str> = split_lines(&text)
         .into_iter()

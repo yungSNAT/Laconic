@@ -243,7 +243,7 @@ The Color Purple won the prize.
 
 | Exit status | Meaning |
 | --- | --- |
-| 0 | `lint` found no more failing findings than `--max-findings` allows, or ran with `--warn`; `preserve` found nothing dropped, and nothing added under `--strict`; `mcp` reached the end of its input. |
+| 0 | `lint` found no more failing findings than `--max-findings` allows, or ran with `--warn`; `preserve` found nothing dropped, and nothing added under `--strict`; `mcp` reached the end of its input; `--version` or `--help` printed its text. |
 | 1 | `lint` found more failing findings than allowed; `preserve` found an item dropped, or one added under `--strict`. |
 | 2 | A usage, project file or read error, or an input or output error in `mcp`. |
 

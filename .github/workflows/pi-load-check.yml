@@ -7,7 +7,7 @@ on:
       - skills/**
       - package.json
       - tools/laconic-tools/**
-      - .github/ci/pi/**
+      - ci/pi/**
       - .github/workflows/pi-load-check.yml
   push:
     branches: [main]
@@ -16,7 +16,7 @@ on:
       - skills/**
       - package.json
       - tools/laconic-tools/**
-      - .github/ci/pi/**
+      - ci/pi/**
       - .github/workflows/pi-load-check.yml
 
 permissions:
@@ -39,7 +39,7 @@ jobs:
           node-version: 22
       - name: Install Pi
         run: |
-          npm ci --ignore-scripts --prefix .github/ci/pi
-          echo "$GITHUB_WORKSPACE/.github/ci/pi/node_modules/.bin" >> "$GITHUB_PATH"
+          npm ci --ignore-scripts --prefix ci/pi
+          echo "$GITHUB_WORKSPACE/ci/pi/node_modules/.bin" >> "$GITHUB_PATH"
       - name: Verify the Pi package, commands, status, and persisted mode
         run: cargo run --locked --quiet --manifest-path tools/laconic-tools/Cargo.toml -- check-pi

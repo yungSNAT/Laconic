@@ -110,6 +110,29 @@ The judge sees the source, one rewrite and the ledger, never the setup's name. I
 
 Survival alone proves little, since copying the source scores 100%. Decided before any run: a setup is better than another on this benchmark only if its survival interval excludes 0, it is no longer and it invents no more. Anything else is reported as a trade-off or a tie. The setups and the ledgers come from Laconic's author, and the ledgers had one independent review, so read them before relying on a margin. Report the result whichever way it falls.
 
+## Fact-audit agreement
+
+This measures `laconic-check preserve` against a fact checker Laconic's author did not write, on rewrites Laconic did not make. The [AI Humanizer Benchmark](https://huggingface.co/datasets/ai-humanizer-benchmark/ai-humanizer-benchmark) publishes the AI-written texts of each monthly cycle and each commercial humaniser's rewrite of them. The paper [Humanized but Still True?](https://arxiv.org/abs/2611.00359) judged each number, name and quotation of 3 or more words in the 2026-10 cycle's rewrites as kept or altered, and published the judgements with its checker, [humanizer-fact-audit](https://github.com/zwang-devv/humanizer-fact-audit). `fact_audit_agreement.py` downloads both at pinned revisions into `evals/results/fact-audit`, which Git ignores, runs `preserve` on each source and rewrite, and prints the table below and the documents where the 2 checkers differ on numbers or quotations:
+
+```bash
+cargo build --release --manifest-path tools/laconic-check/Cargo.toml
+python3 evals/fact_audit_agreement.py --laconic-check tools/laconic-check/target/release/laconic-check
+```
+
+Measured on 13 November 2026 over the 363 rewrites the paper judged (11 commercial humanisers, 33 texts each), benchmark revision `6306b2043736dd958cf39ee1d9a64956c54dd78a` and `humanizer-fact-audit` commit `e665dda0506a64c834886c94d8f328d447119a07`. A document counts under a kind when the paper marks at least one of its units of that kind altered, and `preserve` counts as reporting it when it reports any dropped item of that kind, not necessarily the same unit, so '43 of 47' is not a recall figure. The 'Unreleased' column is commit `882cb7e` of the `preserve` change. Both versions ran on Linux (x86_64), 0.4.0 as its release binary:
+
+| Documents the paper marks as | Documents | laconic-check 0.4.0 | Unreleased (`882cb7e`) |
+| --- | --- | --- | --- |
+| Any unit altered | 105 | 105 fail | 105 fail |
+| Numbers altered | 47 | 44 report a dropped number or quantity | 43 |
+| Quotations of 3 or more words altered | 58 | 58 report a dropped quotation | 58 |
+| Names altered | 28 | 20 list a name to check | 20 |
+| Every unit kept | 258 | 17 pass; 224 fail only on meaning words; 0 fail on a month, inline code or URL; 17 fail on a number, quantity or quotation | 23 pass; 222; 0; 13 |
+
+Both versions fail every document the paper marks altered. In each of the 4 documents whose altered number the unreleased version misses, the altered unit is a 'first', and `preserve` does not read ordinal words, so neither version can see it. 0.4.0 reported one of the 4, cleverhumanizer's s17, for a wrong reason: it read the source's bold list markers ('**1.**') as numbers the rewrite dropped. The unreleased version reads them as layout, so it no longer reports a number in that document, which still fails on dropped meaning words ('not' 6 times to 2). It also stops reporting bold markers in 7 documents the paper marks fully kept.
+
+The paper's judgements are the reference here, so the table measures agreement with them, not the accuracy of either checker. `preserve` never fails on a name, and it also fails on words such as 'not', 'must' and 'before', which the paper does not judge. The texts are CC BY 4.0 (AI Humanizer Benchmark); `humanizer-fact-audit` is by Ziyuan Wang, Genliang Zhu and Xiaobo Chen, its code MIT and its data CC BY 4.0. Nothing from either is stored in this repository.
+
 ## Agent cost benchmark
 
 `evals/agent_bench.py` measures whether a rule set changes how an agent works, not just how it writes. It builds 5 small Python repositories with one failing test each and asks Claude Code to fix them with tools limited to Read, Edit, Glob, Grep and `python -m unittest`. It records whether the tests pass afterwards, plus turns, tokens, cost and permission denials. It compares 2 rule files:

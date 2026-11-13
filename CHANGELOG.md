@@ -49,8 +49,7 @@ The manifests other than Claude Code's still declare plugin 0.5.0, so a build fr
 
 ### Changed
 
-- `preserve` keeps a number's sign, accounting brackets and currency, so '-3%' to '3%', '(1,200)' to '1,200' and '$500' to '£500' now fail. Its report lines change with them: a dropped '$1,200' was 'dropped number: 1,200' and is now 'dropped number: $1,200', and a bracketed '(1,200)' is '-1,200', so a script that parses the report sees new values (#105).
-- `preserve` reads brackets as a negative sign only around money or a comma-grouped figure, '($250)' or '(1,200)'. Other bracketed numbers, such as '(62%)' and '(2.5)', are asides, so '(5%)' to '5%' passes and '(5%)' to '-5%' fails as a sign change.
+- `preserve` keeps a number's sign, accounting brackets around money or a comma-grouped figure, such as '($250)' or '(1,200)', and currency, so '-3%' to '3%', '(1,200)' to '1,200' and '$500' to '£500' now fail. Its report lines change with them: a dropped '$1,200' was 'dropped number: 1,200' and is now 'dropped number: $1,200', and a bracketed '(1,200)' is '-1,200', so a script that parses the report sees new values (#105).
 
 ### Fixed
 

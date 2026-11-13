@@ -2402,9 +2402,17 @@ mod tests {
             "Type \\<b the color> here.\n",
             "See <a title=\"x > y\">the color</a>.\n",
             "See <a title='x > color'>the color</a>.\n",
+            // Neither an email address nor a scheme of 2 or more characters.
+            "<color@>\n",
+            "<c:color>\n",
         ] {
             assert_eq!(rules(text), ["us-spelling"], "{text:?}");
         }
+        // An odd run of backslashes escapes the '<'; an even run escapes only itself.
+        assert_eq!(rules("\\<img alt=\"color\">\n"), ["double-quotes"]);
+        assert!(rules("\\\\<img alt=\"color\">\n").is_empty());
+        // An email autolink may hold a slash before its '@'.
+        assert!(rules("Mail <colour/color@example.com> now.\n").is_empty());
         // A line that opens with a tag stands alone, as a heading does.
         assert_eq!(
             rules(

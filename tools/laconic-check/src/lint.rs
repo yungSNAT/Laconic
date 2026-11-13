@@ -2336,6 +2336,16 @@ mod tests {
         );
         assert_eq!(rules("See <a href=\"x\">the color</a>.\n"), ["us-spelling"]);
         assert_eq!(rules("<3 the color.\n"), ["us-spelling"]);
+        // Only CommonMark's tag syntax is markup: a comparison, an escaped '<' and a '>' in a
+        // quoted attribute leave the prose visible and the attribute masked.
+        for text in [
+            "If x<y, the color is y>z.\n",
+            "Type \\<b the color> here.\n",
+            "See <a title=\"x > y\">the color</a>.\n",
+            "See <a title='x > color'>the color</a>.\n",
+        ] {
+            assert_eq!(rules(text), ["us-spelling"], "{text:?}");
+        }
         // A line that opens with a tag stands alone, as a heading does.
         assert_eq!(
             rules(
@@ -2352,6 +2362,7 @@ mod tests {
             "<!-- the color -->\n",
             "<https://example.com/color>\n",
             "<img src=\"a.png\"\n",
+            "<img alt=\"a > b\" title=\"color\" />\n",
         ] {
             assert!(lint(tags).is_empty(), "{tags:?}: {:?}", lint(tags));
         }

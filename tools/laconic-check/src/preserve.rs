@@ -18,7 +18,6 @@ const MEANING_WORDS: &[&str] = &[
     "nor",
     "neither",
     "without",
-    "cannot",
     "must",
     "may",
     "only",
@@ -369,12 +368,11 @@ fn only_in(
 }
 
 /// Words for meaning counts, with hedges on a number read as one: 'approximately 50' to
-/// 'about 50' is not a change, and every negative contraction ('didn't', 'wasn't') reads
-/// as 'not', so 'do not' to 'don't' is not one either.
+/// 'about 50' is not a change.
 fn meaning_tokens(text: &str) -> Vec<String> {
     let mut tokens: Vec<String> = words(&prose(text))
         .into_iter()
-        .map(|w| if w.ends_with("n't") { "not".into() } else { w })
+        .flat_map(uncontracted)
         .collect();
     for i in 1..tokens.len() {
         if matches!(
@@ -386,6 +384,24 @@ fn meaning_tokens(text: &str) -> Vec<String> {
         }
     }
     tokens
+}
+
+/// A negative contraction or 'cannot' as its auxiliary and 'not', so 'don't' and 'do not'
+/// match, as do 'won't' and 'will not', but 'can't' to 'won't' drops 'can'.
+fn uncontracted(word: String) -> Vec<String> {
+    let auxiliary = match word.strip_suffix("n't") {
+        Some("wo") => "will",
+        Some("ca") => "can",
+        Some("sha") => "shall",
+        Some(stem) => stem,
+        None if word == "cannot" => "can",
+        None => return vec![word],
+    };
+    [auxiliary, "not"]
+        .into_iter()
+        .filter(|w| !w.is_empty())
+        .map(String::from)
+        .collect()
 }
 
 /// Uses of 'may' or 'will' that are a month or part of a name, such as 'Will Smith'.
@@ -474,7 +490,8 @@ fn starts_with_percent(text: &str) -> bool {
 }
 
 /// A number with the size or unit it carries, attached or as the next word: '$47.3M',
-/// '150 km', 'three days'. Read from prose, so a value in code or a URL is not one.
+/// '150 km', 'three days', '25 degrees Celsius'. Read from prose, so a value in code or a
+/// URL is not one.
 fn quantities(text: &str) -> Vec<String> {
     let text = prose(text);
     let tokens: Vec<&str> = text.split_whitespace().collect();
@@ -510,7 +527,11 @@ fn quantities(text: &str) -> Vec<String> {
         {
             unit
         } else if value.len() == bare.len() && attached.is_empty() {
-            match tokens.get(i + 1) {
+            // '25 degrees Celsius' names its unit after 'degrees'.
+            let degrees = tokens
+                .get(i + 1)
+                .is_some_and(|w| matches!(w.to_lowercase().as_str(), "degree" | "degrees"));
+            match tokens.get(i + 1 + usize::from(degrees)) {
                 Some(next) => next,
                 None => continue,
             }
@@ -591,9 +612,9 @@ fn numbers(text: &str) -> Vec<String> {
             let percent = !token.ends_with('%') && starts_with_percent(&after);
             let token = if percent { token + "%" } else { token };
             let (start, mut negative, currency) = number_prefix(&chars, i);
-            // Accounting brackets mark a negative amount: '(1,200)' or '($250)'. A bare
-            // whole number in brackets, such as a note '(3)', is an aside, not an amount.
-            let amount = !currency.is_empty() || token.contains([',', '.']);
+            // Accounting brackets mark a negative amount: '(1,200)', '($250)' or '(5%)'. A
+            // bare whole number in brackets, such as a note '(3)', is an aside, not an amount.
+            let amount = !currency.is_empty() || token.contains([',', '.']) || token.ends_with('%');
             if start > 0 && chars[start - 1] == '(' && chars.get(j) == Some(&')') && amount {
                 negative = true;
             }
@@ -1357,6 +1378,38 @@ Priya said.",
     }
 
     #[test]
+    fn a_negative_contraction_keeps_its_modal() {
+        for (original, edited) in [
+            ("We can't pay.", "We cannot pay."),
+            ("We can't pay.", "We can not pay."),
+            ("We won't pay.", "We will not pay."),
+            ("You shouldn't pay.", "You should not pay."),
+        ] {
+            for (a, b) in [(original, edited), (edited, original)] {
+                assert!(missing(a, b).is_empty(), "{a} to {b}");
+                assert!(added(a, b).is_empty(), "{a} to {b}");
+            }
+        }
+        for (original, edited, lost, gained) in [
+            ("We can't pay.", "We won't pay.", "can", "will"),
+            ("We won't pay.", "We can't pay.", "will", "can"),
+            ("We can't pay.", "We will not pay.", "can", "will"),
+            ("We won't pay.", "We cannot pay.", "will", "can"),
+        ] {
+            assert_eq!(
+                missing(original, edited)["meaning word"],
+                vec![format!("'{lost}' (1 before, 0 after)")],
+                "{original} to {edited}"
+            );
+            assert_eq!(
+                added(original, edited)["meaning word"],
+                vec![format!("'{gained}' (0 before, 1 after)")],
+                "{original} to {edited}"
+            );
+        }
+    }
+
+    #[test]
     fn sign_brackets_and_currency_belong_to_the_value() {
         for (original, edited, dropped) in [
             ("It costs $500.", "It costs £500.", "$500"),
@@ -1365,6 +1418,7 @@ Priya said.",
             ("A loss of (1,200).", "A loss of 1,200.", "-1,200"),
             ("A loss of ($250).", "A loss of $250.", "-$250"),
             ("A refund of $250.", "A refund of ($250).", "$250"),
+            ("Margin was (5%).", "Margin was 5%.", "-5%"),
         ] {
             assert_eq!(
                 missing(original, edited)["number"],
@@ -1398,6 +1452,11 @@ Priya said.",
             ("Latency is 200 ms.", "Latency is 200 s.", "200 ms"),
             ("Store below 25 °C.", "Store below 25 °F.", "25 °C"),
             ("Store below 25°C.", "Store below 25°F.", "25 °C"),
+            (
+                "Store below 25 degrees Celsius.",
+                "Store below 25 degrees Fahrenheit.",
+                "25 °C",
+            ),
             ("Take 5 mg daily.", "Take 5 g daily.", "5 mg"),
             ("Add 2 L of water.", "Add 2 mL of water.", "2 L"),
         ] {
@@ -1410,6 +1469,7 @@ Priya said.",
         for (original, edited) in [
             ("Latency is 200 ms.", "Latency is 200 milliseconds."),
             ("Take 5 g daily.", "Take 5 grams daily."),
+            ("Store below 25 degrees Celsius.", "Store below 25 °C."),
             ("Add 2 L of water.", "Add 2 litres of water."),
         ] {
             assert!(missing(original, edited).is_empty(), "{original}");

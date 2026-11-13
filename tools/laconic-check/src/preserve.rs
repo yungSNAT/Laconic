@@ -614,8 +614,8 @@ fn numbers(text: &str) -> Vec<String> {
             let (start, mut negative, currency) = number_prefix(&chars, i);
             // Accounting brackets mark a negative amount of money or a grouped figure: '($250)'
             // or '(1,200)'. Any other number in brackets, such as a note '(3)', a share '(62%)'
-            // or a ratio '(2.5)', is an aside, not an amount.
-            let amount = !currency.is_empty() || token.contains(',');
+            // or '(1,200%)', or a ratio '(2.5)', is an aside, not an amount.
+            let amount = !currency.is_empty() || (token.contains(',') && !token.ends_with('%'));
             if start > 0 && chars[start - 1] == '(' && chars.get(j) == Some(&')') && amount {
                 negative = true;
             }
@@ -1448,6 +1448,7 @@ Priya said.",
                 "Turnout was high at 62% this year.",
             ),
             ("The ratio (2.5) held.", "The ratio 2.5 held."),
+            ("Growth was (1,200%).", "Growth was 1,200%."),
         ] {
             assert!(missing(original, edited).is_empty(), "{original}");
             assert!(added(original, edited).is_empty(), "{original}");

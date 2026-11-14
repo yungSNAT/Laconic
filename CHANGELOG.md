@@ -28,6 +28,7 @@ The manifests other than Claude Code's still declare plugin 0.5.0, so a build fr
 - Keep figurative language in fiction, judging only its density (#55).
 - State the fact-keeping promise as an aim until the fact-survival benchmark reports, and name 'humanizer' and 'no AI slop' in the README.
 - Date the Style Manual rules with a 'rules last checked' line.
+- Rule 8 sizes work by what is left and gives a time only with a measured basis; its example, 'about 15 minutes if the tests cover this', was a time with no measured basis.
 
 ### Plugin: fixed
 

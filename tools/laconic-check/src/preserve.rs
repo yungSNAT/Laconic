@@ -587,7 +587,10 @@ fn quantity_at(
                 return None;
             }
             let (_, unit) = quantity_at(tokens, i + 2, pounds, true)?;
-            return Some((number_value(bare), unit));
+            // A price takes a size across a range, never a unit: 'a fee of $5 and 10 kg'.
+            let priced = tokens[i][..tokens[i].len() - body.len()].contains(currency_mark);
+            let size = matches!(unit, "thousand" | "million" | "billion" | "trillion");
+            return (!priced || size).then(|| (number_value(bare), unit));
         }
         // '25 degrees Celsius' names its unit after 'degrees'.
         let degrees = matches!(next.to_lowercase().as_str(), "degree" | "degrees");
@@ -673,7 +676,13 @@ fn numbers(text: &str, pounds: &[String]) -> Vec<String> {
             let percent = !token.ends_with('%') && starts_with_percent(&after);
             let token = if percent { token + "%" } else { token };
             let (start, mut negative, mut currency) = number_prefix(&chars, i);
-            // A range's upper bound shares its lower bound's currency: '$5-10' is $5 to $10.
+            // A full stop or comma after the digits ends the clause: 'Pay 30. Dollars ...'.
+            if currency.is_empty() && !matches!(chars[j - 1], '.' | ',') {
+                let pound = pounds.contains(&number_value(&token));
+                currency = spelled_currency(&chars[j..], pound).to_string();
+            }
+            // A range's upper bound without its own currency shares its lower bound's: '$5-10'
+            // is $5 to $10, but 'from $5 to 10 euros' ends in euros.
             if let Some((from, end, mark)) = &last
                 && currency.is_empty()
                 && chars
@@ -681,11 +690,6 @@ fn numbers(text: &str, pounds: &[String]) -> Vec<String> {
                     .is_some_and(|between| joins_range(&chars[..*from], between))
             {
                 currency = mark.clone();
-            }
-            // A full stop or comma after the digits ends the clause: 'Pay 30. Dollars ...'.
-            if currency.is_empty() && !matches!(chars[j - 1], '.' | ',') {
-                let pound = pounds.contains(&number_value(&token));
-                currency = spelled_currency(&chars[j..], pound).to_string();
             }
             last = Some((start, j, currency.clone()));
             // Accounting brackets mark a negative amount of money or a grouped figure: '($250)'
@@ -728,7 +732,6 @@ fn numbers(text: &str, pounds: &[String]) -> Vec<String> {
 /// space before the digits, as in '$ 27.99'.
 fn number_prefix(chars: &[char], digit: usize) -> (usize, bool, String) {
     let minus = |c: char| matches!(c, '-' | '\u{2212}');
-    let currency_mark = |c: char| matches!(c, '$' | '£' | '¥' | '\u{20A0}'..='\u{20CF}');
     let mut start = digit;
     let mut sign_at = None;
     if start > 0 && minus(chars[start - 1]) {
@@ -822,6 +825,11 @@ fn spelled_currency(after: &[char], money: bool) -> &'static str {
         "pound" | "pounds" if money => "£",
         _ => "",
     }
+}
+
+/// A currency mark: '$', '£', '¥' or one from the Unicode Currency Symbols block.
+fn currency_mark(c: char) -> bool {
+    matches!(c, '$' | '£' | '¥' | '\u{20A0}'..='\u{20CF}')
 }
 
 fn number_word(w: &str) -> Option<&'static str> {
@@ -1637,6 +1645,18 @@ Priya said.",
                 "The fee is $5 and 2 forms are needed.",
                 "The fee is $5; 2 forms are needed.",
             ),
+            (
+                "Prices run from $5 to 10 euros.",
+                "Prices run from $5 to €10.",
+            ),
+            (
+                "The fee is $5 and 10 kg of luggage.",
+                "The fee is $5; 10 kg of luggage.",
+            ),
+            (
+                "Revenue was $5 to 10 billion.",
+                "Revenue was $5 billion to 10 billion.",
+            ),
         ] {
             assert!(missing(original, edited).is_empty(), "{original}");
             assert!(added(original, edited).is_empty(), "{original}");
@@ -1651,6 +1671,11 @@ Priya said.",
             ("It costs ₹500.", "It costs ₩500.", "₹500"),
             ("It costs $30.", "It costs 30 euros.", "$30"),
             ("It costs £5.", "It costs 5 lb.", "£5"),
+            (
+                "Prices run from $5 to 10 euros.",
+                "Prices run from $5 to $10.",
+                "€10",
+            ),
         ] {
             assert_eq!(
                 missing(original, edited)["number"],

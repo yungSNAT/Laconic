@@ -81,29 +81,30 @@ jobs:
         with:
           files: ${{ env.MANY }}
           args: --max-findings 2
-      # 170 files with a failing finding each, whose paths alone pass the Windows limit, so no
-      # single lint call can judge their total against --max-findings.
-      - name: Track 170 files with long paths and a failing finding each
+      # Only 170 tracked files, each with a failing finding, whose paths alone pass the Windows
+      # limit, so no single lint call can judge their total against --max-findings. They are
+      # tracked rather than named in files, as Windows caps an input's environment variable at
+      # 32,767 characters too. The index is not restored, so these steps come last.
+      - name: Track only 170 files with long paths and a failing finding each
         shell: bash
         run: |
+          git rm -r -q --cached .
           mkdir -p faults
           long=$(printf '%0190d' 0 | tr 0 f)
           for i in $(seq 1 170); do
             cp tools/laconic-check/action/tests/fault.md "faults/$long-$i.md"
           done
           git add faults
-          { echo 'FAULTS<<EOF'; git ls-files faults; echo EOF; } >> "$GITHUB_ENV"
+          test "$(git ls-files | wc -l)" -eq 170
       - name: 170 failing findings pass a --max-findings of 170
         uses: ./
         with:
-          files: ${{ env.FAULTS }}
           args: --max-findings 170
       - name: 170 failing findings fail a --max-findings of 169
         id: over
         continue-on-error: true
         uses: ./
         with:
-          files: ${{ env.FAULTS }}
           args: --max-findings=169
       - name: Check the 170 findings failed the step
         shell: bash
@@ -115,5 +116,3 @@ jobs:
         run: printf 'max-findings = 170\n' > .laconic-check
       - name: The project file's --max-findings counts across the calls
         uses: ./
-        with:
-          files: ${{ env.FAULTS }}

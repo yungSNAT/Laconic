@@ -101,11 +101,22 @@ for file in "${files[@]}"; do
   size=$((size + ${#file} + 3))
 done
 run_batch
-# Leading and trailing whitespace off, as lint trims options and project file lines.
+# Leading and trailing whitespace off, as lint trims project file lines: Unicode's White_Space
+# characters, written as UTF-8 bytes so that no locale decides which count.
+spaces=($'\t' $'\n' $'\v' $'\f' $'\r' ' ' $'\xc2\x85' $'\xc2\xa0' $'\xe1\x9a\x80'
+  $'\xe2\x80\x80' $'\xe2\x80\x81' $'\xe2\x80\x82' $'\xe2\x80\x83' $'\xe2\x80\x84' $'\xe2\x80\x85'
+  $'\xe2\x80\x86' $'\xe2\x80\x87' $'\xe2\x80\x88' $'\xe2\x80\x89' $'\xe2\x80\x8a' $'\xe2\x80\xa8'
+  $'\xe2\x80\xa9' $'\xe2\x80\xaf' $'\xe2\x81\x9f' $'\xe3\x80\x80')
 trim() {
-  local s=$1
-  s=${s#"${s%%[![:space:]]*}"}
-  printf '%s' "${s%"${s##*[![:space:]]}"}"
+  local s=$1 space trimmed=
+  while [[ "$trimmed" != "$s" ]]; do
+    trimmed=$s
+    for space in "${spaces[@]}"; do
+      s=${s#"$space"}
+      s=${s%"$space"}
+    done
+  done
+  printf '%s' "$s"
 }
 # A count as lint reads it, digits with an optional '+', without the '+' or leading zeros.
 digits() {
@@ -118,7 +129,7 @@ digits() {
 # file (--config's, or .laconic-check in this directory), else 0. The first calls already
 # rejected a bad option, value or project file, so these are well formed.
 max_findings() {
-  local i=0 arg max='' config='' line key
+  local i=0 arg max='' config='' line key first=1 bom=$'\xef\xbb\xbf'
   while (( i < ${#args[@]} )); do
     arg=${args[i]}
     case "$arg" in
@@ -135,7 +146,10 @@ max_findings() {
     [[ -n "$config" || ! -f .laconic-check ]] || config=.laconic-check
     if [[ -n "$config" ]]; then
       while IFS= read -r line || [[ -n "$line" ]]; do
-        line=$(trim "${line#$'\xef\xbb\xbf'}")
+        # lint drops every byte order mark at the start of the file.
+        while [[ -n "$first" && $line == "$bom"* ]]; do line=${line#"$bom"}; done
+        first=
+        line=$(trim "$line")
         [[ -n "$line" && $line != '#'* && $line == *=* ]] || continue
         key=$(trim "${line%%=*}")
         [[ "$key" != max-findings ]] || max=$(trim "${line#*=}")

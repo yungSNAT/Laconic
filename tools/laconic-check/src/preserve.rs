@@ -1717,9 +1717,9 @@ Priya said.",
 
     #[test]
     fn compares_many_numbers_in_linear_time() {
-        // Each number was looked for in a list of every kept one, so 8 times the numbers took
-        // about 64 times as long. Hash sets give about 8 times; the fastest of 3 runs keeps a
-        // busy machine from deciding the ratio.
+        // Each number was looked for in a list of every kept one, so 16 times the numbers took
+        // about 60 times as long in a debug build and 145 in a release build. Hash sets give
+        // about 16 to 19 times; the fastest of 3 runs keeps a busy machine from deciding the ratio.
         let fastest = |items: usize| {
             let text: String = (0..items).map(|n| format!("{n} ")).collect();
             (0..3)
@@ -1731,10 +1731,10 @@ Priya said.",
                 .min()
                 .unwrap()
         };
-        let (small, large) = (fastest(2_000), fastest(16_000));
+        let (small, large) = (fastest(2_000), fastest(32_000));
         assert!(
-            large < small * 24,
-            "8 times the numbers took {:.1} times as long ({small:?} to {large:?})",
+            large < small * 32,
+            "16 times the numbers took {:.1} times as long ({small:?} to {large:?})",
             large.as_secs_f64() / small.as_secs_f64()
         );
     }

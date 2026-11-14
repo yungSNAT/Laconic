@@ -19,7 +19,7 @@
 
 Laconic is an AI 'humanizer' (humaniser) and 'no AI slop' skill for coding agents and chat assistants. It makes the model lead with the answer, mark what it has not verified and stop when the answer is complete, and tells it to keep every fact, step and caveat the reader needs. It instructs the model to write every original sentence to the Australian Government Style Manual, with the house overrides listed in the skill.
 
-To humanise AI-written text, ask the agent to humanise it. The prose skill removes AI writing patterns, is written to keep every fact, number and caveat, and leaves the text shorter, not padded with performed personality. The [fact-survival benchmark](evals/README.md#fact-survival-benchmark) that tests this promise has not reported yet. On 99 public texts, an [outside fact checker](#fact-changes-on-a-public-set) found that Laconic lost a number, name or quotation about as often as `humanizer`, or more often, depending on the model; neither difference is clear of 0.
+To humanise AI-written text, ask the agent to humanise it. The prose skill removes AI writing patterns, is written to keep every fact, number and caveat, and leaves the text shorter, not padded with performed personality. The [fact-survival benchmark](evals/README.md#fact-survival-benchmark) that tests this promise has not reported yet. On 99 public texts on 14 November 2026, an [external unit-matching checker](#fact-changes-on-a-public-set), run by Laconic's author, found that Laconic's rewrites lost a number, date, name or quotation about as often as `humanizer`, or more often, depending on the model; neither difference is clear of 0.
 
 <table>
 <tr>
@@ -200,12 +200,12 @@ On 14 November 2026, Laconic's prose skill and [humanizer](https://github.com/bl
 
 | Round | Laconic | `humanizer` | Difference (95% interval) |
 |---|---|---|---|
-| Claude Opus 5.5 | 18 of 134 (13.4%) | 10 of 134 (7.5%) | +6.0 points (0.0 to +12.3) |
-| `gpt-6.1-sol` (Codex) | 20 of 134 (14.9%) | 20 of 134 (14.9%) | 0.0 points (−2.2 to +2.1) |
+| Claude Opus 5.5 | 18 of 134 (13.43%) | 10 of 134 (7.46%) | +5.97 points (0.00 to +12.32) |
+| `gpt-6.1-sol` (Codex) | 20 of 134 (14.93%) | 20 of 134 (14.93%) | 0.00 points (−2.21 to +2.14) |
 
-Under Opus 5.5 Laconic lost a unit in more rewrites than `humanizer`, in every unit group: numbers and dates 9 of 440 lost against 5, names 12 of 164 against 9 and quotations 5 of 70 against 0. Under `gpt-6.1-sol` the 2 skills tied. Neither interval excludes 0, so neither round shows a clear difference. Laconic's rewrites were shorter in both rounds: 0.94 and 0.90 of the source's words, against 1.01 and 0.93.
+Under Opus 5.5 Laconic lost units in more rewrites than `humanizer` (18 against 10) and lost more units in every group: numbers and dates 9 of 440 against 5, names 12 of 164 against 9 and quotations 5 of 70 against 0. Under `gpt-6.1-sol` the 2 skills tied. Neither interval excludes 0, so neither round shows a clear difference. Laconic's rewrites were shorter in both rounds: 0.94 and 0.90 of the source's words, against 1.01 and 0.93.
 
-Limits: the checker matches units and can flag a harmless paraphrase of a quotation; it does not see changed conditions, negations or invented claims, so this is not a full test of factual fidelity. 32 of the 99 texts have no unit it can check, so the rates cover 134 rewrites per skill. Each round used one model to rewrite; the instructions were supplied as text, not as installed plugins. [evals/README.md](evals/README.md#public-set-fact-check) gives the pinned revisions.
+Limits: the checker matches units and can flag a harmless paraphrase of a quotation; it does not see changed conditions, negations or invented claims, so this is not a full test of factual fidelity. Of the 99 texts, 32 have no unit it can check, so the rates cover 134 rewrites per skill. Each round used one model to rewrite, 3 texts to a fresh context; the instructions were supplied as text, not as installed plugins. The Opus round was added after the Codex round, with the method unchanged. Laconic's author chose the rival, wrote the method and ran both rounds. [evals/README.md](evals/README.md#public-set-fact-check) gives the pinned revisions.
 
 ## Checker
 

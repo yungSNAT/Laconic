@@ -77,14 +77,40 @@ jobs:
       - name: Validate evaluation cases
         run: python scripts/run_evals.py validate
 
+  # Whether a pull request changes tools/ or this workflow, from the merge commit's first parent.
+  changes:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      tools: ${{ steps.diff.outputs.tools }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 2
+          persist-credentials: false
+      - id: diff
+        run: |
+          changed=$(git diff --name-only HEAD^1 HEAD)
+          if grep -qE '^(tools/|\.github/workflows/tests\.yml$)' <<< "$changed"; then
+            echo tools=true >> "$GITHUB_OUTPUT"
+          else
+            echo tools=false >> "$GITHUB_OUTPUT"
+          fi
+
   # The Cargo tests on Windows and macOS, so a platform failure shows on the PR rather than
-  # at release.
+  # at release. The tests read the repository's Markdown, which a Windows checkout can give CRLF
+  # endings, so Windows runs on every change. macOS checks out the same bytes as Linux, so it runs
+  # on main and on pull requests that change tools/ or this workflow. If the changes job fails,
+  # both legs run.
   cargo-test:
     name: cargo test (${{ matrix.os }})
+    needs: changes
+    if: ${{ !cancelled() }}
     strategy:
       fail-fast: false
       matrix:
-        os: [windows-latest, macos-latest]
+        os: ${{ fromJSON(needs.changes.outputs.tools == 'false' && '["windows-latest"]' || '["windows-latest","macos-latest"]') }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 15
     steps:

@@ -209,6 +209,9 @@ class FactAuditAgreementTest(unittest.TestCase):
         with mock.patch.object(faa.subprocess, "run", return_value=dropped) as called:
             self.assertEqual((True, {"num"}), faa.preserve("lc", "Growth was -3%.", "Growth was 3%."))
         self.assertEqual(["lc", "preserve"], called.call_args.args[0][:2])
+        with mock.patch.object(faa.subprocess, "run", return_value=dropped) as called:
+            faa.preserve("lc", "a", "b", loose=True)
+        self.assertEqual(["lc", "preserve", "--loose"], called.call_args.args[0][:3])
         broken = subprocess.CompletedProcess(args=["x"], returncode=2, stdout="", stderr="usage")
         with mock.patch.object(faa.subprocess, "run", return_value=broken), self.assertRaisesRegex(
             RuntimeError, "exited 2: usage"
@@ -261,6 +264,14 @@ class FactAuditAgreementTest(unittest.TestCase):
         self.assertIn("Judged documents: 1\n", out.getvalue())
         self.assertIn("| Any unit altered | 1 | 1 fail |", out.getvalue())
         self.assertIn("differ on numbers or quotations: 1\n- t s01: missed ['num'], extra []", out.getvalue())
+
+    def test_main_passes_loose_to_preserve(self):
+        counts = faa.tally([({"num"}, True, {"num"})])
+        for argv, loose in (([], False), (["--loose"], True)):
+            with self.subTest(argv=argv), mock.patch.object(faa, "run", return_value=(counts, [])) as run:
+                with redirect_stdout(io.StringIO()):
+                    faa.main(["--laconic-check", sys.executable, "--cache", "c", *argv])
+                self.assertEqual({"loose": loose}, run.call_args.args[2].keywords)
 
     def test_main_refuses_a_binary_that_is_not_an_executable_file(self):
         with tempfile.TemporaryDirectory() as tmp:

@@ -24,7 +24,7 @@ fn usage_text() -> String {
         .map(|r| r.name)
         .collect();
     format!(
-        "usage:\n  laconic-check lint [options] <file.md | ->...\n  laconic-check preserve [--strict] <original> <edited>\n  laconic-check mcp\n\n\
+        "usage:\n  laconic-check lint [options] <file.md | ->...\n  laconic-check preserve [--strict] [--loose] <original> <edited>\n  laconic-check mcp\n\n\
          lint options:\n  \
            --json              print one JSON document instead of a line a finding\n  \
            --disable <rules>   drop these rules' findings (comma-separated, repeatable)\n  \
@@ -38,7 +38,11 @@ fn usage_text() -> String {
          its rule, described under that name in {}\n\
          preserve exits 1 when the edit dropped a protected item. It also lists items the\n\
          edit added, which fail only with --strict (for a rewrite that must add nothing),\n\
-         and names to check, which never fail. A clean result does not check meaning.\n\
+         and names to check, which never fail. With --loose, it lists a lost word of\n\
+         frequency, quantity, ability, prediction, cause or hedging, such as 'often' or\n\
+         'can', to check instead; a swap such as 'all' to 'some' adds a word, which --strict\n\
+         fails on.\n\
+         A clean result does not check meaning.\n\
          mcp serves lint and preserve as MCP tools over standard input and output.\n\
          --version prints the version and --help this text.",
         advisory.join(", "),
@@ -276,11 +280,13 @@ fn main() -> ExitCode {
             }
         },
         Some("preserve") => {
-            // `--strict` may come anywhere before `--`; after it, every argument is a file.
-            let (mut strict, mut options, mut files) = (false, true, Vec::new());
+            // `--strict` and `--loose` may come anywhere before `--`; after it, every argument
+            // is a file.
+            let (mut strict, mut loose, mut options, mut files) = (false, false, true, Vec::new());
             for arg in &args[1..] {
                 match arg.as_str() {
                     "--strict" if options => strict = true,
+                    "--loose" if options => loose = true,
                     "--" if options => options = false,
                     _ => files.push(arg),
                 }
@@ -296,7 +302,7 @@ fn main() -> ExitCode {
                 (Ok(o), Ok(e)) => (o, e),
                 (Err(code), _) | (_, Err(code)) => return code,
             };
-            let report = preserve::report(&original, &edited);
+            let report = preserve::report(&original, &edited, loose);
             for line in &report.lines {
                 println!("{line}");
             }

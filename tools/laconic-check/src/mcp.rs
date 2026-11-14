@@ -405,7 +405,7 @@ fn call_tool(params: Option<&Json>) -> Result<String, String> {
             let (Some(original), Some(edited)) = (arg("original"), arg("edited")) else {
                 return Err("original and edited are required".into());
             };
-            Ok(preserve::report(original, edited).lines.join("\n"))
+            Ok(preserve::report(original, edited, false).lines.join("\n"))
         }
         _ => Err(format!("unknown tool: {name}")),
     }
@@ -772,7 +772,7 @@ mod tests {
         );
         assert_eq!(
             report,
-            preserve::report("Keep 42 items.\n", "Keep items.\n")
+            preserve::report("Keep 42 items.\n", "Keep items.\n", false)
                 .lines
                 .join("\n")
         );

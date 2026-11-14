@@ -160,3 +160,11 @@ jobs:
             --repo "${GITHUB_REPOSITORY}" \
             --title "${GITHUB_REF_NAME}" \
             --notes "Prebuilt laconic-check binaries for Linux (x86_64, static), Windows (x86_64) and macOS (Apple silicon), each with a SHA-256 checksum and a build provenance attestation; an MCP bundle (laconic-check.mcpb); and Scoop, Homebrew, winget and MCP Registry manifests for them."
+
+  # The Action's self-test against the release just published. A release made with the
+  # workflow's token starts no other workflow, so this job calls it.
+  action:
+    needs: release
+    permissions:
+      contents: read
+    uses: ./.github/workflows/laconic-check-action.yml

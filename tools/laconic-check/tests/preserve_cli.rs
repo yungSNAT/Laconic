@@ -77,19 +77,20 @@ fn a_faithful_edit_passes_strict() {
 }
 
 #[test]
-fn a_lost_hedge_or_frequency_word_is_listed_to_check_and_passes() {
+fn loose_lists_a_lost_hedge_or_frequency_word_to_check_and_passes() {
     let pair = files("hedge", "It will often pass.", "It passes.");
+    assert_eq!(preserve(&[], &pair).0, 1);
     assert_eq!(
-        preserve(&["--strict"], &pair),
+        preserve(&["--loose", "--strict"], &pair),
         (
             0,
             "No tracked items dropped; meaning not checked.\ncheck meaning word: 'will' (1 before, 0 after)\ncheck meaning word: 'often' (1 before, 0 after)\nlength: 4 to 2 words (50% of the original)\n".into()
         )
     );
-    // An added one can be an invented claim, so --strict still fails on it.
-    let added = files("added-hedge", "It passes.", "It always passes.");
-    assert_eq!(preserve(&[], &added).0, 0);
-    assert_eq!(preserve(&["--strict"], &added).0, 1);
+    // An added one can be an invented claim, and a swap adds one, so --strict fails on both.
+    let swap = files("swap", "It often passes.", "It always passes.");
+    assert_eq!(preserve(&["--loose"], &swap).0, 0);
+    assert_eq!(preserve(&["--loose", "--strict"], &swap).0, 1);
 }
 
 #[test]

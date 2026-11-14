@@ -52,9 +52,11 @@ const MEANING_WORDS: &[&str] = &[
     "roughly",
 ];
 
-/// Meaning words whose loss `report` lists to check and does not fail on: frequency, quantity,
-/// ability, prediction, cause and hedges. A heavy paraphrase drops these often without changing a
-/// fact; negation, conditions, scope, order, obligation, possibility and bounds still fail.
+/// Meaning words whose loss `report` lists to check under `--loose`, without failing: frequency,
+/// quantifiers, ability, 'should', prediction, cause and hedges. A heavy paraphrase often drops
+/// one without changing a fact, but a lost hedge can turn a qualified claim into a categorical
+/// one, so the default fails on them. Negation, conditions, 'only', 'every', order, 'must',
+/// 'shall', 'may', 'might', 'could' and bounds fail either way.
 const CHECK_WORDS: &[&str] = &[
     "some",
     "all",
@@ -259,11 +261,12 @@ pub struct Report {
     pub added: bool,
 }
 
-pub fn report(original: &str, edited: &str) -> Report {
+/// `loose` is `--loose`: a lost word of `CHECK_WORDS` is listed to check, as a lost name is, and
+/// does not fail. A swap such as 'all' to 'some' also adds a word, which `--strict` fails on.
+pub fn report(original: &str, edited: &str, loose: bool) -> Report {
     let mut missing = missing(original, edited);
-    // A lost word of `CHECK_WORDS` is listed to check, as a lost name is, and never fails.
     let mut loosened = Vec::new();
-    if let Some(words) = missing.remove("meaning word") {
+    if loose && let Some(words) = missing.remove("meaning word") {
         let (check, fail): (Vec<String>, Vec<String>) =
             words.into_iter().partition(|item| to_check(item));
         loosened = check;
@@ -308,11 +311,9 @@ pub fn report(original: &str, edited: &str) -> Report {
 
 /// Whether a meaning-word item, such as `'can' (5 before, 4 after)`, names a word of `CHECK_WORDS`.
 fn to_check(item: &str) -> bool {
-    CHECK_WORDS.iter().any(|word| {
-        item.strip_prefix('\'')
-            .and_then(|rest| rest.strip_prefix(word))
-            .is_some_and(|rest| rest.starts_with("' ("))
-    })
+    item.strip_prefix('\'')
+        .and_then(|rest| rest.split_once("' ("))
+        .is_some_and(|(word, _)| CHECK_WORDS.contains(&word))
 }
 
 /// The edit's length in whitespace-separated words against the original's, as a rounded
@@ -1084,7 +1085,7 @@ mod tests {
 
     #[test]
     fn reports_the_length_change_last_as_a_rounded_share() {
-        let report = report("one two three", "one  two\nthree four");
+        let report = report("one two three", "one  two\nthree four", false);
         assert_eq!(
             report.lines.last().unwrap(),
             "length: 3 to 4 words (133% of the original)"
@@ -1774,7 +1775,7 @@ Priya said.",
             (0..3)
                 .map(|_| {
                     let start = std::time::Instant::now();
-                    assert_eq!(report(&text, &text).lines.len(), 2);
+                    assert_eq!(report(&text, &text, false).lines.len(), 2);
                     start.elapsed()
                 })
                 .min()
@@ -1789,11 +1790,15 @@ Priya said.",
     }
 
     #[test]
-    fn a_lost_frequency_quantifier_or_hedge_is_listed_to_check_and_never_fails() {
-        let loosened = report(
+    fn loose_lists_a_lost_frequency_quantifier_or_hedge_to_check_without_failing() {
+        let (original, edited) = (
             "Users can often export some reports, and it will likely work.",
             "Users export reports, and it works.",
         );
+        // By default each loss fails; under `--loose` each is listed to check.
+        let strict = report(original, edited, false);
+        assert!(strict.dropped, "{:?}", strict.lines);
+        let loosened = report(original, edited, true);
         assert!(!loosened.dropped, "{:?}", loosened.lines);
         for word in ["some", "can", "will", "likely", "often"] {
             let line = format!("check meaning word: '{word}' (1 before, 0 after)");
@@ -1803,7 +1808,15 @@ Priya said.",
                 loosened.lines
             );
         }
-        // Negation, scope, order, obligation, possibility and bounds still fail, beside one to check.
+        // A swap passes, but its added word fails `--strict`.
+        for (original, edited) in [
+            ("All users qualify.", "Some users qualify."),
+            ("We can't pay.", "We won't pay."),
+        ] {
+            let swapped = report(original, edited, true);
+            assert!(!swapped.dropped && swapped.added, "{:?}", swapped.lines);
+        }
+        // Negation, 'every', 'only', order, obligation, possibility and bounds still fail.
         for (original, edited) in [
             ("Do not deploy.", "Deploy."),
             ("Check every file.", "Check files."),
@@ -1814,10 +1827,14 @@ Priya said.",
             ("Up to 4 run at once.", "4 run at once."),
             ("It can often fail if not tested.", "It fails if tested."),
         ] {
-            let failed = report(original, edited);
+            let failed = report(original, edited, true);
             assert!(failed.dropped, "{original} to {edited}: {:?}", failed.lines);
         }
-        let mixed = report("It can often fail if not tested.", "It fails if tested.");
+        let mixed = report(
+            "It can often fail if not tested.",
+            "It fails if tested.",
+            true,
+        );
         assert_eq!(
             mixed.lines[..3],
             [
@@ -1833,6 +1850,7 @@ Priya said.",
         let report = report(
             "The plan was approved.",
             "The plan was approved by Jane Smith.",
+            false,
         );
         assert!(
             report

@@ -18,6 +18,7 @@ downloaded is stored in this repository.
 from __future__ import annotations
 
 import argparse
+import functools
 import json
 import shutil
 import subprocess
@@ -119,16 +120,17 @@ def flagged(stdout: str) -> set[str]:
     return kinds
 
 
-def preserve(binary: str, source: str, rewrite: str) -> tuple[bool, set[str]]:
-    """Whether `preserve` fails the rewrite, and what it flags. `binary` is the executable file
-    `main` resolved; exit 0 is a pass, 1 a failure and any other status an error."""
+def preserve(binary: str, source: str, rewrite: str, loose: bool = False) -> tuple[bool, set[str]]:
+    """Whether `preserve` fails the rewrite, and what it flags, run with `--loose` when `loose`.
+    `binary` is the executable file `main` resolved; exit 0 is a pass, 1 a failure and any other
+    status an error."""
     with tempfile.TemporaryDirectory() as tmp:
         original, edited = Path(tmp, "original.md"), Path(tmp, "edited.md")
         original.write_text(source, encoding="utf-8")
         edited.write_text(rewrite, encoding="utf-8")
         # Bandit B603 flags every subprocess call; this one runs the binary main resolved, with no shell.
         done = subprocess.run(  # nosec B603
-            [binary, "preserve", str(original), str(edited)],
+            [binary, "preserve", *(["--loose"] if loose else []), str(original), str(edited)],
             capture_output=True,
             text=True,
             encoding="utf-8",
@@ -214,11 +216,12 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--laconic-check", default="laconic-check", help="the laconic-check binary")
     parser.add_argument("--cache", type=Path, default=ROOT / "evals" / "results" / "fact-audit")
+    parser.add_argument("--loose", action="store_true", help="run preserve with --loose")
     args = parser.parse_args(argv)
     binary = shutil.which(args.laconic_check)
     if binary is None:
         parser.error(f"--laconic-check {args.laconic_check} is not an executable file")
-    counts, differences = run(binary, args.cache)
+    counts, differences = run(binary, args.cache, functools.partial(preserve, loose=args.loose))
     print(f"Judged documents: {counts['altered'] + counts['kept']}\n")
     print(table(counts))
     print(f"\nDocuments where the checkers differ on numbers or quotations: {len(differences)}")

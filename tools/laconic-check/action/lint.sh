@@ -59,7 +59,7 @@ property() {
   printf '%s' "${s//:/%3A}"
 }
 pattern='^(.+):([0-9]+):([0-9]+): ([a-z-]+): (.*)$'
-failed=()
+failing=0
 annotate() {
   local finding level
   while IFS= read -r finding; do
@@ -69,8 +69,8 @@ annotate() {
     level=error
     if [[ ${BASH_REMATCH[5]} == *'(advisory)'* ]]; then
       level=warning
-    elif [[ ${#failed[@]} -eq 0 || ${failed[${#failed[@]} - 1]} != "${BASH_REMATCH[1]}" ]]; then
-      failed+=("${BASH_REMATCH[1]}")
+    else
+      failing=$((failing + 1))
     fi
     echo "::$level file=$(property "${BASH_REMATCH[1]}"),line=${BASH_REMATCH[2]},col=${BASH_REMATCH[3]},title=$(property "laconic-check ${BASH_REMATCH[4]}")::$(message "${BASH_REMATCH[5]}")"
   done
@@ -101,16 +101,72 @@ for file in "${files[@]}"; do
   size=$((size + ${#file} + 3))
 done
 run_batch
-# --max-findings, from args or .laconic-check, applies to each call. When every call passed
-# without --warn but some found failing findings, lint runs once more on just those files to
-# judge the total.
-if [[ -z "$warn" ]] && (( calls > 1 && status == 0 && ${#failed[@]} > 0 )); then
-  "$LACONIC_CHECK" lint ${args[@]+"${args[@]}"} "${failed[@]}" > /dev/null 2>&1
-  status=$?
-  # shortcut: on Windows, a few hundred such files make this call too long (status 126), and
-  # the step fails rather than guess; a file-list option in laconic-check would lift this.
-  if (( status == 126 )); then
-    echo "::error::${#failed[@]} files have failing findings, too many to check against --max-findings in one lint call; name fewer files, or use --warn"
+# Leading and trailing whitespace off, as lint trims project file lines: Unicode's White_Space
+# characters, written as UTF-8 bytes so that no locale decides which count.
+spaces=($'\t' $'\n' $'\v' $'\f' $'\r' ' ' $'\xc2\x85' $'\xc2\xa0' $'\xe1\x9a\x80'
+  $'\xe2\x80\x80' $'\xe2\x80\x81' $'\xe2\x80\x82' $'\xe2\x80\x83' $'\xe2\x80\x84' $'\xe2\x80\x85'
+  $'\xe2\x80\x86' $'\xe2\x80\x87' $'\xe2\x80\x88' $'\xe2\x80\x89' $'\xe2\x80\x8a' $'\xe2\x80\xa8'
+  $'\xe2\x80\xa9' $'\xe2\x80\xaf' $'\xe2\x81\x9f' $'\xe3\x80\x80')
+trim() {
+  local s=$1 space trimmed=
+  while [[ "$trimmed" != "$s" ]]; do
+    trimmed=$s
+    for space in "${spaces[@]}"; do
+      s=${s#"$space"}
+      s=${s%"$space"}
+    done
+  done
+  printf '%s' "$s"
+}
+# A count as lint reads it, digits with an optional '+', without the '+' or leading zeros.
+digits() {
+  local s=${1#+}
+  s=${s#"${s%%[!0]*}"}
+  printf '%s' "${s:-0}"
+}
+# The --max-findings lint applies, as its option parser and project file reader decide: the
+# last --max-findings before any '--' in args, else the last max-findings line of the project
+# file (--config's, or .laconic-check in this directory), else 0. The first calls already
+# rejected a bad option, value or project file, so these are well formed.
+max_findings() {
+  local i=0 arg max='' config='' line key first=1 bom=$'\xef\xbb\xbf'
+  while (( i < ${#args[@]} )); do
+    arg=${args[i]}
+    case "$arg" in
+      --) break ;;
+      --max-findings=*) max=${arg#*=} ;;
+      --config=*) config=${arg#*=} ;;
+      --max-findings) i=$((i + 1)); max=${args[i]} ;;
+      --config) i=$((i + 1)); config=${args[i]} ;;
+      --disable | --only) i=$((i + 1)) ;;
+    esac
+    i=$((i + 1))
+  done
+  if [[ -z "$max" ]]; then
+    [[ -n "$config" || ! -f .laconic-check ]] || config=.laconic-check
+    if [[ -n "$config" ]]; then
+      while IFS= read -r line || [[ -n "$line" ]]; do
+        # lint drops every byte order mark at the start of the file.
+        while [[ -n "$first" && $line == "$bom"* ]]; do line=${line#"$bom"}; done
+        first=
+        line=$(trim "$line")
+        [[ -n "$line" && $line != '#'* && $line == *=* ]] || continue
+        key=$(trim "${line%%=*}")
+        [[ "$key" != max-findings ]] || max=$(trim "${line#*=}")
+      done < "$config"
+    fi
+  fi
+  digits "${max:-0}"
+}
+# --max-findings, from args or the project file, applies to each call, so when every call passed
+# without --warn, the failing findings of all the calls are judged against it here. This needs no
+# further lint call, so no command line grows with the files. A limit of 19 or more digits is
+# beyond bash's arithmetic and any count of findings.
+if [[ -z "$warn" ]] && (( calls > 1 && status == 0 && failing > 0 )); then
+  max=$(max_findings)
+  if (( ${#max} < 19 && failing > max )); then
+    echo "::error::$failing failing findings across all the files, more than --max-findings allows ($max)"
+    status=1
   fi
 fi
 exit "$status"

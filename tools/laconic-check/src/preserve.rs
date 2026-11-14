@@ -52,6 +52,31 @@ const MEANING_WORDS: &[&str] = &[
     "roughly",
 ];
 
+/// Meaning words whose loss `report` lists to check and does not fail on: frequency, quantity,
+/// ability, prediction, cause and hedges. A heavy paraphrase drops these often without changing a
+/// fact; negation, conditions, scope, order, obligation, possibility and bounds still fail.
+const CHECK_WORDS: &[&str] = &[
+    "some",
+    "all",
+    "any",
+    "most",
+    "should",
+    "can",
+    "always",
+    "will",
+    "because",
+    "likely",
+    "probably",
+    "possibly",
+    "perhaps",
+    "usually",
+    "generally",
+    "often",
+    "sometimes",
+    "approximately",
+    "roughly",
+];
+
 /// Bounds and comparisons; `N` matches a number, so 'over the weekend' is not a bound.
 const MEANING_PHRASES: &[&str] = &[
     "up to",
@@ -235,7 +260,17 @@ pub struct Report {
 }
 
 pub fn report(original: &str, edited: &str) -> Report {
-    let missing = missing(original, edited);
+    let mut missing = missing(original, edited);
+    // A lost word of `CHECK_WORDS` is listed to check, as a lost name is, and never fails.
+    let mut loosened = Vec::new();
+    if let Some(words) = missing.remove("meaning word") {
+        let (check, fail): (Vec<String>, Vec<String>) =
+            words.into_iter().partition(|item| to_check(item));
+        loosened = check;
+        if !fail.is_empty() {
+            missing.insert("meaning word", fail);
+        }
+    }
     let added = added(original, edited);
     let mut lines = Vec::new();
     if missing.is_empty() {
@@ -247,6 +282,11 @@ pub fn report(original: &str, edited: &str) -> Report {
     for (kind, items) in &added {
         lines.extend(items.iter().map(|item| format!("added {kind}: {item}")));
     }
+    lines.extend(
+        loosened
+            .iter()
+            .map(|item| format!("check meaning word: {item}")),
+    );
     lines.extend(
         names(original, edited)
             .into_iter()
@@ -264,6 +304,15 @@ pub fn report(original: &str, edited: &str) -> Report {
         dropped: !missing.is_empty(),
         added: !added.is_empty(),
     }
+}
+
+/// Whether a meaning-word item, such as `'can' (5 before, 4 after)`, names a word of `CHECK_WORDS`.
+fn to_check(item: &str) -> bool {
+    CHECK_WORDS.iter().any(|word| {
+        item.strip_prefix('\'')
+            .and_then(|rest| rest.strip_prefix(word))
+            .is_some_and(|rest| rest.starts_with("' ("))
+    })
 }
 
 /// The edit's length in whitespace-separated words against the original's, as a rounded
@@ -1736,6 +1785,46 @@ Priya said.",
             large < small * 32,
             "16 times the numbers took {:.1} times as long ({small:?} to {large:?})",
             large.as_secs_f64() / small.as_secs_f64()
+        );
+    }
+
+    #[test]
+    fn a_lost_frequency_quantifier_or_hedge_is_listed_to_check_and_never_fails() {
+        let loosened = report(
+            "Users can often export some reports, and it will likely work.",
+            "Users export reports, and it works.",
+        );
+        assert!(!loosened.dropped, "{:?}", loosened.lines);
+        for word in ["some", "can", "will", "likely", "often"] {
+            let line = format!("check meaning word: '{word}' (1 before, 0 after)");
+            assert!(
+                loosened.lines.contains(&line),
+                "{line}: {:?}",
+                loosened.lines
+            );
+        }
+        // Negation, scope, order, obligation, possibility and bounds still fail, beside one to check.
+        for (original, edited) in [
+            ("Do not deploy.", "Deploy."),
+            ("Check every file.", "Check files."),
+            ("Only admins edit.", "Admins edit."),
+            ("Pay before Friday.", "Pay Friday."),
+            ("Staff must apply.", "Staff apply."),
+            ("It may rain.", "It rains."),
+            ("Up to 4 run at once.", "4 run at once."),
+            ("It can often fail if not tested.", "It fails if tested."),
+        ] {
+            let failed = report(original, edited);
+            assert!(failed.dropped, "{original} to {edited}: {:?}", failed.lines);
+        }
+        let mixed = report("It can often fail if not tested.", "It fails if tested.");
+        assert_eq!(
+            mixed.lines[..3],
+            [
+                "dropped meaning word: 'not' (1 before, 0 after)",
+                "check meaning word: 'can' (1 before, 0 after)",
+                "check meaning word: 'often' (1 before, 0 after)",
+            ]
         );
     }
 

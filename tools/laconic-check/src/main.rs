@@ -38,7 +38,8 @@ fn usage_text() -> String {
          its rule, described under that name in {}\n\
          preserve exits 1 when the edit dropped a protected item. It also lists items the\n\
          edit added, which fail only with --strict (for a rewrite that must add nothing),\n\
-         and names to check, which never fail. A clean result does not check meaning.\n\
+         and names and lost hedges, such as 'often' or 'can', to check, which never fail.\n\
+         A clean result does not check meaning.\n\
          mcp serves lint and preserve as MCP tools over standard input and output.\n\
          --version prints the version and --help this text.",
         advisory.join(", "),

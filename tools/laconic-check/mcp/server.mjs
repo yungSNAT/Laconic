@@ -31,7 +31,7 @@ const TOOLS = [
   {
     name: "preserve",
     description:
-      "Compare an original and an edited text and report numbers, sizes and units, dated months, inline code, URLs and meaning words and bounds (not, never, must, may, will, if, before, likely, some, all, only, unless, up to, about 50% and similar) that the edit dropped, then, as advice, those it added (an added figure or obligation can be invented) and any names to check. A clean result rules out these losses only; it does not prove the meaning survived.",
+      "Compare an original and an edited text and report numbers, sizes and units, dated months, inline code, URLs and meaning words and bounds (not, never, must, may, if, before, every, only, unless, up to, about 50% and similar) that the edit dropped, then, as advice, those it added (an added figure or obligation can be invented), lost hedges and quantifiers such as often, some, all, can, will or likely to check, and any names to check. A clean result rules out these losses only; it does not prove the meaning survived.",
     inputSchema: {
       type: "object",
       properties: {

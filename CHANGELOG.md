@@ -45,7 +45,7 @@ The manifests other than Claude Code's still declare plugin 0.5.0, so a build fr
 
 - `lint` checks the body of a GitHub alert, such as `> [!NOTE]`, as prose; it skipped every block quotation (#111).
 - `lint` lints the remaining files after one it cannot read, then exits 2; it stopped at that file, so `--json` printed nothing (#112).
-- The Action lints a large repository in several `laconic-check` calls, so Windows runners no longer exceed the command-line limit. It judges `--max-findings` over all the calls and lints a path named twice in `files` once.
+- The Action lints a large repository in several `laconic-check` calls, so the Windows command-line limit no longer stops it. To apply `--max-findings` to all the calls, it lints the files with failing findings again in one call; if their paths pass the Windows limit, the step fails. A path named twice in `files` is linted once.
 
 ## [laconic-check 0.5.0] - 2026-11-13
 

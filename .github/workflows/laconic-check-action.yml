@@ -76,3 +76,8 @@ jobs:
         env:
           OUTCOME: ${{ steps.limit.outcome }}
         run: test "$OUTCOME" = failure
+      - name: The same 2 findings pass a --max-findings of 2
+        uses: ./
+        with:
+          files: ${{ env.MANY }}
+          args: --max-findings 2

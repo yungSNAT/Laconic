@@ -17,17 +17,21 @@ if [[ -z "$LACONIC_FILES" ]]; then
     files+=("$file")
   done < "$tracked"
 else
+  # A path named twice is linted once, so the --max-findings check below counts it once.
+  unique=$(awk '!seen[$0]++' <<< "$LACONIC_FILES") || exit 2
   while IFS= read -r file; do
     [[ -z "$file" ]] || files+=("$file")
-  done <<< "$LACONIC_FILES"
+  done <<< "$unique"
 fi
 args=()
 read -r -d '' -a args <<< "$LACONIC_ARGS" || true
+warn=
 for arg in ${args[@]+"${args[@]}"}; do
   if [[ "$arg" == --json ]]; then
     echo "::error::the Action reads lint's text output, so args cannot include --json"
     exit 2
   fi
+  [[ "$arg" != --warn ]] || warn=1
 done
 if [[ ${#files[@]} -eq 0 ]]; then
   echo "No Markdown files to lint."
@@ -98,9 +102,15 @@ for file in "${files[@]}"; do
 done
 run_batch
 # --max-findings, from args or .laconic-check, applies to each call. When every call passed
-# but some found failing findings, lint runs once more on just those files to judge the total.
-if (( calls > 1 && status == 0 && ${#failed[@]} > 0 )); then
+# without --warn but some found failing findings, lint runs once more on just those files to
+# judge the total.
+if [[ -z "$warn" ]] && (( calls > 1 && status == 0 && ${#failed[@]} > 0 )); then
   "$LACONIC_CHECK" lint ${args[@]+"${args[@]}"} "${failed[@]}" > /dev/null 2>&1
   status=$?
+  # shortcut: on Windows, a few hundred such files make this call too long (status 126), and
+  # the step fails rather than guess; a file-list option in laconic-check would lift this.
+  if (( status == 126 )); then
+    echo "::error::${#failed[@]} files have failing findings, too many to check against --max-findings in one lint call; name fewer files, or use --warn"
+  fi
 fi
 exit "$status"

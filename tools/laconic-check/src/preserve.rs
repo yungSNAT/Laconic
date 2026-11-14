@@ -299,6 +299,9 @@ pub fn added(original: &str, edited: &str) -> BTreeMap<&'static str, Vec<String>
     only_in(edited, original, |had, has| (has, had))
 }
 
+/// A report kind and the function that lists its items in a text.
+type Extractor<'a> = (&'static str, &'a dyn Fn(&str) -> Vec<String>);
+
 /// Items in `from` that `to` lacks; `order` maps the 2 meaning-word counts to
 /// (before, after) for the report.
 fn only_in(
@@ -307,23 +310,26 @@ fn only_in(
     order: fn(usize, usize) -> (usize, usize),
 ) -> BTreeMap<&'static str, Vec<String>> {
     let mut out: BTreeMap<&'static str, Vec<String>> = BTreeMap::new();
-    // Unsigned values, as a quantity carries no sign or currency.
-    let values_to: Vec<String> = numbers(to)
+    // 'pound' names money or a weight: 'N pounds' is money when either text writes '£N'.
+    // shortcut: a weight of 5 pounds beside a '£5' amount then reads as money; telling them
+    // apart needs each sentence's sense.
+    let pounds: Vec<String> = [from, to]
         .iter()
-        .map(|n| {
-            number_value(n)
-                .trim_start_matches(|c: char| !c.is_ascii_digit())
-                .to_string()
-        })
+        .flat_map(|t| numbers(t, &[]))
+        .filter(|n| n.contains('£'))
+        .map(|n| unsigned(&n))
         .collect();
-    for (kind, extract) in [
-        ("number", numbers as fn(&str) -> Vec<String>),
-        ("quantity", quantities),
-        ("month", months),
-        ("code", code_spans),
-        ("url", urls),
-        ("quotation", quotations),
-    ] {
+    // Unsigned values, as a quantity carries no sign or currency.
+    let values_to: Vec<String> = numbers(to, &pounds).iter().map(|n| unsigned(n)).collect();
+    let extractors: [Extractor; 6] = [
+        ("number", &|t| numbers(t, &pounds)),
+        ("quantity", &|t| quantities(t, &pounds)),
+        ("month", &months),
+        ("code", &code_spans),
+        ("url", &urls),
+        ("quotation", &quotations),
+    ];
+    for (kind, extract) in extractors {
         let key = |x: &String| {
             if kind == "number" {
                 number_value(x)
@@ -451,6 +457,13 @@ fn number_value(token: &str) -> String {
     }
 }
 
+/// A number's value without its sign or currency.
+fn unsigned(token: &str) -> String {
+    number_value(token)
+        .trim_start_matches(|c: char| !c.is_ascii_digit())
+        .to_string()
+}
+
 /// The text without ordered list markers, which number the layout and not the content,
 /// including a marker inside bold or strong emphasis ('**1. Plan**', '**1.** Plan').
 /// shortcut: a hard-wrapped line starting '12. ' reads as a marker, so markers stop at
@@ -490,59 +503,106 @@ fn starts_with_percent(text: &str) -> bool {
 }
 
 /// A number with the size or unit it carries, attached or as the next word: '$47.3M',
-/// '150 km', 'three days', '25 degrees Celsius'. Read from prose, so a value in code or a
-/// URL is not one.
-fn quantities(text: &str) -> Vec<String> {
-    let text = prose(text);
+/// '150 km', 'three days', '25 degrees Celsius'. Both bounds of a range carry its unit, so
+/// '45 to 60 minutes', '45-60 minutes' and '45–60 minutes' are each 45 and 60 minutes.
+/// Read from prose, so a value in code or a URL is not one. 'pounds' is not a weight after a
+/// value in `pounds`, the amounts written with '£'.
+fn quantities(text: &str, pounds: &[String]) -> Vec<String> {
+    let text = dash_ranges(&prose(text));
     let tokens: Vec<&str> = text.split_whitespace().collect();
-    let mut out = Vec::new();
-    for (i, token) in tokens.iter().enumerate() {
-        let body = token.trim_start_matches(|c: char| !c.is_alphanumeric());
-        let end = body
-            .find(|c: char| !(c.is_ascii_digit() || matches!(c, ',' | '.')))
-            .unwrap_or(body.len());
-        let (value, attached) = body.split_at(end);
-        let (value, attached) = if value.is_empty() {
-            let word = body
-                .trim_end_matches(|c: char| !c.is_alphanumeric())
-                .split('-')
-                .next()
-                .unwrap_or_default()
-                .to_lowercase();
-            match number_word(&word) {
-                Some(n) => (n, &body[word.len()..]),
-                None => continue,
+    (0..tokens.len())
+        .filter_map(|i| quantity_at(&tokens, i, pounds, false))
+        .map(|(value, unit)| format!("{value} {unit}"))
+        .collect()
+}
+
+/// The text with a hyphen or en dash between 2 numbers written as ' to ', so '45-60 minutes'
+/// reads as '45 to 60 minutes'. A word with more than one, such as the date '2026-11-14' or
+/// the phone number '0400-123-456', is no range and stays as it is.
+fn dash_ranges(text: &str) -> String {
+    text.split_whitespace()
+        .map(|word| {
+            let chars: Vec<char> = word.chars().collect();
+            let dashes: Vec<usize> = (1..chars.len().saturating_sub(1))
+                .filter(|&i| {
+                    matches!(chars[i], '-' | '\u{2013}')
+                        && chars[i - 1].is_ascii_digit()
+                        && chars[i + 1].is_ascii_digit()
+                })
+                .collect();
+            match dashes[..] {
+                [at] => {
+                    let (low, high) = (&chars[..at], &chars[at + 1..]);
+                    format!("{} to {}", String::from_iter(low), String::from_iter(high))
+                }
+                _ => word.to_string(),
             }
-        } else {
-            (value, attached)
-        };
-        let bare = value.trim_end_matches(['.', ',']);
-        if bare.is_empty() {
-            continue;
-        }
-        let unit = attached.trim_start_matches('-');
-        let word = if !unit
+        })
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+/// The value of the number at token `i` and its unit, if it has one. `upper` marks a range's
+/// upper bound, which does not look for a further range.
+fn quantity_at(
+    tokens: &[&str],
+    i: usize,
+    pounds: &[String],
+    upper: bool,
+) -> Option<(String, &'static str)> {
+    let body = tokens
+        .get(i)?
+        .trim_start_matches(|c: char| !c.is_alphanumeric());
+    let end = body
+        .find(|c: char| !(c.is_ascii_digit() || matches!(c, ',' | '.')))
+        .unwrap_or(body.len());
+    let (value, attached) = body.split_at(end);
+    let (value, attached) = if value.is_empty() {
+        let word = body
             .trim_end_matches(|c: char| !c.is_alphanumeric())
-            .is_empty()
-        {
-            unit
-        } else if value.len() == bare.len() && attached.is_empty() {
-            // '25 degrees Celsius' names its unit after 'degrees'.
-            let degrees = tokens
-                .get(i + 1)
-                .is_some_and(|w| matches!(w.to_lowercase().as_str(), "degree" | "degrees"));
-            match tokens.get(i + 1 + usize::from(degrees)) {
-                Some(next) => next,
-                None => continue,
-            }
-        } else {
-            continue;
-        };
-        if let Some(unit) = quantity_word(word.trim_end_matches(|c: char| !c.is_alphanumeric())) {
-            out.push(format!("{} {unit}", number_value(bare)));
-        }
+            .split('-')
+            .next()
+            .unwrap_or_default()
+            .to_lowercase();
+        (number_word(&word)?, &body[word.len()..])
+    } else {
+        (value, attached)
+    };
+    let bare = value.trim_end_matches(['.', ',']);
+    if bare.is_empty() {
+        return None;
     }
-    out
+    let unit = attached.trim_start_matches('-');
+    let word = if !unit
+        .trim_end_matches(|c: char| !c.is_alphanumeric())
+        .is_empty()
+    {
+        unit
+    } else if value.len() == bare.len() && attached.is_empty() {
+        let next = tokens.get(i + 1)?;
+        // A range's lower bound takes the unit of its upper bound: '45 to 60 minutes',
+        // 'between 2 and 3 hours', '2 or 3 days'.
+        if matches!(*next, "to" | "and" | "or") {
+            if upper {
+                return None;
+            }
+            let (_, unit) = quantity_at(tokens, i + 2, pounds, true)?;
+            // A price takes a size across a range, never a unit: 'a fee of $5 and 10 kg'.
+            let priced = tokens[i][..tokens[i].len() - body.len()].contains(currency_mark);
+            let size = matches!(unit, "thousand" | "million" | "billion" | "trillion");
+            return (!priced || size).then(|| (number_value(bare), unit));
+        }
+        // '25 degrees Celsius' names its unit after 'degrees'.
+        let degrees = matches!(next.to_lowercase().as_str(), "degree" | "degrees");
+        tokens.get(i + 1 + usize::from(degrees))?
+    } else {
+        return None;
+    };
+    let word = word.trim_end_matches(|c: char| !c.is_alphanumeric());
+    let pound = matches!(word.to_lowercase().as_str(), "pound" | "pounds");
+    let money = pound && pounds.contains(&number_value(bare));
+    let unit = quantity_word(word).filter(|_| !money)?;
+    Some((number_value(bare), unit))
 }
 
 fn quantity_word(word: &str) -> Option<&'static str> {
@@ -589,10 +649,14 @@ fn months(text: &str) -> Vec<String> {
         .collect()
 }
 
-fn numbers(text: &str) -> Vec<String> {
+/// Numbers with their sign and currency; `pounds` lists the values that 'pounds' after a
+/// number names as money.
+fn numbers(text: &str, pounds: &[String]) -> Vec<String> {
     let text = without_list_markers(text);
     let chars: Vec<char> = text.chars().collect();
     let mut out = Vec::new();
+    // Where the last number started and ended, and its currency.
+    let mut last: Option<(usize, usize, String)> = None;
     let mut i = 0;
     while i < chars.len() {
         let starts = chars[i].is_ascii_digit() && (i == 0 || !chars[i - 1].is_alphanumeric());
@@ -611,7 +675,23 @@ fn numbers(text: &str) -> Vec<String> {
             let after: String = chars[j..chars.len().min(j + 12)].iter().collect();
             let percent = !token.ends_with('%') && starts_with_percent(&after);
             let token = if percent { token + "%" } else { token };
-            let (start, mut negative, currency) = number_prefix(&chars, i);
+            let (start, mut negative, mut currency) = number_prefix(&chars, i);
+            // A full stop or comma after the digits ends the clause: 'Pay 30. Dollars ...'.
+            if currency.is_empty() && !matches!(chars[j - 1], '.' | ',') {
+                let pound = pounds.contains(&number_value(&token));
+                currency = spelled_currency(&chars[j..], pound).to_string();
+            }
+            // A range's upper bound without its own currency shares its lower bound's: '$5-10'
+            // is $5 to $10, but 'from $5 to 10 euros' ends in euros.
+            if let Some((from, end, mark)) = &last
+                && currency.is_empty()
+                && chars
+                    .get(*end..start)
+                    .is_some_and(|between| joins_range(&chars[..*from], between))
+            {
+                currency = mark.clone();
+            }
+            last = Some((start, j, currency.clone()));
             // Accounting brackets mark a negative amount of money or a grouped figure: '($250)'
             // or '(1,200)'. Any other number in brackets, such as a note '(3)', a share '(62%)'
             // or '(1,200%)', or a ratio '(2.5)', is an aside, not an amount.
@@ -646,12 +726,12 @@ fn numbers(text: &str) -> Vec<String> {
 
 /// The sign and currency before the digits at `digit`: whether a minus sign makes the
 /// number negative, the currency mark with up to 3 capital letters before it ('$', 'US$',
-/// '£'), and where that prefix starts. A minus counts only at the start of a word, so
-/// '2-3' is a range and 'COVID-19' a name, and a currency mark may stand one space before
-/// the digits, as in '$ 27.99'.
+/// '£', '₹'), and where that prefix starts. A currency mark is '$', '£', '¥' or one from the
+/// Unicode Currency Symbols block, such as '€', '₹' or '₩'. A minus counts only at the start
+/// of a word, so '2-3' is a range and 'COVID-19' a name, and a currency mark may stand one
+/// space before the digits, as in '$ 27.99'.
 fn number_prefix(chars: &[char], digit: usize) -> (usize, bool, String) {
     let minus = |c: char| matches!(c, '-' | '\u{2212}');
-    let currency_mark = |c: char| matches!(c, '$' | '£' | '€' | '¥');
     let mut start = digit;
     let mut sign_at = None;
     if start > 0 && minus(chars[start - 1]) {
@@ -698,6 +778,58 @@ fn number_prefix(chars: &[char], digit: usize) -> (usize, bool, String) {
         }
         signed => (start, signed.is_some(), currency),
     }
+}
+
+/// Whether 2 numbers form a range, given the text `before` the first and `between` them: a
+/// hyphen or en dash, or 'to', 'and' or 'or' after 'from' or 'between' ('from $5 to 10'), so
+/// 'donated $50 to 3 charities' is no range.
+fn joins_range(before: &[char], between: &[char]) -> bool {
+    match String::from_iter(between).trim() {
+        "-" | "\u{2013}" => true,
+        "to" | "and" | "or" => {
+            let before = String::from_iter(&before[before.len().saturating_sub(16)..]);
+            let word = before.trim_end().rsplit(char::is_whitespace).next();
+            word.is_some_and(|w| matches!(w.to_lowercase().as_str(), "from" | "between"))
+        }
+        _ => false,
+    }
+}
+
+/// The currency mark a word after a number names, at once or after a size, so '30 dollars'
+/// and '30 billion dollars' are '$30'. A range's lower bound takes the word after its upper
+/// bound: '5-10 dollars' and '5 to 10 dollars' are '$5' to '$10'. 'pound' is also a weight,
+/// so it names '£' only when `money` is set.
+fn spelled_currency(after: &[char], money: bool) -> &'static str {
+    let after: String = after.iter().take(40).collect();
+    let mut words = after
+        .split_whitespace()
+        .map(|w| w.trim_matches(|c: char| !c.is_alphanumeric()));
+    let numeral = |w: &str| w.starts_with(|c: char| c.is_ascii_digit());
+    let mut word = words.next().unwrap_or_default();
+    if after.starts_with(['-', '\u{2013}']) && numeral(word) {
+        word = words.next().unwrap_or_default();
+    } else if matches!(word, "to" | "and" | "or") && words.clone().next().is_some_and(numeral) {
+        words.next();
+        word = words.next().unwrap_or_default();
+    }
+    if matches!(
+        quantity_word(word),
+        Some("thousand" | "million" | "billion" | "trillion")
+    ) {
+        word = words.next().unwrap_or_default();
+    }
+    match word.to_lowercase().as_str() {
+        "dollar" | "dollars" => "$",
+        "euro" | "euros" => "€",
+        "yen" => "¥",
+        "pound" | "pounds" if money => "£",
+        _ => "",
+    }
+}
+
+/// A currency mark: '$', '£', '¥' or one from the Unicode Currency Symbols block.
+fn currency_mark(c: char) -> bool {
+    matches!(c, '$' | '£' | '¥' | '\u{20A0}'..='\u{20CF}')
 }
 
 fn number_word(w: &str) -> Option<&'static str> {
@@ -1483,6 +1615,113 @@ Priya said.",
         ] {
             assert!(missing(original, edited).is_empty(), "{original}");
         }
+    }
+
+    #[test]
+    fn a_currency_word_matches_its_mark_and_every_mark_is_its_own() {
+        for (original, edited) in [
+            ("Revenue was $30 billion.", "Revenue was 30 billion dollar."),
+            ("It costs $30.", "It costs 30 dollars."),
+            ("It costs €5.", "It costs 5 euros."),
+            ("It costs ¥500.", "It costs 500 yen."),
+            ("It costs £5.", "It costs 5 pounds."),
+            ("It weighs 10 lb.", "It weighs 10 pounds."),
+            (
+                "It costs £5 and needs 2 pounds of flour.",
+                "It costs £5 and needs 2 lb of flour.",
+            ),
+            ("It costs $5-10.", "It costs 5-10 dollars."),
+            ("It costs $5 to $10.", "It costs 5 to 10 dollars."),
+            ("Prices run from $5 to 10.", "Prices run from $5 to $10."),
+            (
+                "Prices are between $5 and 10.",
+                "Prices are between $5 and $10.",
+            ),
+            (
+                "I donated $50 to 3 charities.",
+                "I donated $50 each to 3 charities.",
+            ),
+            (
+                "The fee is $5 and 2 forms are needed.",
+                "The fee is $5; 2 forms are needed.",
+            ),
+            (
+                "Prices run from $5 to 10 euros.",
+                "Prices run from $5 to €10.",
+            ),
+            (
+                "The fee is $5 and 10 kg of luggage.",
+                "The fee is $5; 10 kg of luggage.",
+            ),
+            (
+                "Revenue was $5 to 10 billion.",
+                "Revenue was $5 billion to 10 billion.",
+            ),
+        ] {
+            assert!(missing(original, edited).is_empty(), "{original}");
+            assert!(added(original, edited).is_empty(), "{original}");
+        }
+        // A currency word in the next sentence names no currency.
+        let next_sentence = missing(
+            "Pay 30. Dollars are scarce.",
+            "Pay 30 now. Dollars are scarce.",
+        );
+        assert!(next_sentence.is_empty(), "{next_sentence:?}");
+        for (original, edited, dropped) in [
+            ("It costs ₹500.", "It costs ₩500.", "₹500"),
+            ("It costs $30.", "It costs 30 euros.", "$30"),
+            ("It costs £5.", "It costs 5 lb.", "£5"),
+            (
+                "Prices run from $5 to 10 euros.",
+                "Prices run from $5 to $10.",
+                "€10",
+            ),
+        ] {
+            assert_eq!(
+                missing(original, edited)["number"],
+                vec![dropped],
+                "{original}"
+            );
+        }
+    }
+
+    #[test]
+    fn both_bounds_of_a_range_carry_its_unit() {
+        for (original, edited) in [
+            ("Bake for 45 to 60 minutes.", "Bake for 45-60 minutes."),
+            (
+                "Bake for 45 to 60 minutes.",
+                "Bake for 45\u{2013}60 minutes.",
+            ),
+            ("Add 30 to 60 grams of salt.", "Add 30-60 grams of salt."),
+            ("Allow 2-3 hours.", "Allow between 2 and 3 hours."),
+            ("Allow 2-3 days.", "Allow 2 or 3 days."),
+        ] {
+            for (from, to) in [(original, edited), (edited, original)] {
+                assert!(missing(from, to).is_empty(), "{from}");
+                assert!(added(from, to).is_empty(), "{from}");
+            }
+        }
+        assert_eq!(
+            missing("Bake for 45-60 minutes.", "Bake for 45-60 hours.")["quantity"],
+            vec!["45 minute", "60 minute"]
+        );
+        assert_eq!(
+            missing("Add 5-10 kg.", "Add 5 to 10 g.")["quantity"],
+            vec!["5 kg", "10 kg"]
+        );
+        // A date or phone number is no range, so the word after it is no unit of its parts.
+        let dated = added(
+            "Due 2026-11-14. Call 0400-123-456.",
+            "Due 2026-11-14 hours. Call 0400-123-456 minutes.",
+        );
+        assert!(dated.is_empty(), "{dated:?}");
+    }
+
+    #[test]
+    fn a_long_chain_of_ranges_reads_one_step_ahead() {
+        let chain = "1 to ".repeat(50_000) + "1 km";
+        assert!(missing(&chain, &chain).is_empty());
     }
 
     #[test]

@@ -1,14 +1,25 @@
 version: 2
+# A version update waits until its release is 7 days old, which leaves time for a malicious
+# release to be found and pulled first. Cooldown does not delay security updates.
 updates:
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: weekly
+    cooldown:
+      default-days: 7
     groups:
       # CodeQL refuses a workflow whose init, analyze and upload-sarif steps differ in version.
       codeql-action:
         patterns:
           - "github/codeql-action*"
+      # One pull request for the week's minor and patch bumps, such as one action's pin in 2 files.
+      actions:
+        patterns:
+          - "*"
+        update-types:
+          - minor
+          - patch
   # The pinned CLIs behind the load checks; see ci/README.md.
   - package-ecosystem: npm
     directories:
@@ -16,13 +27,19 @@ updates:
       - /ci/pi
     schedule:
       interval: weekly
+    cooldown:
+      default-days: 7
   # The fuzz targets' libFuzzer bindings; laconic-check itself has no dependencies.
   - package-ecosystem: cargo
     directory: /tools/laconic-check/fuzz
     schedule:
       interval: weekly
+    cooldown:
+      default-days: 7
   # Coverage for the Codecov upload, pinned by hash in requirements-coverage.txt.
   - package-ecosystem: pip
     directory: /ci
     schedule:
       interval: weekly
+    cooldown:
+      default-days: 7

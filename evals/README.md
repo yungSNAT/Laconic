@@ -133,6 +133,21 @@ Both versions fail every document the paper marks altered. In each of the 4 docu
 
 The paper's judgements are the reference here, so the table measures agreement with them, not the accuracy of either checker. `preserve` never fails on a name, and it also fails on words such as 'not', 'must' and 'before', which the paper does not judge. The texts are CC BY 4.0 (AI Humanizer Benchmark); `humanizer-fact-audit` is by Ziyuan Wang, Genliang Zhu and Xiaobo Chen, its code MIT and its data CC BY 4.0. Nothing from either is stored in this repository.
 
+## Public-set fact check
+
+Run on 14 November 2026, with the method committed before any rewrite. The sources are the 99 public texts of the 2026-09, 2026-10 and 2026-11 cycles of the [AI Humanizer Benchmark](https://huggingface.co/datasets/ai-humanizer-benchmark/ai-humanizer-benchmark) at revision `35cf47ea697819c30d2d7845d37389db318e0363`, 33 a cycle. Laconic's prose skill at commit `2ea470ad1b34ae342052bb6153b8e9ec6556ce9b` and [humanizer](https://github.com/blader/humanizer/tree/v4.0.0) 4.0.0 (`b48c832f0f809c1b5658edbb838c2521b72f2413`) each rewrote every text twice, 3 texts to a fresh context, with the same instruction and the skill's full text supplied directly. One round used `claude-opus-5-5` at high effort through Claude Code, the other `gpt-6.1-sol` at high reasoning through Codex. All 396 planned rewrites in each round were valid.
+
+[humanizer-fact-audit](https://github.com/zwang-devv/humanizer-fact-audit) at commit `e665dda0506a64c834886c94d8f328d447119a07`, with spaCy and `en_core_web_sm` 3.8.0 on CPU, compared each rewrite with its source. A rewrite fails when it loses at least one extracted number or date, person or organisation name, or quotation of 3 or more words. Each source compared with itself kept every unit. 32 sources have no extractable unit, so the rates use the 134 rewrites per skill whose source has one. The interval is a paired bootstrap over the 33 fixed batches, 10,000 resamples, seed 2282.
+
+| Round | Skill | Rewrites losing a unit | Numbers and dates lost | Names lost | Quotations lost | Mean length against source, in words |
+|---|---|---|---|---|---|---|
+| Opus 5.5 | Laconic | 18 of 134 | 9 of 440 | 12 of 164 | 5 of 70 | 0.936 |
+| Opus 5.5 | `humanizer` | 10 of 134 | 5 of 440 | 9 of 164 | 0 of 70 | 1.013 |
+| `gpt-6.1-sol` | Laconic | 20 of 134 | 13 of 440 | 17 of 164 | 0 of 70 | 0.896 |
+| `gpt-6.1-sol` | `humanizer` | 20 of 134 | 12 of 440 | 18 of 164 | 0 of 70 | 0.932 |
+
+Laconic minus `humanizer`: +5.97 percentage points under Opus 5.5 (95% interval 0.00 to +12.32) and 0.00 under `gpt-6.1-sol` (−2.21 to +2.14). The checker can flag a harmless paraphrase and misses changed conditions, negations, commitments and invented claims, so these are unit-loss rates, not full factual fidelity. The rounds used different models and runners and are not pooled. The run scripts, rewrites and scores are kept by Laconic's author and are not stored here; the texts are CC BY 4.0 and the checker's code is MIT.
+
 ## Agent cost benchmark
 
 `evals/agent_bench.py` measures whether a rule set changes how an agent works, not just how it writes. It builds 5 small Python repositories with one failing test each and asks Claude Code to fix them with tools limited to Read, Edit, Glob, Grep and `python -m unittest`. It records whether the tests pass afterwards, plus turns, tokens, cost and permission denials. It compares 2 rule files:

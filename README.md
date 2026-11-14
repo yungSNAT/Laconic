@@ -19,7 +19,7 @@
 
 Laconic is an AI 'humanizer' (humaniser) and 'no AI slop' skill for coding agents and chat assistants. It makes the model lead with the answer, mark what it has not verified and stop when the answer is complete, and tells it to keep every fact, step and caveat the reader needs. It instructs the model to write every original sentence to the Australian Government Style Manual, with the house overrides listed in the skill.
 
-To humanise AI-written text, ask the agent to humanise it. The prose skill removes AI writing patterns, is written to keep every fact, number and caveat, and leaves the text shorter, not padded with performed personality. The [fact-survival benchmark](evals/README.md#fact-survival-benchmark) that tests this promise has not reported yet.
+To humanise AI-written text, ask the agent to humanise it. The prose skill removes AI writing patterns, is written to keep every fact, number and caveat, and leaves the text shorter, not padded with performed personality. The [fact-survival benchmark](evals/README.md#fact-survival-benchmark) that tests this promise has not reported yet. On 99 public texts, an [outside fact checker](#fact-changes-on-a-public-set) found that Laconic lost a number, name or quotation about as often as `humanizer`, or more often, depending on the model; neither difference is clear of 0.
 
 <table>
 <tr>
@@ -193,6 +193,19 @@ Four regex checks were widened after inspecting responses that failed them with 
 </details>
 
 Limits: 40 texts per setup from one generating model, judged by the same model family, on these 20 prompts and these installed setups. Each checker reflects its author's house view, and the `avoid-ai-writing` detector is that skill's own engine. Passing the regex checks is partial evidence that facts survived, not proof that every qualifier did. [evals/README.md](evals/README.md) gives the commands to rerun it.
+
+### Fact changes on a public set
+
+On 14 November 2026, Laconic's prose skill and [humanizer](https://github.com/blader/humanizer) 4.0.0 each rewrote the 99 public texts of the September to November 2026 cycles of the [AI Humanizer Benchmark](https://huggingface.co/datasets/ai-humanizer-benchmark/ai-humanizer-benchmark), 2 trials each, in 2 rounds with different models. An outside checker, [humanizer-fact-audit](https://github.com/zwang-devv/humanizer-fact-audit), counted the rewrites that lost at least one number, date, person or organisation name, or quotation of 3 or more words from the source. The method was committed before any rewrite was made.
+
+| Round | Laconic | `humanizer` | Difference (95% interval) |
+|---|---|---|---|
+| Claude Opus 5.5 | 18 of 134 (13.4%) | 10 of 134 (7.5%) | +6.0 points (0.0 to +12.3) |
+| `gpt-6.1-sol` (Codex) | 20 of 134 (14.9%) | 20 of 134 (14.9%) | 0.0 points (−2.2 to +2.1) |
+
+Under Opus 5.5 Laconic lost a unit in more rewrites than `humanizer`, in every unit group: numbers and dates 9 of 440 lost against 5, names 12 of 164 against 9 and quotations 5 of 70 against 0. Under `gpt-6.1-sol` the 2 skills tied. Neither interval excludes 0, so neither round shows a clear difference. Laconic's rewrites were shorter in both rounds: 0.94 and 0.90 of the source's words, against 1.01 and 0.93.
+
+Limits: the checker matches units and can flag a harmless paraphrase of a quotation; it does not see changed conditions, negations or invented claims, so this is not a full test of factual fidelity. 32 of the 99 texts have no unit it can check, so the rates cover 134 rewrites per skill. Each round used one model to rewrite; the instructions were supplied as text, not as installed plugins. [evals/README.md](evals/README.md#public-set-fact-check) gives the pinned revisions.
 
 ## Checker
 

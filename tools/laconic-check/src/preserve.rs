@@ -652,8 +652,8 @@ fn numbers(text: &str, pounds: &[String]) -> Vec<String> {
     let text = without_list_markers(text);
     let chars: Vec<char> = text.chars().collect();
     let mut out = Vec::new();
-    // Where the last number ended, and its currency.
-    let mut last: Option<(usize, String)> = None;
+    // Where the last number started and ended, and its currency.
+    let mut last: Option<(usize, usize, String)> = None;
     let mut i = 0;
     while i < chars.len() {
         let starts = chars[i].is_ascii_digit() && (i == 0 || !chars[i - 1].is_alphanumeric());
@@ -674,9 +674,11 @@ fn numbers(text: &str, pounds: &[String]) -> Vec<String> {
             let token = if percent { token + "%" } else { token };
             let (start, mut negative, mut currency) = number_prefix(&chars, i);
             // A range's upper bound shares its lower bound's currency: '$5-10' is $5 to $10.
-            if let Some((end, mark)) = &last
+            if let Some((from, end, mark)) = &last
                 && currency.is_empty()
-                && chars.get(*end..start).is_some_and(joins_range)
+                && chars
+                    .get(*end..start)
+                    .is_some_and(|between| joins_range(&chars[..*from], between))
             {
                 currency = mark.clone();
             }
@@ -685,7 +687,7 @@ fn numbers(text: &str, pounds: &[String]) -> Vec<String> {
                 let pound = pounds.contains(&number_value(&token));
                 currency = spelled_currency(&chars[j..], pound).to_string();
             }
-            last = Some((j, currency.clone()));
+            last = Some((start, j, currency.clone()));
             // Accounting brackets mark a negative amount of money or a grouped figure: '($250)'
             // or '(1,200)'. Any other number in brackets, such as a note '(3)', a share '(62%)'
             // or '(1,200%)', or a ratio '(2.5)', is an aside, not an amount.
@@ -775,13 +777,19 @@ fn number_prefix(chars: &[char], digit: usize) -> (usize, bool, String) {
     }
 }
 
-/// Whether the text between 2 numbers makes them a range: a hyphen, an en dash, 'to', 'and'
-/// or 'or'.
-fn joins_range(between: &[char]) -> bool {
-    matches!(
-        String::from_iter(between).trim(),
-        "-" | "\u{2013}" | "to" | "and" | "or"
-    )
+/// Whether 2 numbers form a range, given the text `before` the first and `between` them: a
+/// hyphen or en dash, or 'to', 'and' or 'or' after 'from' or 'between' ('from $5 to 10'), so
+/// 'donated $50 to 3 charities' is no range.
+fn joins_range(before: &[char], between: &[char]) -> bool {
+    match String::from_iter(between).trim() {
+        "-" | "\u{2013}" => true,
+        "to" | "and" | "or" => {
+            let before = String::from_iter(&before[before.len().saturating_sub(16)..]);
+            let word = before.trim_end().rsplit(char::is_whitespace).next();
+            word.is_some_and(|w| matches!(w.to_lowercase().as_str(), "from" | "between"))
+        }
+        _ => false,
+    }
 }
 
 /// The currency mark a word after a number names, at once or after a size, so '30 dollars'
@@ -1616,6 +1624,19 @@ Priya said.",
             ),
             ("It costs $5-10.", "It costs 5-10 dollars."),
             ("It costs $5 to $10.", "It costs 5 to 10 dollars."),
+            ("Prices run from $5 to 10.", "Prices run from $5 to $10."),
+            (
+                "Prices are between $5 and 10.",
+                "Prices are between $5 and $10.",
+            ),
+            (
+                "I donated $50 to 3 charities.",
+                "I donated $50 each to 3 charities.",
+            ),
+            (
+                "The fee is $5 and 2 forms are needed.",
+                "The fee is $5; 2 forms are needed.",
+            ),
         ] {
             assert!(missing(original, edited).is_empty(), "{original}");
             assert!(added(original, edited).is_empty(), "{original}");

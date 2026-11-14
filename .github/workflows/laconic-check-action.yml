@@ -25,7 +25,7 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 5
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -81,3 +81,39 @@ jobs:
         with:
           files: ${{ env.MANY }}
           args: --max-findings 2
+      # 170 files with a failing finding each, whose paths alone pass the Windows limit, so no
+      # single lint call can judge their total against --max-findings.
+      - name: Track 170 files with long paths and a failing finding each
+        shell: bash
+        run: |
+          mkdir -p faults
+          long=$(printf '%0190d' 0 | tr 0 f)
+          for i in $(seq 1 170); do
+            cp tools/laconic-check/action/tests/fault.md "faults/$long-$i.md"
+          done
+          git add faults
+          { echo 'FAULTS<<EOF'; git ls-files faults; echo EOF; } >> "$GITHUB_ENV"
+      - name: 170 failing findings pass a --max-findings of 170
+        uses: ./
+        with:
+          files: ${{ env.FAULTS }}
+          args: --max-findings 170
+      - name: 170 failing findings fail a --max-findings of 169
+        id: over
+        continue-on-error: true
+        uses: ./
+        with:
+          files: ${{ env.FAULTS }}
+          args: --max-findings=169
+      - name: Check the 170 findings failed the step
+        shell: bash
+        env:
+          OUTCOME: ${{ steps.over.outcome }}
+        run: test "$OUTCOME" = failure
+      - name: Allow 170 findings in a project file
+        shell: bash
+        run: printf 'max-findings = 170\n' > .laconic-check
+      - name: The project file's --max-findings counts across the calls
+        uses: ./
+        with:
+          files: ${{ env.FAULTS }}

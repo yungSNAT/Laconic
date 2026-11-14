@@ -986,6 +986,9 @@ impl Document {
     /// Records one masked paragraph; `at` maps a 1-based column to its line and column.
     fn collect(&mut self, masked: &[char], at: impl Fn(usize) -> (usize, usize)) {
         let mut k = 0;
+        // The end of the whitespace-delimited token holding the current word, and whether that
+        // token is an address. Each token is tested once, however many words it holds.
+        let (mut token_end, mut address) = (0, false);
         while k < masked.len() {
             if !masked[k].is_alphabetic() {
                 k += 1;
@@ -1001,20 +1004,22 @@ impl Document {
             }
             // A bare domain or path, such as 'planetark.org/cartridges-4-planet-ark', is an
             // address, not prose.
-            let token_start = masked[..start]
-                .iter()
-                .rposition(|c| c.is_whitespace())
-                .map_or(0, |p| p + 1);
-            let token_end = masked[k..]
-                .iter()
-                .position(|c| c.is_whitespace())
-                .map_or(masked.len(), |p| k + p);
-            let token = &masked[token_start..token_end];
-            if token.iter().any(|&c| c == '/' || c == '@')
-                || token
-                    .windows(3)
-                    .any(|w| w[0].is_alphanumeric() && w[1] == '.' && w[2].is_alphanumeric())
-            {
+            if start >= token_end {
+                let token_start = masked[..start]
+                    .iter()
+                    .rposition(|c| c.is_whitespace())
+                    .map_or(0, |p| p + 1);
+                token_end = masked[k..]
+                    .iter()
+                    .position(|c| c.is_whitespace())
+                    .map_or(masked.len(), |p| k + p);
+                let token = &masked[token_start..token_end];
+                address = token.iter().any(|&c| c == '/' || c == '@')
+                    || token
+                        .windows(3)
+                        .any(|w| w[0].is_alphanumeric() && w[1] == '.' && w[2].is_alphanumeric());
+            }
+            if address {
                 continue;
             }
             let word: String = masked[start..k].iter().collect();
@@ -3127,6 +3132,30 @@ mod tests {
         assert_eq!(
             at("- item\n  - Hope this\n    helps."),
             vec![(2, 5, "closer")]
+        );
+    }
+
+    #[test]
+    fn lints_a_paragraph_without_whitespace_in_linear_time() {
+        // Each word once rescanned its whole whitespace-free token, so 8 times the text took
+        // about 64 times as long. Linear time gives about 8 times; the fastest of 3 runs
+        // keeps a busy machine from deciding the ratio.
+        let fastest = |words: usize| {
+            let text = "a,".repeat(words);
+            (0..3)
+                .map(|_| {
+                    let start = std::time::Instant::now();
+                    lint(&text);
+                    start.elapsed()
+                })
+                .min()
+                .unwrap()
+        };
+        let (small, large) = (fastest(2_500), fastest(20_000));
+        assert!(
+            large < small * 24,
+            "8 times the words took {:.1} times as long ({small:?} to {large:?})",
+            large.as_secs_f64() / small.as_secs_f64()
         );
     }
 }

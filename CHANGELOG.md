@@ -41,6 +41,10 @@ The manifests other than Claude Code's still declare plugin 0.5.0, so a build fr
 - Pin CI agent installs and disable lifecycle scripts (#28).
 - Keep scenario prompts out of Claude CLI arguments and reject model values that could become options (#30).
 
+### laconic-check: changed
+
+- Release builds use link-time optimisation and one codegen unit, so the Linux binary is about a fifth smaller (1,010,600 to 813,544 bytes) and starts slightly faster.
+
 ### laconic-check: fixed
 
 - `lint` takes linear time on a paragraph without whitespace, such as minified text: each word rescanned its whole token, so 80,000 characters of 'a,' took about 6 seconds and twice the text 4 times as long.

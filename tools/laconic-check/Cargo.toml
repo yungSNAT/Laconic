@@ -7,3 +7,7 @@ description = "Flags Australian English and house-style candidates in Markdown p
 publish = false
 
 [dependencies]
+
+[profile.release]
+lto = true
+codegen-units = 1

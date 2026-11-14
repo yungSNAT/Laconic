@@ -49,6 +49,7 @@ The manifests other than Claude Code's still declare plugin 0.5.0, so a build fr
 ### laconic-check: fixed
 
 - `lint` no longer rescans a whitespace-free token for each word it holds, so minified text takes linear time: 80,000 characters of 'a,' took about 6 seconds and twice the text 4 times as long (#119).
+- `preserve` compares numbers and quantities through hash sets, so a text of many numbers takes linear time: 16,000 numbers took about 1 second and twice as many 5 times as long.
 - `lint` checks the body of a GitHub alert, such as `> [!NOTE]`, as prose; it skipped every block quotation (#111).
 - `lint` lints the remaining files after one it cannot read, then exits 2; it stopped at that file, so `--json` printed nothing (#112).
 - The Action lints a large repository in several `laconic-check` calls, so the Windows command-line limit no longer stops it. It counts the failing findings of all the calls against `--max-findings`, taken from `args` or the project file as `lint` takes it, so no call has to hold every file with a failing finding. A path named twice in `files` is linted once.

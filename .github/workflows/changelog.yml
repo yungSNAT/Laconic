@@ -22,7 +22,7 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
       - name: Require a changelog line for a shipped change
-        uses: yungSNAT/yungSNAT/.github/actions/changelog-line@5cd2765e4c78098b7602809e60830f07373fae44 # main
+        uses: yungSNAT/yungSNAT/.github/actions/changelog-line@5cd2765e4c78098b7602809e60830f07373fae44 # v1
         with:
           shipped: '^(skills|\.cursor/skills|rules|hooks|extensions|\.opencode|\.claude-plugin|\.codex-plugin|\.agents/plugins)/|^(plugin\.json|package\.json|qwen-extension\.json|kimi\.plugin\.json|gemini-extension\.json|GEMINI\.md|action\.yml|\.pre-commit-hooks\.yaml)$|^tools/laconic-check/(src/|mcp/|action/|Cargo\.(toml|lock)$)|^tools/laconic-tools/src/(main|packages)\.rs$'
           heading: '## [Unreleased]'

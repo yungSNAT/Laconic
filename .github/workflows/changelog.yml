@@ -6,7 +6,7 @@ name: changelog
 # will not notice. Dependabot's pull requests are skipped.
 on:
   pull_request:
-    types: [opened, synchronize, reopened, labeled, unlabeled]
+    types: [opened, edited, synchronize, reopened, labeled, unlabeled]
 
 permissions:
   contents: read
@@ -26,8 +26,8 @@ jobs:
           BASE: ${{ github.event.pull_request.base.sha }}
           HEAD: ${{ github.event.pull_request.head.sha }}
         run: |
-          shipped='^(skills|\.cursor/skills|rules|hooks|extensions|\.opencode|\.claude-plugin|\.codex-plugin|\.agents/plugins)/|^(plugin\.json|package\.json|qwen-extension\.json|kimi\.plugin\.json|gemini-extension\.json|GEMINI\.md|action\.yml|\.pre-commit-hooks\.yaml)$|^tools/laconic-check/(src/|mcp/|action/|Cargo\.(toml|lock)$)|^tools/laconic-tools/src/packages\.rs$'
-          files=$(git diff --no-renames --name-only "$BASE...$HEAD")
+          shipped='^(skills|\.cursor/skills|rules|hooks|extensions|\.opencode|\.claude-plugin|\.codex-plugin|\.agents/plugins)/|^(plugin\.json|package\.json|qwen-extension\.json|kimi\.plugin\.json|gemini-extension\.json|GEMINI\.md|action\.yml|\.pre-commit-hooks\.yaml)$|^tools/laconic-check/(src/|mcp/|action/|Cargo\.(toml|lock)$)|^tools/laconic-tools/src/(main|packages)\.rs$'
+          files=$(git -c core.quotePath=false diff --no-renames --name-only "$BASE...$HEAD")
           changed=$(printf '%s\n' "$files" | grep -E "$shipped" || true)
           if [ -z "$changed" ]; then
             echo "No shipped file changed."

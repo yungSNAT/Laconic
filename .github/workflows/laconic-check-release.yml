@@ -3,13 +3,17 @@ name: laconic-check release
 # Builds laconic-check for Linux, Windows and macOS, bundles them as an MCP bundle and writes
 # the Scoop, Homebrew, winget and MCP Registry manifests for them. A tag such as
 # laconic-check-v0.1.0 attests the archives and publishes everything as a GitHub release; a
-# manual run attests and uploads artefacts; a PR that changes this workflow only uploads them.
+# manual run attests and uploads artefacts. A PR that changes this workflow, the crate's
+# Cargo.toml (a version bump or the release profile) or the package manifest writer only
+# uploads them, so packaging is tested before the tag.
 on:
   push:
     tags: ["laconic-check-v*"]
   pull_request:
     paths:
       - .github/workflows/laconic-check-release.yml
+      - tools/laconic-check/Cargo.toml
+      - tools/laconic-tools/src/packages.rs
   workflow_dispatch:
 
 permissions:

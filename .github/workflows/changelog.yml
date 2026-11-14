@@ -22,24 +22,7 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
       - name: Require a changelog line for a shipped change
-        env:
-          BASE: ${{ github.event.pull_request.base.sha }}
-          HEAD: ${{ github.event.pull_request.head.sha }}
-        run: |
-          shipped='^(skills|\.cursor/skills|rules|hooks|extensions|\.opencode|\.claude-plugin|\.codex-plugin|\.agents/plugins)/|^(plugin\.json|package\.json|qwen-extension\.json|kimi\.plugin\.json|gemini-extension\.json|GEMINI\.md|action\.yml|\.pre-commit-hooks\.yaml)$|^tools/laconic-check/(src/|mcp/|action/|Cargo\.(toml|lock)$)|^tools/laconic-tools/src/(main|packages)\.rs$'
-          files=$(git -c core.quotePath=false diff --no-renames --name-only "$BASE...$HEAD")
-          changed=$(printf '%s\n' "$files" | grep -E "$shipped" || true)
-          if [ -z "$changed" ]; then
-            echo "No shipped file changed."
-            exit 0
-          fi
-          log=$(git diff --unified=0 "$BASE...$HEAD" -- CHANGELOG.md)
-          added=$(printf '%s\n' "$log" | sed -n '/^+++ /d; s/^+//p' | grep -c '[^[:space:]]' || true)
-          if [ "$added" -gt 0 ]; then
-            echo "CHANGELOG.md gains $added line(s)."
-            exit 0
-          fi
-          echo "Shipped files changed:"
-          echo "$changed"
-          echo "::error file=CHANGELOG.md::This pull request changes shipped files but adds no line to CHANGELOG.md. Add one under ## [Unreleased], or apply the skip-changelog label if users will not notice the change."
-          exit 1
+        uses: yungSNAT/yungSNAT/.github/actions/changelog-line@5cd2765e4c78098b7602809e60830f07373fae44 # main
+        with:
+          shipped: '^(skills|\.cursor/skills|rules|hooks|extensions|\.opencode|\.claude-plugin|\.codex-plugin|\.agents/plugins)/|^(plugin\.json|package\.json|qwen-extension\.json|kimi\.plugin\.json|gemini-extension\.json|GEMINI\.md|action\.yml|\.pre-commit-hooks\.yaml)$|^tools/laconic-check/(src/|mcp/|action/|Cargo\.(toml|lock)$)|^tools/laconic-tools/src/(main|packages)\.rs$'
+          heading: '## [Unreleased]'

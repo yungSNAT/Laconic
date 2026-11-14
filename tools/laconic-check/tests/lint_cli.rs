@@ -119,6 +119,22 @@ fn usage_settings_and_read_errors_exit_2() {
 }
 
 #[test]
+fn an_unreadable_file_is_reported_and_the_rest_are_still_linted() {
+    let dir = folder("unreadable", &[("two.md", TWO)]);
+    let (code, out, err) = lint(&dir, &["missing.md", "two.md", "--warn"]);
+    assert_eq!(code, 2);
+    assert_eq!(out.lines().count(), 2, "{out}");
+    assert!(out.starts_with("two.md:1:5: us-spelling: "), "{out}");
+    assert!(err.starts_with("missing.md: "), "{err}");
+    let (code, out, _) = lint(&dir, &["--json", "two.md", "missing.md"]);
+    assert_eq!(code, 2);
+    assert!(
+        out.ends_with("],\"failing\":2,\"suppressed\":0}\n"),
+        "{out}"
+    );
+}
+
+#[test]
 fn json_reports_every_finding_and_the_counts() {
     let quiet = "<!-- laconic-check-disable-next-line us-spelling -->\nThe flavor is sweet.\n";
     let dir = folder("json", &[("two.md", TWO), ("quiet.md", quiet)]);

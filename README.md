@@ -245,7 +245,7 @@ The Color Purple won the prize.
 | --- | --- |
 | 0 | `lint` found no more failing findings than `--max-findings` allows, or ran with `--warn`; `preserve` found nothing dropped, and nothing added under `--strict`; `mcp` reached the end of its input; `--version` or `--help` printed its text. |
 | 1 | `lint` found more failing findings than allowed; `preserve` found an item dropped, or one added under `--strict`. |
-| 2 | A usage, project file or read error, or an input or output error in `mcp`. |
+| 2 | A usage, project file or read error, or an input or output error in `mcp`. After a read error, `lint` still lints the other files. |
 
 To run it with [pre-commit](https://pre-commit.com), put `laconic-check` on the PATH and add its hooks; the commit message hook also needs `pre-commit install --hook-type commit-msg`, and laconic-check 0.4.0 or later, as 0.3.0 lacks `--commit-msg`:
 

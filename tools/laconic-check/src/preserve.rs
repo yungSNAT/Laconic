@@ -7,7 +7,7 @@
 //! clean result does not prove the meaning survived; it only rules out these losses. An
 //! addition is a reason to check the edit invented nothing, not proof that it did.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashSet};
 
 const MEANING_WORDS: &[&str] = &[
     "not",
@@ -313,14 +313,14 @@ fn only_in(
     // 'pound' names money or a weight: 'N pounds' is money when either text writes '£N'.
     // shortcut: a weight of 5 pounds beside a '£5' amount then reads as money; telling them
     // apart needs each sentence's sense.
-    let pounds: Vec<String> = [from, to]
+    let pounds: HashSet<String> = [from, to]
         .iter()
-        .flat_map(|t| numbers(t, &[]))
+        .flat_map(|t| numbers(t, &HashSet::new()))
         .filter(|n| n.contains('£'))
         .map(|n| unsigned(&n))
         .collect();
     // Unsigned values, as a quantity carries no sign or currency.
-    let values_to: Vec<String> = numbers(to, &pounds).iter().map(|n| unsigned(n)).collect();
+    let values_to: HashSet<String> = numbers(to, &pounds).iter().map(|n| unsigned(n)).collect();
     let extractors: [Extractor; 6] = [
         ("number", &|t| numbers(t, &pounds)),
         ("quantity", &|t| quantities(t, &pounds)),
@@ -337,16 +337,13 @@ fn only_in(
                 x.clone()
             }
         };
-        let kept: Vec<String> = extract(to).iter().map(key).collect();
+        let kept: HashSet<String> = extract(to).iter().map(key).collect();
         let lost: Vec<String> = dedup(extract(from))
             .into_iter()
             .filter(|x| !kept.contains(&key(x)))
             // A lost number already reports itself; a quantity adds only a changed size or unit.
             .filter(|x| {
-                kind != "quantity"
-                    || x.split(' ')
-                        .next()
-                        .is_some_and(|n| values_to.iter().any(|v| v == n))
+                kind != "quantity" || x.split(' ').next().is_some_and(|n| values_to.contains(n))
             })
             .collect();
         if !lost.is_empty() {
@@ -425,16 +422,10 @@ fn not_modal(text: &str, word: &str) -> usize {
     dated + named
 }
 
+/// The items in their first order, each once.
 fn dedup(mut v: Vec<String>) -> Vec<String> {
-    let mut seen = Vec::new();
-    v.retain(|x| {
-        if seen.contains(x) {
-            false
-        } else {
-            seen.push(x.clone());
-            true
-        }
-    });
+    let mut seen = HashSet::new();
+    v.retain(|x| seen.insert(x.clone()));
     v
 }
 
@@ -507,7 +498,7 @@ fn starts_with_percent(text: &str) -> bool {
 /// '45 to 60 minutes', '45-60 minutes' and '45–60 minutes' are each 45 and 60 minutes.
 /// Read from prose, so a value in code or a URL is not one. 'pounds' is not a weight after a
 /// value in `pounds`, the amounts written with '£'.
-fn quantities(text: &str, pounds: &[String]) -> Vec<String> {
+fn quantities(text: &str, pounds: &HashSet<String>) -> Vec<String> {
     let text = dash_ranges(&prose(text));
     let tokens: Vec<&str> = text.split_whitespace().collect();
     (0..tokens.len())
@@ -547,7 +538,7 @@ fn dash_ranges(text: &str) -> String {
 fn quantity_at(
     tokens: &[&str],
     i: usize,
-    pounds: &[String],
+    pounds: &HashSet<String>,
     upper: bool,
 ) -> Option<(String, &'static str)> {
     let body = tokens
@@ -651,7 +642,7 @@ fn months(text: &str) -> Vec<String> {
 
 /// Numbers with their sign and currency; `pounds` lists the values that 'pounds' after a
 /// number names as money.
-fn numbers(text: &str, pounds: &[String]) -> Vec<String> {
+fn numbers(text: &str, pounds: &HashSet<String>) -> Vec<String> {
     let text = without_list_markers(text);
     let chars: Vec<char> = text.chars().collect();
     let mut out = Vec::new();
@@ -1722,6 +1713,30 @@ Priya said.",
     fn a_long_chain_of_ranges_reads_one_step_ahead() {
         let chain = "1 to ".repeat(50_000) + "1 km";
         assert!(missing(&chain, &chain).is_empty());
+    }
+
+    #[test]
+    fn compares_many_numbers_in_linear_time() {
+        // Each number was looked for in a list of every kept one, so 16 times the numbers took
+        // about 60 times as long in a debug build and 145 in a release build. Hash sets give
+        // about 16 to 19 times; the fastest of 3 runs keeps a busy machine from deciding the ratio.
+        let fastest = |items: usize| {
+            let text: String = (0..items).map(|n| format!("{n} ")).collect();
+            (0..3)
+                .map(|_| {
+                    let start = std::time::Instant::now();
+                    assert_eq!(report(&text, &text).lines.len(), 2);
+                    start.elapsed()
+                })
+                .min()
+                .unwrap()
+        };
+        let (small, large) = (fastest(2_000), fastest(32_000));
+        assert!(
+            large < small * 32,
+            "16 times the numbers took {:.1} times as long ({small:?} to {large:?})",
+            large.as_secs_f64() / small.as_secs_f64()
+        );
     }
 
     #[test]

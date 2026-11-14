@@ -43,11 +43,11 @@ The manifests other than Claude Code's still declare plugin 0.5.0, so a build fr
 
 ### laconic-check: changed
 
-- Release builds use link-time optimisation and one codegen unit, so the Linux binary is about a fifth smaller (1,010,600 to 813,544 bytes) and starts slightly faster.
+- Release builds use link-time optimisation and one codegen unit, so the Linux binary is about a fifth smaller and starts slightly faster (#119).
 
 ### laconic-check: fixed
 
-- `lint` takes linear time on a paragraph without whitespace, such as minified text: each word rescanned its whole token, so 80,000 characters of 'a,' took about 6 seconds and twice the text 4 times as long.
+- `lint` no longer rescans a whitespace-free token for each word it holds, so minified text takes linear time: 80,000 characters of 'a,' took about 6 seconds and twice the text 4 times as long (#119).
 - `lint` checks the body of a GitHub alert, such as `> [!NOTE]`, as prose; it skipped every block quotation (#111).
 - `lint` lints the remaining files after one it cannot read, then exits 2; it stopped at that file, so `--json` printed nothing (#112).
 - The Action lints a large repository in several `laconic-check` calls, so the Windows command-line limit no longer stops it. To apply `--max-findings` to all the calls, it lints the files with failing findings again in one call; if their paths pass the Windows limit, the step fails. A path named twice in `files` is linted once.

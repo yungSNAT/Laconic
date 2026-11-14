@@ -49,7 +49,7 @@ claude plugin install laconic@laconic
 For any agent the Skills CLI supports:
 
 ```bash
-npx skills add yungSNAT/laconic --global --agent '*' --yes
+npx skills add yungSNAT/laconic --global --agent "*" --yes
 ```
 
 ## Use

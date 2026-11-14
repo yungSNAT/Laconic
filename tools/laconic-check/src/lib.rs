@@ -7,5 +7,6 @@
 pub mod lint;
 pub mod mcp;
 pub mod preserve;
+pub mod sarif;
 #[cfg(test)]
 mod seeded_faults;

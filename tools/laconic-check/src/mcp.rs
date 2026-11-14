@@ -305,7 +305,7 @@ fn write_string(s: &str, out: &mut String) {
     out.push('"');
 }
 
-fn object(members: Vec<(&str, Json)>) -> Json {
+pub(crate) fn object(members: Vec<(&str, Json)>) -> Json {
     Json::Object(
         members
             .into_iter()
@@ -314,7 +314,7 @@ fn object(members: Vec<(&str, Json)>) -> Json {
     )
 }
 
-fn text(s: &str) -> Json {
+pub(crate) fn text(s: &str) -> Json {
     Json::String(s.to_string())
 }
 

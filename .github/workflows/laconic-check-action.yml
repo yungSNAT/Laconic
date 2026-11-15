@@ -1,7 +1,7 @@
 name: laconic-check action
 
 # Runs the composite Action in action.yml on each runner it supports: a clean file passes and a
-# seeded fault fails the step.
+# seeded fault fails the step. The release workflow calls it once a release is published.
 on:
   pull_request:
     paths:
@@ -14,6 +14,7 @@ on:
       - action.yml
       - tools/laconic-check/action/**
       - .github/workflows/laconic-check-action.yml
+  workflow_call:
 
 permissions:
   contents: read
@@ -30,15 +31,43 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      # A version bump in action.yml names a release that is published only after the bump
+      # merges, so until then the steps install the latest published release, with a warning.
+      # The release workflow's run, on the tag, must find the release action.yml names.
+      - name: Choose the release to install
+        id: release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version=$(tr -d '\r' < action.yml | sed -n 's/^    default: \([0-9][0-9.]*\)$/\1/p')
+          if [[ -z "$version" ]]; then
+            echo "::error::cannot read the version input's default from action.yml"
+            exit 1
+          fi
+          if gh release view "laconic-check-v$version" --repo "$GITHUB_REPOSITORY" --json tagName > /dev/null; then
+            echo "Testing laconic-check-v$version, which action.yml names."
+          elif [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            echo "::error::laconic-check-v$version, which action.yml names, is not published"
+            exit 1
+          else
+            latest=$(gh release list --repo "$GITHUB_REPOSITORY" --exclude-drafts --exclude-pre-releases \
+              --json tagName --jq '[.[].tagName | select(startswith("laconic-check-v"))][0]')
+            echo "::warning::laconic-check-v$version, which action.yml names, is not published yet, so this run tests $latest"
+            version=${latest#laconic-check-v}
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
       - name: A clean file passes
         uses: ./
         with:
+          version: ${{ steps.release.outputs.version }}
           files: tools/laconic-check/action/tests/clean.md
       - name: A seeded fault fails
         id: fault
         continue-on-error: true
         uses: ./
         with:
+          version: ${{ steps.release.outputs.version }}
           files: tools/laconic-check/action/tests/fault.md
       - name: Check the seeded fault failed the step
         shell: bash
@@ -63,12 +92,14 @@ jobs:
       - name: With no files, every tracked Markdown file is linted
         uses: ./
         with:
+          version: ${{ steps.release.outputs.version }}
           args: --warn --only weekday
       - name: Findings from different lint calls count against one --max-findings
         id: limit
         continue-on-error: true
         uses: ./
         with:
+          version: ${{ steps.release.outputs.version }}
           files: ${{ env.MANY }}
           args: --max-findings 1
       - name: Check the 2 findings failed the step
@@ -79,6 +110,7 @@ jobs:
       - name: The same 2 findings pass a --max-findings of 2
         uses: ./
         with:
+          version: ${{ steps.release.outputs.version }}
           files: ${{ env.MANY }}
           args: --max-findings 2
       # Only 170 tracked files, each with a failing finding, whose paths alone pass the Windows
@@ -99,12 +131,14 @@ jobs:
       - name: 170 failing findings pass a --max-findings of 170
         uses: ./
         with:
+          version: ${{ steps.release.outputs.version }}
           args: --max-findings 170
       - name: 170 failing findings fail a --max-findings of 169
         id: over
         continue-on-error: true
         uses: ./
         with:
+          version: ${{ steps.release.outputs.version }}
           args: --max-findings=169
       - name: Check the 170 findings failed the step
         shell: bash
@@ -116,3 +150,5 @@ jobs:
         run: printf 'max-findings = 170\n' > .laconic-check
       - name: The project file's --max-findings counts across the calls
         uses: ./
+        with:
+          version: ${{ steps.release.outputs.version }}

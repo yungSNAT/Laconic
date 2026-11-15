@@ -44,6 +44,7 @@ The manifests other than Claude Code's still declare plugin 0.5.0, so a build fr
 
 ### laconic-check: added
 
+- The MCP `preserve` tool takes an optional boolean `loose`, which does what `preserve --loose` does; without it, or with `false`, a lost word such as 'often' is still reported as dropped. Any other value is an error.
 - `preserve --loose` lists a lost word of frequency, quantity, ability, prediction, cause or hedging, such as 'often', 'some', 'can', 'will', 'because' or 'likely', on a `check meaning word:` line that does not fail; without it, these losses fail as before. On the fact audit, 64 of the 258 rewrites the paper marks fully kept pass with `--loose` (23 without), and all 105 it marks altered still fail. `evals/fact_audit_agreement.py --loose` measures it.
 
 ### laconic-check: changed

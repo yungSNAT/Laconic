@@ -233,6 +233,7 @@ To run `lint` as a gate in CI or a pre-commit hook, these options set what it re
 | Option | Effect |
 | --- | --- |
 | `--json` | Prints one JSON object: `findings`, each with `file`, `line`, `column`, `rule`, `advisory`, `message` and `url`, then the `failing` count and the number of findings `suppressed` by comments. |
+| `--sarif` | Prints a [SARIF 2.1.0](https://docs.oasis-open.org/sarif/sarif/v2.1.0/sarif-v2.1.0.html) log for GitHub code scanning and other SARIF viewers: every rule, with its description and link, and each finding as a result at level `warning` (`note` if advisory), located by the file's absolute `file` URI, which code scanning maps to its repository path, and by columns in UTF-16 code units, as SARIF counts them. Not with `--json`; on `main`, not yet in a release. |
 | `--disable <rules>` | Drops these rules' findings; comma-separated and repeatable. |
 | `--only <rules>` | Keeps only these rules' findings; `--disable` wins over it. |
 | `--max-findings <n>` | Fails only on more than n failing findings (default 0). |
@@ -280,6 +281,15 @@ In GitHub Actions, the composite Action downloads a laconic-check release for th
     version: 0.5.0     # the laconic-check release; 0.5.0 by default
     files: README.md   # one path a line; default: every .md and .markdown file Git tracks
     args: --warn       # further lint options
+```
+
+To list findings in GitHub code scanning instead, put `laconic-check` on the PATH (until a release has `--sarif`, `cargo install --locked --git https://github.com/yungSNAT/Laconic --rev <commit> laconic-check`), give the job `security-events: write` and upload the log. With `--warn`, findings do not fail the step, so it fails only on a usage or read error, and then nothing incomplete is uploaded; to fail the job on findings too, add the Action above or another `lint` step without `--warn`:
+
+```yaml
+- run: laconic-check lint --sarif --warn README.md docs/*.md > laconic-check.sarif
+- uses: github/codeql-action/upload-sarif@v4
+  with:
+    sarif_file: laconic-check.sarif
 ```
 
 `lint -` reads standard input, so an agent can check a draft without saving it. When `laconic-check` is on the PATH, both skills run it on written deliverables before sending. Its US-to-Australian word list combines a hand-written list with about 2,400 pairs generated from the [English Speller Database](https://github.com/en-wl/wordlist) and reviewed against the Style Manual (`laconic-tools gen-au-words`). Seeded-fault tests plant one known fault per rule into clean prose and require the checker to catch each one exactly once, with no findings on the clean text. A calibration test runs `lint` over 3 Productivity Commission reports released in 2018 and 2021 (about 198,500 words of human prose, CC BY 3.0 AU) and fails if its 2,246 findings, its 67 advisories (41 clause-dash paragraphs, 8 stacked hedges, 14 acronyms used before their definition and 4 compounds written both closed and hyphenated) or the 7 stock phrases, staged contrasts and unnecessary hyphens amongst them rise, which guards against a net increase in findings on human text. An outside run on 5 November 2026 linted the 150 human articles in [jenna-russell/human_detectors](https://github.com/jenna-russell/human_detectors) at commit `afcf03d` (110,723 words of mostly American non-fiction, not stored here): 25.9 findings per 1,000 words, 97% of them house-style differences (double quotation marks, US spellings, em dashes, number words, word choice and serial commas). The AI-tell rules fired 18 times (0.16 per 1,000 words: 8 staged contrasts, 7 stock phrases, 2 reveal questions and 1 chatbot closer), not yet labelled true or false. The articles are plain text, so this run does not test `bold-label`.

@@ -6,6 +6,9 @@
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+use laconic_check::lint::{RULES, RULES_URL};
+use laconic_check::mcp::{Json, parse};
+
 /// A fresh directory for one test, holding the given files.
 fn folder(name: &str, files: &[(&str, &str)]) -> PathBuf {
     let dir = std::env::temp_dir().join(format!("laconic-check-{}-{name}", std::process::id()));
@@ -180,6 +183,248 @@ fn a_commit_message_is_linted_without_its_comments_or_diff() {
         out.starts_with("COMMIT_EDITMSG:1:15: us-spelling: "),
         "{out}"
     );
+}
+
+/// The member at `path` of a JSON value: a key in an object or an index in an array.
+fn at<'a>(value: &'a Json, path: &[&str]) -> &'a Json {
+    path.iter().fold(value, |value, key| match value {
+        Json::Object(members) => members
+            .iter()
+            .find(|(k, _)| k == key)
+            .map(|(_, v)| v)
+            .unwrap_or_else(|| panic!("no '{key}' in {value:?}")),
+        Json::Array(items) => &items[key.parse::<usize>().unwrap()],
+        _ => panic!("'{key}' in a scalar {value:?}"),
+    })
+}
+
+fn string(value: &Json) -> &str {
+    match value {
+        Json::String(s) if !s.is_empty() => s,
+        _ => panic!("not a non-empty string: {value:?}"),
+    }
+}
+
+fn array(value: &Json) -> &[Json] {
+    match value {
+        Json::Array(items) => items,
+        _ => panic!("not an array: {value:?}"),
+    }
+}
+
+/// SARIF 2.1.0 as GitHub code scanning reads it: the log's version, one run whose driver
+/// lists every rule with the descriptions and help code scanning requires, and one result a
+/// finding with its rule, level, message and a location: the file as an absolute `file` URI,
+/// and a region of one character whose columns count UTF-16 code units, as SARIF's do by
+/// default.
+#[test]
+fn sarif_reports_each_finding_with_its_rule_level_and_location() {
+    let dir = folder(
+        "sarif",
+        &[
+            ("two.md", TWO),
+            ("my notes.md", "\u{1f600} The color is red.\n"),
+            ("advisory.md", "It could potentially rain.\n"),
+        ],
+    );
+    let (code, out, err) = lint(&dir, &["--sarif", "two.md", "my notes.md", "advisory.md"]);
+    assert_eq!((code, err.as_str()), (1, ""));
+    assert!(out.ends_with('\n') && out.lines().count() == 1, "{out}");
+    let log = parse(&out).expect("SARIF output is JSON");
+    assert_eq!(
+        string(at(&log, &["$schema"])),
+        "https://json.schemastore.org/sarif-2.1.0.json"
+    );
+    assert_eq!(string(at(&log, &["version"])), "2.1.0");
+    assert_eq!(array(at(&log, &["runs"])).len(), 1);
+    let run = at(&log, &["runs", "0"]);
+    let driver = at(run, &["tool", "driver"]);
+    assert_eq!(string(at(driver, &["name"])), "laconic-check");
+    assert_eq!(string(at(driver, &["version"])), env!("CARGO_PKG_VERSION"));
+    string(at(driver, &["informationUri"]));
+    let rules = array(at(driver, &["rules"]));
+    assert_eq!(rules.len(), RULES.len());
+    for (rule, wanted) in rules.iter().zip(RULES) {
+        assert_eq!(string(at(rule, &["id"])), wanted.name);
+        for key in ["shortDescription", "fullDescription", "help"] {
+            string(at(rule, &[key, "text"]));
+        }
+        assert_eq!(
+            string(at(rule, &["helpUri"])),
+            format!("{RULES_URL}#{}", wanted.name)
+        );
+        let level = if wanted.advisory { "note" } else { "warning" };
+        assert_eq!(string(at(rule, &["defaultConfiguration", "level"])), level);
+    }
+    assert_eq!(
+        at(run, &["invocations", "0", "executionSuccessful"]),
+        &Json::Bool(true)
+    );
+    let results: Vec<(String, String, String, String, String, String, String)> =
+        array(at(run, &["results"]))
+            .iter()
+            .map(|result| {
+                let rule = string(at(result, &["ruleId"]));
+                let index = match at(result, &["ruleIndex"]) {
+                    Json::Number(n) => n.parse::<usize>().unwrap(),
+                    other => panic!("ruleIndex {other:?}"),
+                };
+                assert_eq!(string(at(&rules[index], &["id"])), rule);
+                assert_eq!(
+                    string(at(result, &["level"])),
+                    string(at(&rules[index], &["defaultConfiguration", "level"]))
+                );
+                assert_eq!(array(at(result, &["locations"])).len(), 1);
+                let location = at(result, &["locations", "0", "physicalLocation"]);
+                let number = |key: &str| match at(location, &["region", key]) {
+                    Json::Number(n) => n.clone(),
+                    other => panic!("{key} {other:?}"),
+                };
+                assert_eq!(number("endLine"), number("startLine"));
+                (
+                    file_name(string(at(location, &["artifactLocation", "uri"]))),
+                    number("startLine"),
+                    number("startColumn"),
+                    number("endColumn"),
+                    rule.to_owned(),
+                    string(at(result, &["level"])).to_owned(),
+                    string(at(result, &["message", "text"])).to_owned(),
+                )
+            })
+            .collect();
+    let row = |uri: &str, line: &str, column: &str, rule: &str, level: &str, message: &str| {
+        let end = (column.parse::<usize>().unwrap() + 1).to_string();
+        (
+            uri.to_owned(),
+            line.to_owned(),
+            column.to_owned(),
+            end,
+            rule.to_owned(),
+            level.to_owned(),
+            message.to_owned(),
+        )
+    };
+    assert_eq!(
+        results,
+        [
+            row(
+                "two.md",
+                "1",
+                "5",
+                "us-spelling",
+                "warning",
+                "'color': Australian form is 'colour'"
+            ),
+            row(
+                "two.md",
+                "3",
+                "5",
+                "us-spelling",
+                "warning",
+                "'flavor': Australian form is 'flavour'"
+            ),
+            // The emoji is one column in the text output and 2 UTF-16 code units here.
+            row(
+                "my%20notes.md",
+                "1",
+                "8",
+                "us-spelling",
+                "warning",
+                "'color': Australian form is 'colour'"
+            ),
+            row(
+                "advisory.md",
+                "1",
+                "4",
+                "stacked-hedge",
+                "note",
+                "stacked hedge 'could potentially' (advisory); keep one qualifier at the \
+                 confidence the source supports",
+            ),
+        ]
+    );
+}
+
+/// The last segment of an absolute `file` URI with no `.` or `..` segments.
+fn file_name(uri: &str) -> String {
+    assert!(uri.starts_with("file:///"), "{uri}");
+    assert!(!uri.contains("/./") && !uri.contains("/../"), "{uri}");
+    uri.rsplit('/').next().unwrap().to_owned()
+}
+
+/// A path given from a subdirectory names the same file as one given from its parent, so
+/// code scanning maps both to the same repository path.
+#[test]
+fn sarif_names_a_file_the_same_from_any_directory() {
+    let dir = folder("sarif-dirs", &[("two.md", TWO)]);
+    std::fs::create_dir_all(dir.join("sub")).unwrap();
+    let uri = |cwd: &Path, file: &str| {
+        let (code, out, _) = lint(cwd, &["--sarif", file]);
+        assert_eq!(code, 1, "{out}");
+        let log = parse(&out).unwrap();
+        let location = at(
+            &log,
+            &[
+                "runs",
+                "0",
+                "results",
+                "0",
+                "locations",
+                "0",
+                "physicalLocation",
+            ],
+        );
+        string(at(location, &["artifactLocation", "uri"])).to_owned()
+    };
+    let from_parent = uri(&dir, "two.md");
+    assert_eq!(file_name(&from_parent), "two.md");
+    assert_eq!(uri(&dir.join("sub"), "../two.md"), from_parent);
+    assert_eq!(uri(&dir.join("sub"), "./../sub/../two.md"), from_parent);
+}
+
+/// `--sarif` changes what `lint` prints, never its exit status or what its filters keep, and
+/// cannot be combined with `--json`.
+#[test]
+fn sarif_keeps_lints_exit_statuses() {
+    let dir = folder(
+        "sarif-status",
+        &[
+            ("two.md", TWO),
+            ("clean.md", "The colour is red.\n"),
+            ("advisory.md", "It could potentially rain.\n"),
+        ],
+    );
+    for args in [
+        &["clean.md"][..],
+        &["advisory.md"],
+        &["two.md"],
+        &["--max-findings", "1", "two.md"],
+        &["--max-findings=2", "two.md"],
+        &["--warn", "two.md"],
+        &["missing.md", "two.md", "--warn"],
+        &["--only", "latin", "two.md"],
+        &["--disable", "us-spelling", "two.md", "advisory.md"],
+        &["--only", "stacked-hedge", "two.md", "advisory.md"],
+    ] {
+        let (plain, text, _) = lint(&dir, args);
+        let sarif: Vec<&str> = ["--sarif"]
+            .into_iter()
+            .chain(args.iter().copied())
+            .collect();
+        let (code, out, _) = lint(&dir, &sarif);
+        assert_eq!(code, plain, "{args:?}");
+        let log = parse(&out).unwrap_or_else(|| panic!("{args:?}: {out}"));
+        let complete = at(
+            &log,
+            &["runs", "0", "invocations", "0", "executionSuccessful"],
+        );
+        assert_eq!(complete, &Json::Bool(plain != 2), "{args:?}");
+        let results = array(at(&log, &["runs", "0", "results"]));
+        assert_eq!(results.len(), text.lines().count(), "{args:?}");
+    }
+    let (code, out, err) = lint(&dir, &["--sarif", "--json", "two.md"]);
+    assert_eq!((code, out.as_str()), (2, ""));
+    assert!(err.contains("--json and --sarif"), "{err}");
 }
 
 /// README.md's exit-status table lists exactly the statuses `main.rs` can return.

@@ -15,7 +15,7 @@ use std::fs;
 use std::process::ExitCode;
 
 use laconic_check::mcp::Json;
-use laconic_check::{lint, mcp, preserve};
+use laconic_check::{lint, mcp, preserve, sarif};
 
 fn usage_text() -> String {
     let advisory: Vec<&str> = lint::RULES
@@ -27,6 +27,7 @@ fn usage_text() -> String {
         "usage:\n  laconic-check lint [options] <file.md | ->...\n  laconic-check preserve [--strict] [--loose] <original> <edited>\n  laconic-check mcp\n\n\
          lint options:\n  \
            --json              print one JSON document instead of a line a finding\n  \
+           --sarif             print a SARIF 2.1.0 log instead of a line a finding\n  \
            --disable <rules>   drop these rules' findings (comma-separated, repeatable)\n  \
            --only <rules>      keep only these rules' findings (comma-separated, repeatable)\n  \
            --max-findings <n>  fail only on more than n failing findings (default 0)\n  \
@@ -74,6 +75,7 @@ fn read(path: &str) -> Result<String, ExitCode> {
 struct Options {
     warn: bool,
     json: bool,
+    sarif: bool,
     commit_msg: bool,
     disable: Vec<&'static str>,
     only: Vec<&'static str>,
@@ -100,7 +102,12 @@ fn options(args: &[String]) -> Result<Options, String> {
             None => (arg.as_str(), None),
         };
         let takes_value = matches!(name, "--disable" | "--only" | "--max-findings" | "--config");
-        if !takes_value && !matches!(name, "--" | "--warn" | "--json" | "--commit-msg") {
+        if !takes_value
+            && !matches!(
+                name,
+                "--" | "--warn" | "--json" | "--sarif" | "--commit-msg"
+            )
+        {
             return Err(format!("unknown option '{name}'"));
         }
         let value = match (takes_value, inline) {
@@ -113,12 +120,16 @@ fn options(args: &[String]) -> Result<Options, String> {
             "--" => operands = true,
             "--warn" => cli.warn = true,
             "--json" => cli.json = true,
+            "--sarif" => cli.sarif = true,
             "--commit-msg" => cli.commit_msg = true,
             "--disable" => cli.disable.extend(rule_names(value)?),
             "--only" => cli.only.extend(rule_names(value)?),
             "--max-findings" => max_findings = Some(count(value)?),
             _ => config = Some(value.to_owned()),
         }
+    }
+    if cli.json && cli.sarif {
+        return Err("--json and --sarif cannot be combined".into());
     }
     let path = config.or_else(|| {
         std::path::Path::new(PROJECT_FILE)
@@ -138,6 +149,7 @@ fn options(args: &[String]) -> Result<Options, String> {
     Ok(Options {
         warn: cli.warn,
         json: cli.json,
+        sarif: cli.sarif,
         commit_msg: cli.commit_msg,
         files: cli.files,
         ..options
@@ -220,6 +232,11 @@ fn run_lint(options: &Options) -> ExitCode {
                 continue;
             }
         };
+        let (lines, uri): (Vec<&str>, String) = if options.sarif {
+            (text.lines().collect(), sarif::artifact_uri(file))
+        } else {
+            (Vec::new(), String::new())
+        };
         let (found, silenced) = lint::lint_counting(&text);
         suppressed += silenced;
         for f in found {
@@ -246,6 +263,9 @@ fn run_lint(options: &Options) -> ExitCode {
                         Json::String(format!("{}#{name}", lint::RULES_URL)),
                     ),
                 ]));
+            } else if options.sarif {
+                let line = f.line.checked_sub(1).and_then(|i| lines.get(i));
+                findings.push(sarif::result(&uri, f, line.copied().unwrap_or("")));
             } else {
                 println!("{file}:{}:{}: {name}: {}", f.line, f.column, f.message);
             }
@@ -258,6 +278,8 @@ fn run_lint(options: &Options) -> ExitCode {
             ("suppressed".into(), Json::Number(suppressed.to_string())),
         ]);
         println!("{}", mcp::to_string(&report));
+    } else if options.sarif {
+        println!("{}", mcp::to_string(&sarif::log(findings, !unread)));
     }
     if unread {
         ExitCode::from(2)

@@ -214,8 +214,9 @@ fn array(value: &Json) -> &[Json] {
 
 /// SARIF 2.1.0 as GitHub code scanning reads it: the log's version, one run whose driver
 /// lists every rule with the descriptions and help code scanning requires, and one result a
-/// finding with its rule, level, message and a location whose column counts UTF-16 code
-/// units, as SARIF does by default.
+/// finding with its rule, level, message and a location: the file as an absolute `file` URI,
+/// and a region of one character whose columns count UTF-16 code units, as SARIF's do by
+/// default.
 #[test]
 fn sarif_reports_each_finding_with_its_rule_level_and_location() {
     let dir = folder(
@@ -259,7 +260,7 @@ fn sarif_reports_each_finding_with_its_rule_level_and_location() {
         at(run, &["invocations", "0", "executionSuccessful"]),
         &Json::Bool(true)
     );
-    let results: Vec<(String, String, String, String, String, String)> =
+    let results: Vec<(String, String, String, String, String, String, String)> =
         array(at(run, &["results"]))
             .iter()
             .map(|result| {
@@ -279,10 +280,12 @@ fn sarif_reports_each_finding_with_its_rule_level_and_location() {
                     Json::Number(n) => n.clone(),
                     other => panic!("{key} {other:?}"),
                 };
+                assert_eq!(number("endLine"), number("startLine"));
                 (
-                    string(at(location, &["artifactLocation", "uri"])).to_owned(),
+                    file_name(string(at(location, &["artifactLocation", "uri"]))),
                     number("startLine"),
                     number("startColumn"),
+                    number("endColumn"),
                     rule.to_owned(),
                     string(at(result, &["level"])).to_owned(),
                     string(at(result, &["message", "text"])).to_owned(),
@@ -290,10 +293,12 @@ fn sarif_reports_each_finding_with_its_rule_level_and_location() {
             })
             .collect();
     let row = |uri: &str, line: &str, column: &str, rule: &str, level: &str, message: &str| {
+        let end = (column.parse::<usize>().unwrap() + 1).to_string();
         (
             uri.to_owned(),
             line.to_owned(),
             column.to_owned(),
+            end,
             rule.to_owned(),
             level.to_owned(),
             message.to_owned(),
@@ -340,8 +345,45 @@ fn sarif_reports_each_finding_with_its_rule_level_and_location() {
     );
 }
 
-/// `--sarif` changes what `lint` prints, never its exit status, and cannot be combined with
-/// `--json`.
+/// The last segment of an absolute `file` URI with no `.` or `..` segments.
+fn file_name(uri: &str) -> String {
+    assert!(uri.starts_with("file:///"), "{uri}");
+    assert!(!uri.contains("/./") && !uri.contains("/../"), "{uri}");
+    uri.rsplit('/').next().unwrap().to_owned()
+}
+
+/// A path given from a subdirectory names the same file as one given from its parent, so
+/// code scanning maps both to the same repository path.
+#[test]
+fn sarif_names_a_file_the_same_from_any_directory() {
+    let dir = folder("sarif-dirs", &[("two.md", TWO)]);
+    std::fs::create_dir_all(dir.join("sub")).unwrap();
+    let uri = |cwd: &Path, file: &str| {
+        let (code, out, _) = lint(cwd, &["--sarif", file]);
+        assert_eq!(code, 1, "{out}");
+        let log = parse(&out).unwrap();
+        let location = at(
+            &log,
+            &[
+                "runs",
+                "0",
+                "results",
+                "0",
+                "locations",
+                "0",
+                "physicalLocation",
+            ],
+        );
+        string(at(location, &["artifactLocation", "uri"])).to_owned()
+    };
+    let from_parent = uri(&dir, "two.md");
+    assert_eq!(file_name(&from_parent), "two.md");
+    assert_eq!(uri(&dir.join("sub"), "../two.md"), from_parent);
+    assert_eq!(uri(&dir.join("sub"), "./../sub/../two.md"), from_parent);
+}
+
+/// `--sarif` changes what `lint` prints, never its exit status or what its filters keep, and
+/// cannot be combined with `--json`.
 #[test]
 fn sarif_keeps_lints_exit_statuses() {
     let dir = folder(
@@ -360,8 +402,11 @@ fn sarif_keeps_lints_exit_statuses() {
         &["--max-findings=2", "two.md"],
         &["--warn", "two.md"],
         &["missing.md", "two.md", "--warn"],
+        &["--only", "latin", "two.md"],
+        &["--disable", "us-spelling", "two.md", "advisory.md"],
+        &["--only", "stacked-hedge", "two.md", "advisory.md"],
     ] {
-        let plain = lint(&dir, args).0;
+        let (plain, text, _) = lint(&dir, args);
         let sarif: Vec<&str> = ["--sarif"]
             .into_iter()
             .chain(args.iter().copied())
@@ -374,6 +419,8 @@ fn sarif_keeps_lints_exit_statuses() {
             &["runs", "0", "invocations", "0", "executionSuccessful"],
         );
         assert_eq!(complete, &Json::Bool(plain != 2), "{args:?}");
+        let results = array(at(&log, &["runs", "0", "results"]));
+        assert_eq!(results.len(), text.lines().count(), "{args:?}");
     }
     let (code, out, err) = lint(&dir, &["--sarif", "--json", "two.md"]);
     assert_eq!((code, out.as_str()), (2, ""));

@@ -19,17 +19,20 @@ fn message(s: &str) -> Json {
     object(vec![("text", text(s))])
 }
 
-/// One finding in `file`, whose text on the finding's line is `line`. SARIF counts columns
-/// in UTF-16 code units by default; `lint` counts characters.
-pub fn result(file: &str, finding: Finding, line: &str) -> Json {
+/// One finding in the file at `uri`, whose text on the finding's line is `line`, as a region
+/// of the character at the finding. SARIF counts columns in UTF-16 code units by default;
+/// `lint` counts characters.
+pub fn result(uri: &str, finding: Finding, line: &str) -> Json {
     let rule = finding.rule.rule();
-    let column: usize = line
+    let mut units = line
         .chars()
         .map(char::len_utf16)
-        .chain(std::iter::repeat(1))
+        .chain(std::iter::repeat(1));
+    let start = 1 + units
+        .by_ref()
         .take(finding.column.saturating_sub(1))
-        .sum::<usize>()
-        + 1;
+        .sum::<usize>();
+    let end = start + units.next().unwrap_or(1);
     let number = |n: usize| Json::Number(n.to_string());
     object(vec![
         ("ruleId", text(rule.name)),
@@ -41,15 +44,14 @@ pub fn result(file: &str, finding: Finding, line: &str) -> Json {
             Json::Array(vec![object(vec![(
                 "physicalLocation",
                 object(vec![
-                    (
-                        "artifactLocation",
-                        object(vec![("uri", text(&artifact_uri(file)))]),
-                    ),
+                    ("artifactLocation", object(vec![("uri", text(uri))])),
                     (
                         "region",
                         object(vec![
                             ("startLine", number(finding.line)),
-                            ("startColumn", number(column)),
+                            ("startColumn", number(start)),
+                            ("endLine", number(finding.line)),
+                            ("endColumn", number(end)),
                         ]),
                     ),
                 ]),
@@ -112,10 +114,33 @@ pub fn log(results: Vec<Json>, complete: bool) -> Json {
     ])
 }
 
-/// A path as a URI reference: a relative path stays relative, which code scanning reads
-/// from the repository root, and an absolute one becomes a `file` URI. Characters outside
-/// RFC 3986's unreserved set and `/` are percent-encoded.
-fn artifact_uri(path: &str) -> String {
+/// A file's location as an absolute `file` URI, with `.`, `..` and symbolic links resolved,
+/// so code scanning maps it to the same repository path from any directory; standard input
+/// stays `-`. A path that cannot be resolved is written as given.
+pub fn artifact_uri(path: &str) -> String {
+    if path == "-" {
+        return path.to_owned();
+    }
+    match std::fs::canonicalize(path) {
+        Ok(full) => file_uri(&without_verbatim(&full.to_string_lossy())),
+        Err(_) => file_uri(path),
+    }
+}
+
+/// A Windows path without the verbatim prefix `canonicalize` gives it: `\\?\C:\...` is
+/// `C:\...` and `\\?\UNC\server\share\...` is `\\server\share\...`.
+fn without_verbatim(path: &str) -> String {
+    match path.strip_prefix(r"\\?\") {
+        Some(rest) => rest
+            .strip_prefix(r"UNC\")
+            .map_or_else(|| rest.to_owned(), |unc| format!(r"\\{unc}")),
+        None => path.to_owned(),
+    }
+}
+
+/// A path as a URI reference: a relative path stays relative and an absolute one becomes a
+/// `file` URI. Characters outside RFC 3986's unreserved set and `/` are percent-encoded.
+fn file_uri(path: &str) -> String {
     let slashed = if cfg!(windows) {
         path.replace('\\', "/")
     } else {
@@ -153,17 +178,23 @@ mod tests {
 
     #[test]
     fn a_path_becomes_a_uri_reference() {
-        assert_eq!(artifact_uri("docs/a b#1%.md"), "docs/a%20b%231%25.md");
-        assert_eq!(artifact_uri("a:b.md"), "a%3Ab.md");
-        assert_eq!(artifact_uri("caf\u{e9}.md"), "caf%C3%A9.md");
         assert_eq!(artifact_uri("-"), "-");
+        assert_eq!(file_uri("docs/a b#1%.md"), "docs/a%20b%231%25.md");
+        assert_eq!(file_uri("a:b.md"), "a%3Ab.md");
+        assert_eq!(file_uri("caf\u{e9}.md"), "caf%C3%A9.md");
+        assert_eq!(without_verbatim(r"\\?\C:\work\a.md"), r"C:\work\a.md");
+        assert_eq!(
+            without_verbatim(r"\\?\UNC\host\share\a.md"),
+            r"\\host\share\a.md"
+        );
+        assert_eq!(without_verbatim("/work/a.md"), "/work/a.md");
         if cfg!(windows) {
-            assert_eq!(artifact_uri(r"docs\a.md"), "docs/a.md");
-            assert_eq!(artifact_uri(r"C:\work\a b.md"), "file:///C:/work/a%20b.md");
-            assert_eq!(artifact_uri(r"\\host\share\a.md"), "file://host/share/a.md");
+            assert_eq!(file_uri(r"docs\a.md"), "docs/a.md");
+            assert_eq!(file_uri(r"C:\work\a b.md"), "file:///C:/work/a%20b.md");
+            assert_eq!(file_uri(r"\\host\share\a.md"), "file://host/share/a.md");
         } else {
-            assert_eq!(artifact_uri(r"docs\a.md"), "docs%5Ca.md");
-            assert_eq!(artifact_uri("/work/a b.md"), "file:///work/a%20b.md");
+            assert_eq!(file_uri(r"docs\a.md"), "docs%5Ca.md");
+            assert_eq!(file_uri("/work/a b.md"), "file:///work/a%20b.md");
         }
     }
 }

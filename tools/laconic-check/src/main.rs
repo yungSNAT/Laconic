@@ -232,10 +232,10 @@ fn run_lint(options: &Options) -> ExitCode {
                 continue;
             }
         };
-        let lines: Vec<&str> = if options.sarif {
-            text.lines().collect()
+        let (lines, uri): (Vec<&str>, String) = if options.sarif {
+            (text.lines().collect(), sarif::artifact_uri(file))
         } else {
-            Vec::new()
+            (Vec::new(), String::new())
         };
         let (found, silenced) = lint::lint_counting(&text);
         suppressed += silenced;
@@ -265,7 +265,7 @@ fn run_lint(options: &Options) -> ExitCode {
                 ]));
             } else if options.sarif {
                 let line = f.line.checked_sub(1).and_then(|i| lines.get(i));
-                findings.push(sarif::result(file, f, line.copied().unwrap_or("")));
+                findings.push(sarif::result(&uri, f, line.copied().unwrap_or("")));
             } else {
                 println!("{file}:{}:{}: {name}: {}", f.line, f.column, f.message);
             }

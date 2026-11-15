@@ -233,7 +233,7 @@ To run `lint` as a gate in CI or a pre-commit hook, these options set what it re
 | Option | Effect |
 | --- | --- |
 | `--json` | Prints one JSON object: `findings`, each with `file`, `line`, `column`, `rule`, `advisory`, `message` and `url`, then the `failing` count and the number of findings `suppressed` by comments. |
-| `--sarif` | Prints a [SARIF 2.1.0](https://docs.oasis-open.org/sarif/sarif/v2.1.0/sarif-v2.1.0.html) log for GitHub code scanning and other SARIF viewers: every rule, with its description and link, and each finding as a result at level `warning` (`note` if advisory). Its columns count UTF-16 code units, as SARIF's do. Not with `--json`; on `main`, not yet in a release. |
+| `--sarif` | Prints a [SARIF 2.1.0](https://docs.oasis-open.org/sarif/sarif/v2.1.0/sarif-v2.1.0.html) log for GitHub code scanning and other SARIF viewers: every rule, with its description and link, and each finding as a result at level `warning` (`note` if advisory), located by the file's absolute `file` URI, which code scanning maps to its repository path, and by columns in UTF-16 code units, as SARIF counts them. Not with `--json`; on `main`, not yet in a release. |
 | `--disable <rules>` | Drops these rules' findings; comma-separated and repeatable. |
 | `--only <rules>` | Keeps only these rules' findings; `--disable` wins over it. |
 | `--max-findings <n>` | Fails only on more than n failing findings (default 0). |
@@ -283,12 +283,11 @@ In GitHub Actions, the composite Action downloads a laconic-check release for th
     args: --warn       # further lint options
 ```
 
-To list findings in GitHub code scanning instead, put `laconic-check` on the PATH (until a release has `--sarif`, `cargo install --locked --git https://github.com/yungSNAT/Laconic --rev <commit> laconic-check`), give the job `security-events: write` and upload the log, even when `lint` fails:
+To list findings in GitHub code scanning instead, put `laconic-check` on the PATH (until a release has `--sarif`, `cargo install --locked --git https://github.com/yungSNAT/Laconic --rev <commit> laconic-check`), give the job `security-events: write` and upload the log. With `--warn`, findings do not fail the step, so it fails only on a usage or read error, and then nothing incomplete is uploaded; to fail the job on findings too, add the Action above or another `lint` step without `--warn`:
 
 ```yaml
-- run: laconic-check lint --sarif README.md docs/*.md > laconic-check.sarif
+- run: laconic-check lint --sarif --warn README.md docs/*.md > laconic-check.sarif
 - uses: github/codeql-action/upload-sarif@v4
-  if: ${{ !cancelled() }}
   with:
     sarif_file: laconic-check.sarif
 ```

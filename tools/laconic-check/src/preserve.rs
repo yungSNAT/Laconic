@@ -214,11 +214,44 @@ const NUMBER_WORDS: &[(&str, &str)] = &[
 /// skipped, and a run of more than 3 words reads as a title. shortcut: a lone 'Priya' is
 /// not seen; catching it needs a sentence splitter.
 pub fn names(original: &str, edited: &str) -> Vec<String> {
-    let edited = prose(edited).replace('*', "");
+    let kept = word_runs(&prose(edited).replace('*', ""));
     dedup(name_runs(original))
         .into_iter()
-        .filter(|name| !edited.contains(name))
+        .filter(|name| !kept.contains(name))
         .collect()
+}
+
+/// Every run of 2 or 3 words in `text` as a name in it would read, so looking up a name
+/// takes constant time: the first word without opening marks, as in '(Priya', and the last
+/// without closing marks or what follows a mark inside it, as in 'Nair's' and 'Nair-Smith'.
+/// A run does not span a word that ends in a mark, such as 'Priya,'.
+fn word_runs(text: &str) -> HashSet<String> {
+    let open = |word: &str| {
+        word.trim_start_matches(|c: char| !c.is_alphanumeric())
+            .to_owned()
+    };
+    let words: Vec<&str> = text.split_whitespace().collect();
+    let mut runs = HashSet::new();
+    for (i, last) in words.iter().enumerate() {
+        let whole = last.trim_end_matches(|c: char| !c.is_alphanumeric());
+        let stem = &whole[..whole
+            .find(|c: char| !c.is_alphanumeric())
+            .unwrap_or(whole.len())];
+        let possessive = whole
+            .strip_suffix("'s")
+            .or_else(|| whole.strip_suffix("\u{2019}s"))
+            .unwrap_or(whole);
+        let lasts = [whole, stem, possessive];
+        if i >= 1 {
+            let first = open(words[i - 1]);
+            runs.extend(lasts.map(|end| format!("{first} {end}")));
+        }
+        if i >= 2 {
+            let first = format!("{} {}", open(words[i - 2]), words[i - 1]);
+            runs.extend(lasts.map(|end| format!("{first} {end}")));
+        }
+    }
+    runs
 }
 
 /// Runs of 2 or 3 capitalised words outside headings and bold labels.
@@ -1501,6 +1534,52 @@ Priya said.",
             .is_empty()
         );
         assert!(names("Enhanced Caching Now Implemented Here.", "Cached.").is_empty());
+    }
+
+    #[test]
+    fn a_name_is_kept_inside_marks_a_possessive_or_a_longer_name() {
+        let kept = |edited: &str| names("We asked Priya Nair and Sean O'Brien.", edited);
+        for edited in [
+            "(Priya Nair) asked Sean O'Brien.",
+            "Priya Nair\u{2019}s and Sean O'Brien's notes.",
+            "Dr Priya Nair-Smith met Sean O'Brien.",
+            "Ask Priya\n  Nair, then Mr Sean O'Brien.",
+        ] {
+            assert!(kept(edited).is_empty(), "{edited}: {:?}", kept(edited));
+        }
+        // A name split by a mark or grown into another word is not kept.
+        assert_eq!(
+            kept("Priya, Nair met Sean O'Briens."),
+            vec!["Priya Nair", "Sean O'Brien"]
+        );
+        assert!(names("Met The Audit Committee.", "The Audit Committee met.").is_empty());
+        assert_eq!(
+            names("Met The Audit Committee.", "The Audit Committees met."),
+            vec!["Audit Committee"]
+        );
+    }
+
+    #[test]
+    fn checks_many_names_in_linear_time() {
+        // Each name was looked for in the whole edit, so 16 times the names took about 256
+        // times as long; a set of the edit's word runs gives about 16 to 20 times.
+        let fastest = |items: usize| {
+            let text: String = (0..items).map(|n| format!("Alpha{n} Beta{n}. ")).collect();
+            (0..3)
+                .map(|_| {
+                    let start = std::time::Instant::now();
+                    assert!(names(&text, &text).is_empty());
+                    start.elapsed()
+                })
+                .min()
+                .unwrap()
+        };
+        let (small, large) = (fastest(2_000), fastest(32_000));
+        assert!(
+            large < small * 32,
+            "16 times the names took {:.1} times as long ({small:?} to {large:?})",
+            large.as_secs_f64() / small.as_secs_f64()
+        );
     }
 
     #[test]

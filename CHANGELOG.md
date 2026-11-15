@@ -45,14 +45,17 @@ The manifests other than Claude Code's still declare plugin 0.5.0, so a build fr
 ### laconic-check: added
 
 - `lint --sarif` prints a SARIF 2.1.0 log for GitHub code scanning: every rule with its description and link, and each finding at level `warning`, or `note` if advisory, located by the file's absolute `file` URI and a one-character region in UTF-16 code units. The exit status is unchanged; `--sarif` cannot be combined with `--json`.
+- The MCP `preserve` tool takes an optional boolean `loose`, which does what `preserve --loose` does; without it, or with `false`, a lost word such as 'often' is still reported as dropped. Any other value is an error.
 - `preserve --loose` lists a lost word of frequency, quantity, ability, prediction, cause or hedging, such as 'often', 'some', 'can', 'will', 'because' or 'likely', on a `check meaning word:` line that does not fail; without it, these losses fail as before. On the fact audit, 64 of the 258 rewrites the paper marks fully kept pass with `--loose` (23 without), and all 105 it marks altered still fail. `evals/fact_audit_agreement.py --loose` measures it.
 
 ### laconic-check: changed
 
 - Release builds use link-time optimisation and one codegen unit, so the Linux binary is about a fifth smaller and starts slightly faster (#119).
+- The Action's `args` input documents that it splits at spaces, tabs and new lines and keeps quotation marks as written, so an option's value cannot contain a space, and that a project file whose path has one can go in the working directory as `.laconic-check`.
 
 ### laconic-check: fixed
 
+- `preserve` looks each name up in a set of the edit's runs of 2 and 3 words instead of searching the whole edit for it, so 16 times the names no longer takes about 240 times as long in a debug build; 32,000 names took 1.3 seconds and now take 0.7 in a release build. A name now counts as kept only as whole words: 'Jane Smith' is kept in '(Jane Smith)', 'Jane Smith's' and 'Jane Smith-Jones', but no longer in 'Jane Smithson'. The fact audit's results are unchanged.
 - `lint` no longer rescans a whitespace-free token for each word it holds, so minified text takes linear time: 80,000 characters of 'a,' took about 6 seconds and twice the text 4 times as long (#119).
 - `preserve` compares numbers and quantities through hash sets, so a text of many numbers takes linear time: 16,000 numbers took about 1 second and twice as many 5 times as long.
 - `lint` checks the body of a GitHub alert, such as `> [!NOTE]`, as prose; it skipped every block quotation (#111).

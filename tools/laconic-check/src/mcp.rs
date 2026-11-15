@@ -318,10 +318,16 @@ pub(crate) fn text(s: &str) -> Json {
     Json::String(s.to_string())
 }
 
-fn tool(name: &str, description: &str, properties: &[(&str, &str)]) -> Json {
-    let schema = |description: &str| {
+/// A tool with required string `properties` and optional boolean `flags`.
+fn tool(
+    name: &str,
+    description: &str,
+    properties: &[(&str, &str)],
+    flags: &[(&str, &str)],
+) -> Json {
+    let schema = |kind: &str, description: &str| {
         object(vec![
-            ("type", text("string")),
+            ("type", text(kind)),
             ("description", text(description)),
         ])
     };
@@ -334,7 +340,13 @@ fn tool(name: &str, description: &str, properties: &[(&str, &str)]) -> Json {
                 ("type", text("object")),
                 (
                     "properties",
-                    object(properties.iter().map(|(k, d)| (*k, schema(d))).collect()),
+                    object(
+                        properties
+                            .iter()
+                            .map(|(k, d)| (*k, schema("string", d)))
+                            .chain(flags.iter().map(|(k, d)| (*k, schema("boolean", d))))
+                            .collect(),
+                    ),
                 ),
                 (
                     "required",
@@ -351,6 +363,7 @@ fn tools() -> Json {
             "lint",
             LINT,
             &[("text", "The Markdown or plain prose to check.")],
+            &[],
         ),
         tool(
             "preserve",
@@ -359,6 +372,10 @@ fn tools() -> Json {
                 ("original", "The text before editing."),
                 ("edited", "The text after editing."),
             ],
+            &[(
+                "loose",
+                "If true, list a lost word of frequency, quantity, ability, prediction, cause or hedging, such as 'often', 'some', 'can' or 'likely', as a 'check meaning word' line instead of a dropped one, as the CLI's --loose does. A lost hedge can still overstate a claim. Default false.",
+            )],
         ),
     ])
 }
@@ -374,7 +391,13 @@ fn call_tool(params: Option<&Json>) -> Result<String, String> {
         Some(Json::Object(members)) => members,
         Some(_) => return Err("arguments must be an object".into()),
     };
-    for (_, value) in args {
+    for (key, value) in args {
+        if name == "preserve" && key == "loose" {
+            if !matches!(value, Json::Bool(_)) {
+                return Err("loose must be true or false".into());
+            }
+            continue;
+        }
         let Json::String(s) = value else {
             return Err("every argument must be a string".into());
         };
@@ -405,7 +428,11 @@ fn call_tool(params: Option<&Json>) -> Result<String, String> {
             let (Some(original), Some(edited)) = (arg("original"), arg("edited")) else {
                 return Err("original and edited are required".into());
             };
-            Ok(preserve::report(original, edited, false).lines.join("\n"))
+            let loose = params
+                .and_then(|p| p.get("arguments"))
+                .and_then(|a| a.get("loose"))
+                == Some(&Json::Bool(true));
+            Ok(preserve::report(original, edited, loose).lines.join("\n"))
         }
         _ => Err(format!("unknown tool: {name}")),
     }
@@ -752,6 +779,17 @@ mod tests {
                 Json::Array(vec![text("original"), text("edited")])
             ]
         );
+        let loose = tools[1]
+            .get("inputSchema")
+            .and_then(|s| s.get("properties"))
+            .and_then(|p| p.get("loose"))
+            .and_then(|l| l.get("type"));
+        assert_eq!(loose, Some(&text("boolean")));
+        let lint = tools[0]
+            .get("inputSchema")
+            .and_then(|s| s.get("properties"))
+            .unwrap();
+        assert!(lint.get("loose").is_none(), "{lint:?}");
     }
 
     #[test]
@@ -779,11 +817,54 @@ mod tests {
     }
 
     #[test]
+    fn preserve_reports_a_lost_hedge_as_dropped_unless_loose_is_true() {
+        let (original, edited) = ("Users often export reports.\n", "Users export reports.\n");
+        let call_preserve = |loose: &str| {
+            call(&format!(
+                r#"{{"name":"preserve","arguments":{{"original":{},"edited":{}{loose}}}}}"#,
+                to_string(&text(original)),
+                to_string(&text(edited))
+            ))
+        };
+        let dropped = "dropped meaning word: 'often' (1 before, 0 after)";
+        let check = "check meaning word: 'often' (1 before, 0 after)";
+        for loose in ["", r#","loose":false"#] {
+            let (report, failed) = call_preserve(loose);
+            assert!(!failed, "{report}");
+            assert!(report.lines().any(|line| line == dropped), "{report}");
+            assert!(!report.contains(check), "{report}");
+            assert_eq!(
+                report,
+                preserve::report(original, edited, false).lines.join("\n")
+            );
+        }
+        let (report, failed) = call_preserve(r#","loose":true"#);
+        assert!(!failed && !report.contains(dropped), "{report}");
+        assert!(report.lines().any(|line| line == check), "{report}");
+        assert_eq!(
+            report,
+            preserve::report(original, edited, true).lines.join("\n")
+        );
+        for loose in [r#","loose":"true""#, r#","loose":1"#, r#","loose":null"#] {
+            assert_eq!(
+                call_preserve(loose),
+                ("loose must be true or false".to_string(), true),
+                "{loose}"
+            );
+        }
+    }
+
+    #[test]
     fn bad_tool_calls_are_errors_in_the_result() {
         let long = "a".repeat(MAX_INPUT + 1);
         for (arguments, message) in [
             (
                 r#"{"name":"lint","arguments":{"text":1}}"#.to_string(),
+                "every argument must be a string",
+            ),
+            // `loose` is a flag of preserve only.
+            (
+                r#"{"name":"lint","arguments":{"text":"a","loose":true}}"#.to_string(),
                 "every argument must be a string",
             ),
             (

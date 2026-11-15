@@ -74,6 +74,19 @@ jobs:
         env:
           OUTCOME: ${{ steps.fault.outcome }}
         run: test "$OUTCOME" = failure
+      # --json and --sarif change lint's output to one the Action cannot annotate, so lint.sh
+      # refuses them before any lint call. A stand-in that exits 0 replaces the binary, so the
+      # refusal is lint.sh's whatever options the installed release knows.
+      - name: Output formats the Action cannot read are refused
+        shell: bash
+        run: |
+          for arg in --json --sarif; do
+            status=0
+            out=$(LACONIC_CHECK=true LACONIC_FILES=tools/laconic-check/action/tests/clean.md \
+              LACONIC_ARGS="--warn $arg" bash tools/laconic-check/action/lint.sh) || status=$?
+            test "$status" -eq 2
+            test "$out" = "::error::the Action reads lint's text output, so args cannot include $arg"
+          done
       # Over 32,767 characters of paths, more than one Windows command line holds. A seeded
       # fault sorts first and another last, so each lint call sees one.
       - name: Track enough Markdown files to need 2 lint calls

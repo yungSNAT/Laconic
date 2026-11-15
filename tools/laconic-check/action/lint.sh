@@ -27,8 +27,8 @@ args=()
 read -r -d '' -a args <<< "$LACONIC_ARGS" || true
 warn=
 for arg in ${args[@]+"${args[@]}"}; do
-  if [[ "$arg" == --json ]]; then
-    echo "::error::the Action reads lint's text output, so args cannot include --json"
+  if [[ "$arg" == --json || "$arg" == --sarif ]]; then
+    echo "::error::the Action reads lint's text output, so args cannot include $arg"
     exit 2
   fi
   [[ "$arg" != --warn ]] || warn=1

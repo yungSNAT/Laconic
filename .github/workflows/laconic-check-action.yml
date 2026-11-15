@@ -113,6 +113,16 @@ jobs:
           version: ${{ steps.release.outputs.version }}
           files: ${{ env.MANY }}
           args: --max-findings 2
+      # action.yml documents that args splits at new lines as at spaces; were the 2 lines one
+      # option, lint would reject it.
+      - name: Options on separate lines are split
+        uses: ./
+        with:
+          version: ${{ steps.release.outputs.version }}
+          files: ${{ env.MANY }}
+          args: |
+            --max-findings
+            2
       # Only 170 tracked files, each with a failing finding, whose paths alone pass the Windows
       # limit, so no single lint call can judge their total against --max-findings. They are
       # tracked rather than named in files, as Windows caps an input's environment variable at

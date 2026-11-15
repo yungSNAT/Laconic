@@ -8,7 +8,8 @@
 //! manifest, the listing icon, the skills, the licence files and a README for
 //! the listing, and refuses anything the directory would refuse. The full
 //! plugin stays on `main`; `.github/workflows/plugin-dist.yml` publishes this
-//! build to the `claude-plugin` branch.
+//! build to the `claude-plugin` branch when the version
+//! in `package.json` rises.
 
 use serde_json::{Map, Value};
 use std::collections::{BTreeMap, BTreeSet};
@@ -35,9 +36,8 @@ const SOURCES: [(&str, &str); 6] = [
 ];
 /// The manifest keys the build ships: each describes the plugin and loads
 /// nothing. Any other key fails the build, so a component added on `main` is
-/// never shipped or dropped unnoticed. `version` is left out on purpose:
-/// without one, Claude Code updates on every new commit of the branch, as it
-/// does from `main`.
+/// never shipped or dropped unnoticed. `version` is not among them: the
+/// manifest on `main` declares none, and the build stamps `package.json`'s.
 const MANIFEST_KEYS: [&str; 8] = [
     "$schema",
     "name",
@@ -59,6 +59,9 @@ const MAX_BYTES: usize = 256 * 1024;
 const TEXT: [&str; 5] = ["md", "txt", "json", "yaml", "yml"];
 /// Text files without an extension: the licence files at the root and in each skill.
 const BARE_TEXT: [&str; 2] = ["LICENSE", "NOTICE"];
+/// The file whose `version` every versioned manifest shares. The build stamps
+/// it into the manifest, and the workflow publishes only when it rises.
+const VERSION_SOURCE: &str = "package.json";
 
 /// Files keyed by their path in the plugin folder.
 type Files = BTreeMap<String, Vec<u8>>;
@@ -141,10 +144,31 @@ fn committed(root: &Path) -> Result<Files, String> {
         .collect()
 }
 
+/// The plugin version in `package.json`, which must be `X.Y.Z` without
+/// leading zeros: the workflow compares versions with `sort -V`, which orders
+/// a pre-release above its release and 0.5.00 above 0.5.0.
+fn package_version(bytes: &[u8]) -> Result<String, String> {
+    let package: Value =
+        serde_json::from_slice(bytes).map_err(|e| format!("{VERSION_SOURCE}: {e}"))?;
+    let version = package["version"].as_str().unwrap_or_default();
+    let plain = |part: &str| {
+        !part.is_empty()
+            && part.bytes().all(|byte| byte.is_ascii_digit())
+            && (part == "0" || !part.starts_with('0'))
+    };
+    if version.split('.').count() != 3 || !version.split('.').all(plain) {
+        return Err(format!(
+            "{VERSION_SOURCE} version {version:?} must be X.Y.Z without leading zeros"
+        ));
+    }
+    Ok(version.to_owned())
+}
+
 /// The manifest the directory reads: `main`'s, refused if it declares anything
 /// beyond `MANIFEST_KEYS`.
-fn manifest(bytes: &[u8]) -> Result<Vec<u8>, String> {
-    let manifest: Map<String, Value> =
+/// `version` is the one the build stamps, which `main`'s manifest leaves out.
+fn manifest(bytes: &[u8], version: &str) -> Result<Vec<u8>, String> {
+    let mut manifest: Map<String, Value> =
         serde_json::from_slice(bytes).map_err(|e| format!("{MANIFEST}: {e}"))?;
     if let Some(key) = manifest
         .keys()
@@ -154,6 +178,7 @@ fn manifest(bytes: &[u8]) -> Result<Vec<u8>, String> {
             "{MANIFEST} key {key} is not one the directory build ships"
         ));
     }
+    manifest.insert("version".to_owned(), Value::from(version));
     let mut out = serde_json::to_vec_pretty(&manifest).map_err(|e| e.to_string())?;
     out.push(b'\n');
     Ok(out)
@@ -388,7 +413,11 @@ fn check(files: &Files) -> Result<usize, String> {
 /// Write the plugin at HEAD of `root` into the new folder `destination`.
 pub fn build(root: &Path, destination: &Path) -> Result<String, String> {
     let mut files = committed(root)?;
-    let generated = manifest(&files[MANIFEST])?;
+    let package = git(
+        root,
+        &["cat-file", "blob", &format!("HEAD:{VERSION_SOURCE}")],
+    )?;
+    let generated = manifest(&files[MANIFEST], &package_version(&package)?)?;
     files.insert(MANIFEST.to_owned(), generated);
     let entries = check(&files)?;
     fs::create_dir(destination)
@@ -579,6 +608,14 @@ mod tests {
         for path in ["hooks", "tools", ".cursor", "skills/laconic/agents"] {
             assert!(!out.join(path).exists(), "{path}");
         }
+        let json =
+            |path: &Path| -> Value { serde_json::from_slice(&fs::read(path).unwrap()).unwrap() };
+        let version = json(&out.join(MANIFEST))["version"].clone();
+        assert!(version.is_string());
+        assert_eq!(
+            version,
+            json(&crate::root().join(VERSION_SOURCE))["version"]
+        );
         assert!(build(&crate::root(), &out).is_err(), "an existing folder");
     }
 
@@ -701,14 +738,48 @@ mod tests {
     }
 
     #[test]
+    fn the_version_must_be_plain() {
+        assert_eq!(
+            package_version(br#"{"name": "x", "version": "0.5.10"}"#),
+            Ok("0.5.10".to_owned())
+        );
+        for version in [
+            r#""0.5""#,
+            r#""0.5.0.1""#,
+            r#""0.5.0-rc.1""#,
+            r#""0.5.00""#,
+            r#""01.2.3""#,
+            r#""v1.2.3""#,
+            r#"" 1.2.3""#,
+            r#""1..3""#,
+            r#""""#,
+            "1",
+            "null",
+        ] {
+            let package = format!(r#"{{"version": {version}}}"#);
+            assert!(package_version(package.as_bytes()).is_err(), "{version}");
+        }
+        for package in ["{}", "[]", "not json"] {
+            assert!(package_version(package.as_bytes()).is_err(), "{package}");
+        }
+    }
+
+    #[test]
     fn the_manifest_ships_only_descriptive_keys() {
-        let shipped = manifest(br#"{"name": "laconic", "author": {"name": "yungSNAT"}}"#).unwrap();
+        let shipped = manifest(
+            br#"{"name": "laconic", "author": {"name": "yungSNAT"}}"#,
+            "1.2.3",
+        )
+        .unwrap();
         let shipped: Value = serde_json::from_slice(&shipped).unwrap();
         assert_eq!(shipped["author"]["name"], "yungSNAT");
+        assert_eq!(shipped["version"], "1.2.3");
         for key in ["hooks", "mcpServers", "commands", "skills", "version"] {
             let text = format!(r#"{{"name": "laconic", "{key}": "./x"}}"#);
             assert!(
-                manifest(text.as_bytes()).unwrap_err().contains(key),
+                manifest(text.as_bytes(), "1.2.3")
+                    .unwrap_err()
+                    .contains(key),
                 "{key}"
             );
         }

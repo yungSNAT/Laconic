@@ -6,8 +6,9 @@ name: plugin branch
 # `laconic-tools build-plugin-dist` builds the skills-only plugin from the
 # checked-out commit and refuses any other file; a pull request runs the build
 # and the directory's own validator, and a push to main publishes the build to
-# the claude-plugin branch, which the directory listing tracks. The install
-# routes on main are unchanged.
+# the claude-plugin branch, which the directory listing tracks, once the plugin
+# version in package.json has risen: each commit there is a directory version
+# that is scanned and published. The install routes on main are unchanged.
 on:
   workflow_dispatch:
   pull_request:
@@ -16,6 +17,7 @@ on:
       - skills/**
       - LICENSE
       - NOTICE
+      - package.json
       - docs/plugin-directory-readme.md
       - tools/**
       - ci/claude-code/**
@@ -49,10 +51,8 @@ jobs:
           # The wrapper needs a postinstall to copy this binary. Install it directly.
           npm ci --ignore-scripts --prefix ci/claude-code
           echo "$GITHUB_WORKSPACE/ci/claude-code/node_modules/@anthropic-ai/claude-code-linux-x64" >> "$GITHUB_PATH"
-      # Not --strict: the manifest declares no version on purpose, which the
-      # validator reports as a warning; the directory accepts it.
       - name: Validate the plugin as the directory does
-        run: claude plugin validate --profile directory "$RUNNER_TEMP/plugin"
+        run: claude plugin validate --profile directory --strict "$RUNNER_TEMP/plugin"
 
   publish:
     needs: validate
@@ -70,8 +70,7 @@ jobs:
           persist-credentials: false
       - name: Build the plugin
         run: cargo run --locked --quiet --manifest-path tools/laconic-tools/Cargo.toml -- build-plugin-dist "$RUNNER_TEMP/plugin"
-      # The token reaches only this step, after the build has run. The manifest
-      # declares no version, so Claude Code updates on each new commit here.
+      # The token reaches only this step, after the build has run.
       - name: Commit the plugin to its branch when it changed
         env:
           GH_TOKEN: ${{ github.token }}
@@ -86,6 +85,16 @@ jobs:
             parent="$(git rev-parse FETCH_HEAD)"
             if [ "$(git rev-parse "$parent^{tree}")" = "$tree" ]; then
               echo "The plugin is unchanged on $BRANCH at $parent."
+              exit 0
+            fi
+            # Each commit on this branch is a directory version that is scanned
+            # and published, so a changed plugin waits for the release that
+            # raises the version in package.json. A head with no version, which
+            # no run of this workflow leaves, is published over.
+            version="$(jq -er .version "$RUNNER_TEMP/plugin/.claude-plugin/plugin.json")"
+            published="$(git show "$parent:.claude-plugin/plugin.json" | jq -r '.version // empty')"
+            if [ "$version" = "$published" ] || [ "$(printf '%s\n%s\n' "$published" "$version" | sort -V | tail -n 1)" != "$version" ]; then
+              echo "::notice::The plugin changed but its version $version is not above $published, so $BRANCH stays at $parent."
               exit 0
             fi
           fi

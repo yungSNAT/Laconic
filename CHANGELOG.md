@@ -53,6 +53,7 @@ The manifests other than Claude Code's still declare plugin 0.5.0, so a build fr
 
 ### laconic-check: fixed
 
+- `preserve` looks each name up in a set of the edit's runs of 2 and 3 words instead of searching the whole edit for it, so 16 times the names no longer takes about 240 times as long in a debug build; 32,000 names took 1.3 seconds and now take 0.7 in a release build. A name now counts as kept only as whole words: 'Jane Smith' is kept in '(Jane Smith)', 'Jane Smith's' and 'Jane Smith-Jones', but no longer in 'Jane Smithson'. The fact audit's results are unchanged.
 - `lint` no longer rescans a whitespace-free token for each word it holds, so minified text takes linear time: 80,000 characters of 'a,' took about 6 seconds and twice the text 4 times as long (#119).
 - `preserve` compares numbers and quantities through hash sets, so a text of many numbers takes linear time: 16,000 numbers took about 1 second and twice as many 5 times as long.
 - `lint` checks the body of a GitHub alert, such as `> [!NOTE]`, as prose; it skipped every block quotation (#111).

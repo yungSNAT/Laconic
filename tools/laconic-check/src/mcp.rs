@@ -392,7 +392,7 @@ fn call_tool(params: Option<&Json>) -> Result<String, String> {
         Some(_) => return Err("arguments must be an object".into()),
     };
     for (key, value) in args {
-        if key == "loose" {
+        if name == "preserve" && key == "loose" {
             if !matches!(value, Json::Bool(_)) {
                 return Err("loose must be true or false".into());
             }
@@ -428,11 +428,10 @@ fn call_tool(params: Option<&Json>) -> Result<String, String> {
             let (Some(original), Some(edited)) = (arg("original"), arg("edited")) else {
                 return Err("original and edited are required".into());
             };
-            let loose = args
-                .iter()
-                .rev()
-                .find(|(k, _)| k == "loose")
-                .is_some_and(|(_, v)| *v == Json::Bool(true));
+            let loose = params
+                .and_then(|p| p.get("arguments"))
+                .and_then(|a| a.get("loose"))
+                == Some(&Json::Bool(true));
             Ok(preserve::report(original, edited, loose).lines.join("\n"))
         }
         _ => Err(format!("unknown tool: {name}")),
@@ -834,6 +833,10 @@ mod tests {
             assert!(!failed, "{report}");
             assert!(report.lines().any(|line| line == dropped), "{report}");
             assert!(!report.contains(check), "{report}");
+            assert_eq!(
+                report,
+                preserve::report(original, edited, false).lines.join("\n")
+            );
         }
         let (report, failed) = call_preserve(r#","loose":true"#);
         assert!(!failed && !report.contains(dropped), "{report}");
@@ -857,6 +860,11 @@ mod tests {
         for (arguments, message) in [
             (
                 r#"{"name":"lint","arguments":{"text":1}}"#.to_string(),
+                "every argument must be a string",
+            ),
+            // `loose` is a flag of preserve only.
+            (
+                r#"{"name":"lint","arguments":{"text":"a","loose":true}}"#.to_string(),
                 "every argument must be a string",
             ),
             (

@@ -388,12 +388,12 @@ fn sarif_names_a_file_the_same_from_any_directory() {
 #[test]
 fn sarif_counts_a_supplementary_character_at_a_finding_as_2_columns() {
     let tags = "\u{e0068}\u{e0069}";
-    let text = format!("{tags} Line one.\n\u{1f600} Two {tags} here.\n");
+    let text = format!("{tags} Fine text.\n\u{1f600} Fine {tags} text.\n");
     let dir = folder("sarif-supplementary", &[("tags.md", &text)]);
     let (code, out, _) = lint(&dir, &["tags.md"]);
     assert_eq!(code, 1, "{out}");
     let columns: Vec<&str> = out.lines().map(|l| l.split(": ").next().unwrap()).collect();
-    assert_eq!(columns, ["tags.md:1:1", "tags.md:2:7"], "{out}");
+    assert_eq!(columns, ["tags.md:1:1", "tags.md:2:8"], "{out}");
     let (code, out, _) = lint(&dir, &["--sarif", "tags.md"]);
     assert_eq!(code, 1, "{out}");
     let log = parse(&out).unwrap();
@@ -410,7 +410,7 @@ fn sarif_counts_a_supplementary_character_at_a_finding_as_2_columns() {
         .collect();
     assert_eq!(
         regions,
-        [["1", "1", "3"], ["2", "8", "10"]].map(|r| r.map(String::from))
+        [["1", "1", "3"], ["2", "9", "11"]].map(|r| r.map(String::from))
     );
 }
 

@@ -244,7 +244,7 @@ To run `lint` as a gate in CI or a pre-commit hook, these options set what it re
 A `.laconic-check` file in the directory `lint` runs from holds `key = value` lines for `disable`, `only` and `max-findings`, and `#` comment lines. Rules on the command line add to its lists, and `--max-findings` replaces its count:
 
 ```text
-# Quoted American titles are expected here.
+# CSS property names such as color are expected here.
 disable = us-spelling
 ```
 
@@ -252,7 +252,7 @@ To silence one finding, put a comment naming its rule on its own line before it.
 
 ```markdown
 <!-- laconic-check-disable-next-line us-spelling -->
-The Color Purple won the prize.
+Set the color property of the heading to red.
 ```
 
 | Exit status | Meaning |

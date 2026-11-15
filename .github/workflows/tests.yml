@@ -61,13 +61,15 @@ jobs:
             echo "::error::.cursor copy is out of sync. Run: rm -rf .cursor/skills && cp -R skills .cursor/skills"
             exit 1
           }
-      # Coverage only records the run for the Codecov badge; no threshold.
+      # Line coverage of scripts/ must stay at 100%.
       - name: Install coverage
         run: python -m pip install --only-binary=":all:" --require-hashes -r ci/requirements-coverage.txt
       - name: Unit tests
         run: python -m coverage run --source=scripts -m unittest discover -s tests -v
       - name: Write coverage for Codecov
         run: python -m coverage xml -o coverage-codecov.xml
+      - name: Hold line coverage at 100%
+        run: python -m coverage report --fail-under=100
       - name: Keep the coverage report for the Codecov upload
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:

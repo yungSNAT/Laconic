@@ -1,5 +1,5 @@
-# Codecov reports coverage for the README badge. CI sets no coverage gate, so
-# Codecov's own statuses are informational and it posts no comments.
+# Codecov reports coverage for the README badge. CI holds line coverage at 100% in
+# the unittest job, so Codecov's statuses are informational and it posts no comments.
 coverage:
   status:
     project:

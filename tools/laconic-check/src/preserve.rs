@@ -413,12 +413,10 @@ fn only_in(
         ("quotation", &quotations),
     ];
     for (kind, extract) in extractors {
-        let key = |x: &String| {
-            if kind == "number" {
-                number_value(x)
-            } else {
-                x.clone()
-            }
+        let key = |x: &String| match kind {
+            "number" => number_value(x),
+            "quotation" => quotation_key(x),
+            _ => x.clone(),
         };
         let kept: HashSet<String> = extract(to).iter().map(key).collect();
         let lost: Vec<String> = dedup(extract(from))
@@ -578,7 +576,8 @@ fn starts_with_percent(text: &str) -> bool {
 
 /// A number with the size or unit it carries, attached or as the next word: '$47.3M',
 /// '150 km', 'three days', '25 degrees Celsius'. Both bounds of a range carry its unit, so
-/// '45 to 60 minutes', '45-60 minutes' and '45–60 minutes' are each 45 and 60 minutes.
+/// '45 to 60 minutes', '45-60 minutes', '45 – 60 minutes' and 'a 45- to 60-minute ride' are each
+/// 45 and 60 minutes.
 /// Read from prose, so a value in code or a URL is not one. 'pounds' is not a weight after a
 /// value in `pounds`, the amounts written with '£'.
 fn quantities(text: &str, pounds: &HashSet<String>) -> Vec<String> {
@@ -652,11 +651,11 @@ fn quantity_at(
         .is_empty()
     {
         unit
-    } else if value.len() == bare.len() && attached.is_empty() {
+    } else if value.len() == bare.len() && matches!(attached, "" | "-") {
         let next = tokens.get(i + 1)?;
         // A range's lower bound takes the unit of its upper bound: '45 to 60 minutes',
-        // 'between 2 and 3 hours', '2 or 3 days'.
-        if matches!(*next, "to" | "and" | "or") {
+        // 'between 2 and 3 hours', '2 or 3 days', '30 – 60 grams', 'a 45- to 60-minute ride'.
+        if matches!(*next, "to" | "and" | "or" | "-" | "\u{2013}" | "\u{2014}") {
             if upper {
                 return None;
             }
@@ -1039,6 +1038,17 @@ fn quoted_words(chars: &[char]) -> String {
         .collect();
     let spaced = text.split_whitespace().collect::<Vec<_>>().join(" ");
     spaced.trim_end_matches([',', '.', ';', ':']).to_string()
+}
+
+/// A quotation as compared: a quotation set as its own sentence takes a capital and a question
+/// or exclamation mark ('can I afford it' as "Can I afford it?"), so neither counts.
+fn quotation_key(quotation: &str) -> String {
+    let words = quotation.trim_end_matches(['?', '!']);
+    let mut chars = words.chars();
+    chars
+        .next()
+        .map(|first| first.to_lowercase().chain(chars).collect())
+        .unwrap_or_default()
 }
 
 /// The text without code spans and URLs, so `--all` or a path is not a meaning word.

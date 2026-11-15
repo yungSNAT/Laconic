@@ -1151,6 +1151,19 @@ mod tests {
     }
 
     #[test]
+    fn a_quotation_set_as_its_own_sentence_keeps_its_words() {
+        let original = "It shifted from \"can I afford to publish this book\" to \"will anyone buy it,\" lowering the stakes.";
+        let edited = "It changed from \"Can I afford to publish this book?\" to \"Will anyone buy it?\" This lowered the stakes.";
+        assert!(!missing(original, edited).contains_key("quotation"));
+        assert!(!added(original, edited).contains_key("quotation"));
+        // The words still have to match.
+        assert_eq!(
+            missing("Asked 'can we stop'.", "Asked 'Can we start?'.")["quotation"],
+            vec!["can we stop"]
+        );
+    }
+
+    #[test]
     fn restyling_or_reflowing_a_quotation_changes_nothing() {
         let original = "He said \"it isn't over,\" and left.";
         for edited in [
@@ -1816,6 +1829,11 @@ Priya said.",
             ("Add 30 to 60 grams of salt.", "Add 30-60 grams of salt."),
             ("Allow 2-3 hours.", "Allow between 2 and 3 hours."),
             ("Allow 2-3 days.", "Allow 2 or 3 days."),
+            // A spaced dash, and a lower bound whose hyphen waits for the upper's unit.
+            ("Add 30 to 60 grams.", "Add 30 \u{2014} 60 grams."),
+            ("Add 30 to 60 grams.", "Add 30 \u{2013} 60 grams."),
+            ("Add 30 to 60 grams.", "Add 30 - 60 grams."),
+            ("Rides of 45 to 60 minutes.", "A 45- to 60-minute ride."),
         ] {
             for (from, to) in [(original, edited), (edited, original)] {
                 assert!(missing(from, to).is_empty(), "{from}");

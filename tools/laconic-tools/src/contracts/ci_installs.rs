@@ -12,7 +12,11 @@ use std::collections::BTreeMap;
 use std::fs;
 use std::path::PathBuf;
 
-const WORKFLOWS: [&str; 2] = ["plugin-load-check.yml", "pi-load-check.yml"];
+const WORKFLOWS: [&str; 3] = [
+    "plugin-load-check.yml",
+    "pi-load-check.yml",
+    "plugin-dist.yml",
+];
 const PIP_LINE: &str = "        run: python -m pip install --only-binary=\":all:\" --require-hashes -r ci/requirements-coverage.txt";
 
 /// `shlex.split` for a command without quotes, escapes or comments, which is all the guard

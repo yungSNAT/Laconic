@@ -16,6 +16,9 @@
 //!                                        write a release's package manifests
 //!   laconic-tools calibrate [--check] <human_detectors.json>
 //!                                        measure each rule on an outside human corpus
+//!   laconic-tools build-plugin-dist <destination>
+//!                                        write the skills-only plugin that the
+//!                                        Claude plugin directory reads
 
 mod au_words;
 mod calibrate;
@@ -23,6 +26,7 @@ mod calibrate;
 mod contracts;
 mod packages;
 mod pi_check;
+mod plugin_dist;
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -129,12 +133,14 @@ fn main() -> ExitCode {
         }
         ["calibrate", json] => calibrate::run(&root(), Path::new(json), false),
         ["calibrate", "--check", json] => calibrate::run(&root(), Path::new(json), true),
+        ["build-plugin-dist", destination] => plugin_dist::build(&root(), Path::new(destination)),
         _ => Err(
             "usage: laconic-tools <sync-rules [--check] | check-pi [--runtime pi|omp] \
              | gen-au-words <scowl-pre.txt> <style-manual.txt> \
              | mcpb-manifest <version> <bundle-dir> \
              | package-manifests <version> <dist> <out> \
-             | calibrate [--check] <human_detectors.json>>"
+             | calibrate [--check] <human_detectors.json> \
+             | build-plugin-dist <destination>>"
                 .into(),
         ),
     };

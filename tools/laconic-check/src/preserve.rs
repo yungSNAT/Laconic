@@ -413,12 +413,10 @@ fn only_in(
         ("quotation", &quotations),
     ];
     for (kind, extract) in extractors {
-        let key = |x: &String| {
-            if kind == "number" {
-                number_value(x)
-            } else {
-                x.clone()
-            }
+        let key = |x: &String| match kind {
+            "number" => number_value(x),
+            "quotation" => quotation_key(x),
+            _ => x.clone(),
         };
         let kept: HashSet<String> = extract(to).iter().map(key).collect();
         let lost: Vec<String> = dedup(extract(from))
@@ -578,7 +576,8 @@ fn starts_with_percent(text: &str) -> bool {
 
 /// A number with the size or unit it carries, attached or as the next word: '$47.3M',
 /// '150 km', 'three days', '25 degrees Celsius'. Both bounds of a range carry its unit, so
-/// '45 to 60 minutes', '45-60 minutes' and '45–60 minutes' are each 45 and 60 minutes.
+/// '45 to 60 minutes', '45-60 minutes', '45 – 60 minutes' and 'a 45- to 60-minute ride' are each
+/// 45 and 60 minutes.
 /// Read from prose, so a value in code or a URL is not one. 'pounds' is not a weight after a
 /// value in `pounds`, the amounts written with '£'.
 fn quantities(text: &str, pounds: &HashSet<String>) -> Vec<String> {
@@ -652,11 +651,11 @@ fn quantity_at(
         .is_empty()
     {
         unit
-    } else if value.len() == bare.len() && attached.is_empty() {
+    } else if value.len() == bare.len() && matches!(attached, "" | "-") {
         let next = tokens.get(i + 1)?;
         // A range's lower bound takes the unit of its upper bound: '45 to 60 minutes',
-        // 'between 2 and 3 hours', '2 or 3 days'.
-        if matches!(*next, "to" | "and" | "or") {
+        // 'between 2 and 3 hours', '2 or 3 days', '30 – 60 grams', 'a 45- to 60-minute ride'.
+        if matches!(*next, "to" | "and" | "or" | "-" | "\u{2013}" | "\u{2014}") {
             if upper {
                 return None;
             }
@@ -1041,6 +1040,17 @@ fn quoted_words(chars: &[char]) -> String {
     spaced.trim_end_matches([',', '.', ';', ':']).to_string()
 }
 
+/// A quotation as compared: a quotation set as its own sentence takes a capital and a question
+/// or exclamation mark ('can I afford it' as "Can I afford it?"), so neither counts.
+fn quotation_key(quotation: &str) -> String {
+    let words = quotation.trim_end_matches(['?', '!']);
+    let mut chars = words.chars();
+    chars
+        .next()
+        .map(|first| first.to_lowercase().chain(chars).collect())
+        .unwrap_or_default()
+}
+
 /// The text without code spans and URLs, so `--all` or a path is not a meaning word.
 /// A link label before its URL, as in `[all](https://...)`, is kept.
 fn prose(text: &str) -> String {
@@ -1147,6 +1157,19 @@ mod tests {
         assert_eq!(
             added(original, edited)["quotation"],
             vec!["we will proceed"]
+        );
+    }
+
+    #[test]
+    fn a_quotation_set_as_its_own_sentence_keeps_its_words() {
+        let original = "It shifted from \"can I afford to publish this book\" to \"will anyone buy it,\" lowering the stakes.";
+        let edited = "It changed from \"Can I afford to publish this book?\" to \"Will anyone buy it?\" This lowered the stakes.";
+        assert!(!missing(original, edited).contains_key("quotation"));
+        assert!(!added(original, edited).contains_key("quotation"));
+        // The words still have to match.
+        assert_eq!(
+            missing("Asked 'can we stop'.", "Asked 'Can we start?'.")["quotation"],
+            vec!["can we stop"]
         );
     }
 
@@ -1816,6 +1839,11 @@ Priya said.",
             ("Add 30 to 60 grams of salt.", "Add 30-60 grams of salt."),
             ("Allow 2-3 hours.", "Allow between 2 and 3 hours."),
             ("Allow 2-3 days.", "Allow 2 or 3 days."),
+            // A spaced dash, and a lower bound whose hyphen waits for the upper's unit.
+            ("Add 30 to 60 grams.", "Add 30 \u{2014} 60 grams."),
+            ("Add 30 to 60 grams.", "Add 30 \u{2013} 60 grams."),
+            ("Add 30 to 60 grams.", "Add 30 - 60 grams."),
+            ("Rides of 45 to 60 minutes.", "A 45- to 60-minute ride."),
         ] {
             for (from, to) in [(original, edited), (edited, original)] {
                 assert!(missing(from, to).is_empty(), "{from}");

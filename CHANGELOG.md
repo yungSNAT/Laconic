@@ -8,6 +8,7 @@ The manifests other than Claude Code's still declare plugin 0.5.0, so a build fr
 
 ### Plugin: added
 
+- A skills-only edition for the Claude plugin directory: `laconic-tools build-plugin-dist` builds it from `main` without the hooks, tools or MCP server, refuses any file the directory would refuse from an unverified organisation, and a workflow validates it on pull requests and publishes it to the `claude-plugin` branch.
 - Warn when always-on mode cannot locate the plugin (#18).
 - Run the full Python test suite and eval validation in CI (#19).
 - Run eval model calls in parallel with `--jobs` (#11).

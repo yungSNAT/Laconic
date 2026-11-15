@@ -1,0 +1,65 @@
+Laconic
+Copyright 2026 Ryan Duguid (https://github.com/ryanduguid)
+
+Ryan Duguid's contributions are licensed under the Functional Source
+License, Version 1.1, ALv2 Future License (FSL-1.1-ALv2); see LICENSE.
+Retained third-party material remains under its own licence, as stated below.
+
+For each version licensed under FSL-1.1-ALv2, an additional licence under the
+Apache License, Version 2.0 becomes effective on the second anniversary of the
+date that version was made available.
+
+Versions made available before this change remain available under the
+licences they were released with.
+
+Redistribution under FSL-1.1-ALv2 requires including its terms or a link to
+them and keeping the copyright notices supplied with the software.
+Redistribution under another applicable licence follows that licence's
+conditions.
+
+This skill is part of Laconic (https://github.com/yungSNAT/laconic). Keep this
+file and LICENSE with the skill.
+
+Third-party MIT material: portions of Laconic derive from i-have-adhd
+(https://github.com/ayghri/i-have-adhd) by Ayoub Ghriss, No AI Slop by Peter
+Yang, Stop Slop by Hardik Pandya, humanizer (Siqi Chen) and its forks by jooray
+and sbfnk, avoid-ai-writing (Conor Bronsdon) and Sepia (copyright 2026 Nanako
+Tsai). Those portions remain under the MIT License:
+
+MIT License
+
+Copyright (c) 2026 Ayoub Ghriss
+Copyright (c) 2026 Peter Yang
+Copyright (c) 2025 Hardik Pandya
+Copyright (c) 2025 Siqi Chen
+Copyright (c) 2026 Conor Bronsdon
+Copyright (c) 2026 Nanako Tsai
+Portions adapted from humanizer (Siqi Chen) and its forks by jooray and sbfnk,
+avoid-ai-writing (Conor Bronsdon) and Sepia (copyright 2026 Nanako Tsai), each
+under the MIT License.
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+Australian Government Style Manual: the Australian English rules in
+skills/laconic-prose/references/style-manual-rules.md and
+style-manual-detail.md, and the rules derived from them, are restated in
+Laconic's own words from the Australian Government Style Manual
+(https://www.stylemanual.gov.au/), copyright Commonwealth of Australia. The
+Style Manual is not published under an open licence, and Laconic includes no
+copy of it.

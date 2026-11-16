@@ -29,9 +29,12 @@ updates:
       interval: weekly
     cooldown:
       default-days: 7
-  # The fuzz targets' libFuzzer bindings; laconic-check itself has no dependencies.
+  # The Rust crates' registry dependencies; laconic-check itself has none.
   - package-ecosystem: cargo
-    directory: /tools/laconic-check/fuzz
+    directories:
+      - /tools/laconic-check/fuzz
+      - /tools/laconic-evals
+      - /tools/laconic-tools
     schedule:
       interval: weekly
     cooldown:

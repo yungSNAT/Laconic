@@ -4,3 +4,4 @@ __pycache__/
 evals/results/
 tools/laconic-check/target/
 tools/laconic-tools/target/
+tools/laconic-evals/target/

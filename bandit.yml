@@ -3,7 +3,7 @@
 # Tests use plain assert, fixed fake credentials and argument-list subprocess
 # calls, so they are excluded. B404 (importing subprocess) is a notice that
 # every import raises; B603 and the shell checks B602 and B605 stay on for
-# scripts and evals.
+# scripts.
 exclude_dirs:
   - tests
 skips:

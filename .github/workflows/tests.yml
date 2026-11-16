@@ -4,7 +4,7 @@ name: tests
 # its lint of Laconic's own prose, and the whole Python suite; checks the .cursor
 # copy of the skills; and validates the evaluation cases. The other workflows each
 # cover one layer; this catches the rest (OpenCode plugin, manifests, skills, CI
-# guards, eval tooling, judge, humanise metrics).
+# guards, eval tooling, judge, the laconic-evals benchmarks).
 on:
   pull_request:
   push:
@@ -46,6 +46,14 @@ jobs:
       # Without the binary, tests/test_mcp_server.py would skip.
       - name: Build laconic-check
         run: cargo build --locked --manifest-path tools/laconic-check/Cargo.toml
+      # Its lint test runs the laconic-check just built.
+      - name: Format, lint and test laconic-evals
+        working-directory: tools/laconic-evals
+        run: |
+          export PATH="$GITHUB_WORKSPACE/tools/laconic-check/target/debug:$PATH"
+          cargo fmt --check
+          cargo clippy --locked --all-targets -- -D warnings
+          cargo test --locked
       - name: Lint Laconic's own prose
         working-directory: tools/laconic-check
         run: |
@@ -124,6 +132,9 @@ jobs:
         run: cargo test --locked
       - name: Test laconic-tools
         working-directory: tools/laconic-tools
+        run: cargo test --locked
+      - name: Test laconic-evals
+        working-directory: tools/laconic-evals
         run: cargo test --locked
 
   # The upload runs apart from the tests so the OIDC token is never available

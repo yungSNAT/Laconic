@@ -146,7 +146,7 @@ Further checks on 20 October 2026:
 
 - **Drafts checked before sending:** session mode with the `laconic-check` self-check scored 4.82 weighted against 4.71 without it on 18 prose and accounting cases (4.74 against 4.49 on the 10 accounting cases), with no blocking findings against 1.
 - **Real use:** in the author's own Claude Code sessions on the day Laconic replaced the old setup, assistant messages with no `laconic-check` findings rose from 26% to 42%; numbers written as words fell from 5.7 to 3.6 per 1,000 words.
-- **Agent cost:** on 5 small repository fixes (`evals/agent_bench.py`, 2 trials), every setup passed every task. Session mode cost about 27% more per task than the compact rules, mostly because of its larger always-loaded prompt; a separate agent-guidance section saved nothing and was removed.
+- **Agent cost:** on 5 small repository fixes (the agent cost benchmark in `evals/README.md`, 2 trials), every setup passed every task. Session mode cost about 27% more per task than the compact rules, mostly because of its larger always-loaded prompt; a separate agent-guidance section saved nothing and was removed.
 
 A terse control on 20 October 2026 (45 cases, 2 trials, Opus 5.5 generating and blind-judging) compared installed setups: the compact rules with the prose skill, before and after the stock-phrase, added-qualification and financial-year changes, against the single instruction 'Answer concisely.':
 

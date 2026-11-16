@@ -269,13 +269,22 @@ fn dependabot_covers_actions_and_every_ci_lockfile() {
         .any(|name| name.starts_with("requirements-") && name.ends_with(".txt"));
     assert!(requirements);
     assert_matches(r"(?m)^    directory: /ci$", &blocks["pip"], "pip");
-    // laconic-check has no dependencies, so only the fuzz crate's lockfile lists any.
-    assert!(root().join("tools/laconic-check/fuzz/Cargo.lock").is_file());
-    assert_matches(
-        r"(?m)^    directory: /tools/laconic-check/fuzz$",
-        &blocks["cargo"],
-        "cargo",
-    );
+    // Every Cargo lockfile that lists a registry package; laconic-check's lists none.
+    let mut crates = Vec::new();
+    for entry in fs::read_dir(root().join("tools")).unwrap() {
+        let dir = entry.unwrap().path();
+        for lock in [dir.join("Cargo.lock"), dir.join("fuzz").join("Cargo.lock")] {
+            if fs::read_to_string(&lock).is_ok_and(|text| text.contains("\nsource = \"registry+")) {
+                let crate_dir = lock.parent().unwrap().strip_prefix(root()).unwrap();
+                crates.push(crate_dir.to_string_lossy().replace('\\', "/"));
+            }
+        }
+    }
+    assert!(!crates.is_empty());
+    for directory in crates {
+        let pattern = format!(r"(?m)^      - /{}$", regex::escape(&directory));
+        assert_matches(&pattern, &blocks["cargo"], &directory);
+    }
 }
 
 #[test]

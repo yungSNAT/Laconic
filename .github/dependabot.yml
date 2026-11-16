@@ -39,10 +39,3 @@ updates:
       interval: weekly
     cooldown:
       default-days: 7
-  # Coverage for the Codecov upload, pinned by hash in requirements-coverage.txt.
-  - package-ecosystem: pip
-    directory: /ci
-    schedule:
-      interval: weekly
-    cooldown:
-      default-days: 7

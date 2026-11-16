@@ -84,11 +84,12 @@ Run relevant checks and include the commands and results in the PR. For hook, pl
 cargo test --manifest-path tools/laconic-tools/Cargo.toml
 ```
 
-For Python and evaluation-harness changes:
+For evaluation-harness changes, and the MCP server's Python test:
 
 ```sh
+cargo test --manifest-path tools/laconic-evals/Cargo.toml
+cargo run --quiet --locked --manifest-path tools/laconic-evals/Cargo.toml -- validate
 python3 -m unittest discover -s tests -v
-python3 scripts/run_evals.py validate
 ```
 
 For behaviour changes, add or update representative eval cases when needed, run paired baseline/candidate evaluations under the same conditions and apply the release gate. For hook or plugin changes, verify loading in an isolated configuration directory. If a check was not run, say so and explain why; never invent results or treat inspection as execution.

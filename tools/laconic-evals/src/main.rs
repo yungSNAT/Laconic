@@ -10,8 +10,11 @@ mod fact_audit;
 mod fact_setups;
 mod fact_survival;
 mod humanise;
+mod judge;
 mod proc;
 mod py;
+mod run_evals;
+mod scenario;
 #[cfg(test)]
 mod testing;
 
@@ -36,8 +39,120 @@ struct Cli {
     command: Command,
 }
 
+const CONDITIONS: [&str; 3] = run_evals::CONDITIONS;
+const REFERENCES: [&str; 2] = ["baseline", "comparator"];
+
 #[derive(Debug, Subcommand)]
 enum Command {
+    /// Validates the case catalogue.
+    Validate {
+        /// [default: evals/cases.jsonl]
+        #[arg(long)]
+        cases: Option<PathBuf>,
+    },
+    /// Prints the paired run matrix as JSON Lines.
+    Plan {
+        /// [default: evals/cases.jsonl]
+        #[arg(long)]
+        cases: Option<PathBuf>,
+        #[arg(long, default_value_t = 3, value_parser = clap::value_parser!(i64).range(1..))]
+        trials: i64,
+        #[arg(long)]
+        include_comparator: bool,
+    },
+    /// Aggregates judged score rows and applies the release gate.
+    Score {
+        scores: PathBuf,
+        /// Condition the candidate is compared with.
+        #[arg(long, default_value = "baseline", value_parser = REFERENCES)]
+        reference: String,
+    },
+    /// Aggregates token and cost usage from recorded responses.
+    Measure {
+        responses: PathBuf,
+        /// Condition the candidate is compared with.
+        #[arg(long, default_value = "baseline", value_parser = REFERENCES)]
+        reference: String,
+    },
+    /// Scores recorded responses against the cases' regex checks, without a judge.
+    Checks {
+        responses: PathBuf,
+        /// [default: evals/cases.jsonl]
+        #[arg(long)]
+        cases: Option<PathBuf>,
+    },
+    /// Runs one evaluation condition; resumable.
+    Run {
+        /// [default: evals/cases.jsonl]
+        #[arg(long)]
+        cases: Option<PathBuf>,
+        /// [default: evals/runners.example.json]
+        #[arg(long)]
+        runner_config: Option<PathBuf>,
+        #[arg(long)]
+        runner: String,
+        #[arg(long, value_parser = CONDITIONS)]
+        condition: String,
+        #[arg(long)]
+        condition_skill: Option<PathBuf>,
+        #[arg(long)]
+        case: Vec<String>,
+        #[arg(long, default_value_t = 3, value_parser = clap::value_parser!(i64).range(1..))]
+        trials: i64,
+        #[arg(long, default_value_t = 2)]
+        retries: i64,
+        /// Send the task unchanged; the runner config supplies the setup being compared.
+        #[arg(long)]
+        no_injection: bool,
+        /// Seconds before one model call counts as failed.
+        #[arg(long, default_value_t = 300.0)]
+        call_timeout: f64,
+        /// Model calls to run at once; the budget is a soft threshold that up to jobs - 1
+        /// running calls can pass.
+        #[arg(long, default_value_t = 1)]
+        jobs: i64,
+        #[arg(long, default_value_t = 25.0)]
+        budget_usd: f64,
+        #[arg(long)]
+        allow_unmetered: bool,
+        #[arg(long)]
+        output: PathBuf,
+    },
+    /// Blind-judges paired responses and writes scorable rows.
+    Judge {
+        /// Judge these hand-labelled responses and report blocker agreement instead of
+        /// judging --responses.
+        #[arg(long)]
+        calibrate: Option<PathBuf>,
+        #[arg(long)]
+        responses: Option<PathBuf>,
+        /// [default: evals/cases.jsonl]
+        #[arg(long)]
+        cases: Option<PathBuf>,
+        /// [default: evals/rubric.md]
+        #[arg(long)]
+        rubric: Option<PathBuf>,
+        /// [default: evals/runners.example.json]
+        #[arg(long)]
+        runner_config: Option<PathBuf>,
+        #[arg(long)]
+        runner: String,
+        /// Conditions that every response group must contain.
+        #[arg(long, num_args = 1.., value_parser = CONDITIONS, default_values = ["baseline", "candidate"])]
+        conditions: Vec<String>,
+        #[arg(long, default_value_t = 2)]
+        retries: i64,
+        /// Seconds before one judge call counts as failed.
+        #[arg(long, default_value_t = 300.0)]
+        call_timeout: f64,
+        #[arg(long)]
+        output: Option<PathBuf>,
+    },
+    /// Captures a resumed Claude conversation for the judge and score commands.
+    Scenario {
+        #[command(subcommand)]
+        command: Scenario,
+    },
     /// Checks laconic-check preserve against the fact audit of the AI Humanizer Benchmark.
     FactAudit {
         /// The laconic-check binary.
@@ -79,6 +194,29 @@ enum Command {
     AgentBench {
         #[arg(num_args = 0.., allow_hyphen_values = true, trailing_var_arg = true)]
         args: Vec<String>,
+    },
+}
+
+#[derive(Debug, Subcommand)]
+enum Scenario {
+    /// Checks a scenario folder without calling a provider.
+    Validate { scenario: PathBuf },
+    /// Runs every turn in one claude session and saves the conversation, ungraded.
+    Run {
+        #[arg(long)]
+        scenario: PathBuf,
+        #[arg(long, value_parser = ["baseline", "candidate"])]
+        condition: String,
+        #[arg(long)]
+        condition_skill: Option<PathBuf>,
+        #[arg(long)]
+        model: String,
+        #[arg(long, default_value_t = 1)]
+        trial: i64,
+        #[arg(long)]
+        budget_usd: f64,
+        #[arg(long)]
+        output: PathBuf,
     },
 }
 
@@ -197,6 +335,13 @@ struct Tools<'a> {
     claude: fact_setups::Exec<'a>,
     run_in: agent_bench::Run<'a>,
     which: &'a dyn Fn(&str) -> Option<PathBuf>,
+    /// The runner and judge commands of `run`, `judge` and `scenario run`.
+    runner: run_evals::Exec<'a>,
+    sleep: run_evals::Sleep<'a>,
+    /// Today's date in ISO form, in local time.
+    today: &'a (dyn Fn() -> String + Sync),
+    /// A new claude session id.
+    session: &'a dyn Fn() -> String,
 }
 
 /// The production judge: one claude CLI call.
@@ -217,7 +362,26 @@ const TOOLS: Tools<'static> = Tools {
     claude: &fact_setups::exec,
     run_in: &agent_bench::run_in,
     which: &fact_audit::which,
+    runner: &proc::run,
+    sleep: &std::thread::sleep,
+    today: &today,
+    session: &session,
 };
+
+fn today() -> String {
+    jiff::ZonedDateTime::now().date().to_string()
+}
+
+fn session() -> String {
+    uuid::Uuid::new_v4().to_string()
+}
+
+/// A `--call-timeout` a timer can use.
+fn call_timeout(seconds: f64) -> Result<f64, Stop> {
+    Duration::try_from_secs_f64(seconds)
+        .map(|_| seconds)
+        .map_err(|e| Stop::Usage(format!("--call-timeout: {e}")))
+}
 
 fn survival(command: Survival, out: &mut dyn Write, tools: &Tools) -> Result<u8, Stop> {
     let call = tools.judge;
@@ -325,6 +489,145 @@ fn survival(command: Survival, out: &mut dyn Write, tools: &Tools) -> Result<u8,
 /// Runs one parsed command, writing what it prints to `out`; returns the exit status.
 fn run(cli: Cli, out: &mut dyn Write, tools: &Tools) -> Result<u8, Stop> {
     let printed = match cli.command {
+        Command::Validate { cases } => {
+            return Ok(run_evals::validate(&or_evals(cases, "cases.jsonl"), out)?);
+        }
+        Command::Plan {
+            cases,
+            trials,
+            include_comparator,
+        } => run_evals::plan(&or_evals(cases, "cases.jsonl"), trials, include_comparator)?,
+        Command::Score { scores, reference } => {
+            let rows = cases::read_jsonl(&scores)?;
+            format!(
+                "{}\n",
+                py::dumps_pretty(&run_evals::summarize_scores(&rows, &reference)?)
+            )
+        }
+        Command::Measure {
+            responses,
+            reference,
+        } => {
+            let rows = cases::read_jsonl(&responses)?;
+            format!(
+                "{}\n",
+                py::dumps_pretty(&run_evals::summarize_usage(&rows, &reference)?)
+            )
+        }
+        Command::Checks { responses, cases } => {
+            let cases = run_evals::valid_cases(&or_evals(cases, "cases.jsonl"))?;
+            let summary = run_evals::summarize_checks(&cases, &cases::read_jsonl(&responses)?)?;
+            format!("{}\n", py::dumps_pretty(&summary))
+        }
+        Command::Run {
+            cases,
+            runner_config,
+            runner,
+            condition,
+            condition_skill,
+            case,
+            trials,
+            retries,
+            no_injection,
+            call_timeout: timeout,
+            jobs,
+            budget_usd,
+            allow_unmetered,
+            output,
+        } => {
+            let args = run_evals::RunArgs {
+                cases: or_evals(cases, "cases.jsonl"),
+                runner_config: or_evals(runner_config, "runners.example.json"),
+                runner,
+                condition,
+                condition_skill,
+                case,
+                trials,
+                retries,
+                no_injection,
+                call_timeout: call_timeout(timeout)?,
+                jobs,
+                budget_usd,
+                allow_unmetered,
+                output,
+            };
+            let world = run_evals::World {
+                exec: tools.runner,
+                sleep: tools.sleep,
+                today: tools.today,
+            };
+            return Ok(run_evals::run_evaluations(&args, &world, out)?);
+        }
+        Command::Judge {
+            calibrate,
+            responses,
+            cases,
+            rubric,
+            runner_config,
+            runner,
+            conditions,
+            retries,
+            call_timeout: timeout,
+            output,
+        } => {
+            if calibrate.is_none() && (responses.is_none() || output.is_none()) {
+                return Err(Stop::Usage(
+                    "--responses and --output are required unless --calibrate is given".into(),
+                ));
+            }
+            let args = judge::JudgeArgs {
+                calibrate,
+                responses,
+                cases: or_evals(cases, "cases.jsonl"),
+                rubric: or_evals(rubric, "rubric.md"),
+                runner_config: or_evals(runner_config, "runners.example.json"),
+                runner,
+                conditions,
+                retries,
+                call_timeout: call_timeout(timeout)?,
+                output,
+            };
+            return Ok(judge::command(&args, tools.runner, tools.sleep, out)?);
+        }
+        Command::Scenario {
+            command: Scenario::Validate { scenario },
+        } => {
+            scenario::load_scenario(&scenario)?;
+            let name = scenario
+                .file_name()
+                .map(|n| n.to_string_lossy().into_owned());
+            format!("Valid scenario: {}\n", name.unwrap_or_default())
+        }
+        Command::Scenario {
+            command:
+                Scenario::Run {
+                    scenario,
+                    condition,
+                    condition_skill,
+                    model,
+                    trial,
+                    budget_usd,
+                    output,
+                },
+        } => {
+            let args = scenario::ScenarioArgs {
+                scenario,
+                condition,
+                condition_skill,
+                model,
+                trial,
+                budget_usd,
+                output,
+            };
+            scenario::run_scenario(
+                &args,
+                tools.runner,
+                tools.session,
+                scenario::CALL_TIMEOUT,
+                out,
+            )?;
+            String::new()
+        }
         Command::FactAudit {
             laconic_check,
             cache,

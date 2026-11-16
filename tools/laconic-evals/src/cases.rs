@@ -62,10 +62,6 @@ pub fn load_cases(path: &Path) -> Result<Vec<Value>, String> {
 }
 
 /// The catalogue's problems, in the order the Python reported them.
-#[cfg_attr(
-    not(test),
-    expect(dead_code, reason = "run_evals validate calls it once ported")
-)]
 pub fn validate_cases(cases: &[Value]) -> Vec<String> {
     let mut errors = Vec::new();
     let mut seen = HashSet::new();
@@ -119,10 +115,6 @@ pub fn validate_cases(cases: &[Value]) -> Vec<String> {
 }
 
 /// A pattern compiled as `re.compile(pattern, re.I)`.
-#[cfg_attr(
-    not(test),
-    expect(dead_code, reason = "run_evals validate calls it once ported")
-)]
 pub fn compile(pattern: &str) -> Result<Regex, String> {
     RegexBuilder::new(pattern)
         .case_insensitive(true)
@@ -132,10 +124,6 @@ pub fn compile(pattern: &str) -> Result<Regex, String> {
 
 /// The strings of a checks field, or None when it is not a list of strings. A missing field
 /// is an empty list.
-#[cfg_attr(
-    not(test),
-    expect(dead_code, reason = "run_evals validate calls it once ported")
-)]
 fn strings<'a>(checks: &'a Value, field: &str) -> Option<Vec<&'a str>> {
     match py::get(checks, field) {
         None => Some(Vec::new()),
@@ -146,10 +134,6 @@ fn strings<'a>(checks: &'a Value, field: &str) -> Option<Vec<&'a str>> {
 
 /// A case's optional regex checks must compile, and must accept every known-good example and
 /// reject every known-bad one, so a broken check fails before a paid run.
-#[cfg_attr(
-    not(test),
-    expect(dead_code, reason = "run_evals validate calls it once ported")
-)]
 pub fn validate_checks(checks: &Value) -> Vec<String> {
     if !checks.is_object() {
         return vec!["checks must be an object".into()];
@@ -207,19 +191,11 @@ pub fn validate_checks(checks: &Value) -> Vec<String> {
 
 /// Whether `pattern` matches anywhere in `text`, case-insensitively. Patterns are validated
 /// before use; one that cannot compile or run never matches.
-#[cfg_attr(
-    not(test),
-    expect(dead_code, reason = "run_evals validate calls it once ported")
-)]
 fn found(pattern: &str, text: &str) -> bool {
     compile(pattern).is_ok_and(|re| re.is_match(text).unwrap_or(false))
 }
 
 /// The checks a response fails (case-insensitive regex search).
-#[cfg_attr(
-    not(test),
-    expect(dead_code, reason = "run_evals validate calls it once ported")
-)]
 pub fn check_response(checks: &Value, text: &str) -> Vec<String> {
     let list = |field| strings(checks, field).unwrap_or_default();
     let mut failed: Vec<String> = list("must_include")

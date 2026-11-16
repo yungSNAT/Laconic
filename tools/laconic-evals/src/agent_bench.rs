@@ -179,32 +179,30 @@ pub fn run(claude: &Path, rules: &str, root: &Path, run: Run) -> Result<Value, S
     let Value::Object(usage) = usage else {
         return Err(format!("{} has no attribute 'get'", py::repr(usage)));
     };
-    let mut tokens = Vec::new();
+    // Python's sum: ints add exactly (a total past 64 bits is refused, never wrapped) until the
+    // first float, which is added to that total as a float; the rest are summed as floats.
+    let mut exact = 0_i64;
+    let mut floats: Option<Vec<f64>> = None;
     for name in [
         "input_tokens",
         "cache_creation_input_tokens",
         "cache_read_input_tokens",
     ] {
-        tokens.push(
-            usage
-                .get(name)
-                .filter(|v| py::truthy(v))
-                .map_or(Ok(Num::Int(0)), number)?,
-        );
+        let count = usage
+            .get(name)
+            .filter(|v| py::truthy(v))
+            .map_or(Ok(Num::Int(0)), number)?;
+        match (count, &mut floats) {
+            (count, Some(floats)) => floats.push(count.as_f64()),
+            (Num::Int(i), None) => {
+                exact = exact
+                    .checked_add(i)
+                    .ok_or("the input token total is out of range")?;
+            }
+            (Num::Float(f), None) => floats = Some(vec![Num::Int(exact).as_f64() + f]),
+        }
     }
-    let ints: Option<Vec<i64>> = tokens
-        .iter()
-        .map(|t| if let Num::Int(i) = t { Some(*i) } else { None })
-        .collect();
-    // Python adds ints exactly; a total past 64 bits is refused, never wrapped.
-    let input_tokens = match ints {
-        Some(ints) => Num::Int(
-            ints.iter()
-                .try_fold(0_i64, |total, &i| total.checked_add(i))
-                .ok_or("the input token total is out of range")?,
-        ),
-        None => Num::Float(py::sum(tokens.iter().map(|t| t.as_f64()))),
-    };
+    let input_tokens = floats.map_or(Num::Int(exact), |floats| Num::Float(py::sum(floats)));
     let field =
         |map: &Map<String, Value>, name: &str| map.get(name).cloned().unwrap_or(Value::Null);
     Ok(py::object([

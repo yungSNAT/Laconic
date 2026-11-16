@@ -42,7 +42,7 @@ fn judge_one(
                     ("invented", Value::from(invented)),
                 ]));
             }
-            Err(ReplyError::Fatal(error)) => return Err(failed(error, 0.0)),
+            Err(ReplyError::Fatal(error)) => return Err(failed(error, cost)),
             Err(ReplyError::Retry(error)) if attempt == 3 => return Err(failed(error, cost)),
             Err(ReplyError::Retry(_)) => {}
         }

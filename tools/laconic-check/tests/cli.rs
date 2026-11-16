@@ -41,13 +41,21 @@ fn an_unknown_option_is_still_a_usage_error() {
     }
 }
 
-/// `lsp` exits 0 after `shutdown` and `exit`, 1 for `exit` alone, and 2 on a broken header.
+/// `hook` exits 0 with no output once a turn continued or outside a repository, and 1 on input
+/// that is not a JSON object.
 #[test]
-fn hook_is_silent_once_a_turn_continued_and_fails_on_bad_input() {
+fn hook_is_silent_once_a_turn_continued_or_outside_a_repository_and_fails_on_bad_input() {
     use std::io::Write;
     use std::process::Stdio;
+    // Git's ceiling stops it looking above the temporary directory, which may be in a repository.
+    let ceiling = std::env::temp_dir();
+    let outside = ceiling.join(format!("laconic-cli-outside-{}", std::process::id()));
+    std::fs::create_dir_all(&outside).unwrap();
+    // Debug quoting escapes the backslashes and quotation marks JSON escapes too.
+    let event = format!(r#"{{"cwd":{:?}}}"#, outside.to_str().unwrap());
     for (input, code, out, err) in [
         (r#"{"stop_hook_active":true}"#, 0, "", ""),
+        (event.as_str(), 0, "", ""),
         (
             "not json",
             1,
@@ -57,6 +65,7 @@ fn hook_is_silent_once_a_turn_continued_and_fails_on_bad_input() {
     ] {
         let mut child = Command::new(env!("CARGO_BIN_EXE_laconic-check"))
             .arg("hook")
+            .env("GIT_CEILING_DIRECTORIES", &ceiling)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
@@ -73,8 +82,10 @@ fn hook_is_silent_once_a_turn_continued_and_fails_on_bad_input() {
         assert_eq!(String::from_utf8(done.stdout).unwrap(), out, "{input}");
         assert_eq!(String::from_utf8(done.stderr).unwrap(), err, "{input}");
     }
+    let _ = std::fs::remove_dir_all(&outside);
 }
 
+/// `lsp` exits 0 after `shutdown` and `exit`, 1 for `exit` alone, and 2 on a broken header.
 #[test]
 fn lsp_exit_statuses_follow_the_protocol() {
     use std::io::Write;

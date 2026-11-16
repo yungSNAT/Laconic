@@ -5,7 +5,7 @@ use super::*;
 
 /// A new Git repository in a fresh temporary directory.
 fn repository(name: &str) -> PathBuf {
-    let dir = std::env::temp_dir().join(format!("laconic-hook-{name}-{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("laconic-hook-{}-{name}", std::process::id()));
     let _ = fs::remove_dir_all(&dir);
     fs::create_dir_all(&dir).unwrap();
     let ok = Command::new("git")
@@ -118,10 +118,7 @@ fn lists_fifty_findings_and_counts_the_rest() {
 }
 
 #[test]
-fn says_nothing_where_git_finds_no_repository_and_refuses_input_that_is_not_an_object() {
-    // A directory that does not exist, as the temporary directory may be inside a repository.
-    let missing = std::env::temp_dir().join(format!("laconic-hook-none-{}", std::process::id()));
-    assert_eq!(stop(&event(&missing, false)), Ok(None));
+fn refuses_input_that_is_not_an_object() {
     for input in ["", "[]", "{"] {
         assert_eq!(
             stop(input),
@@ -130,8 +127,57 @@ fn says_nothing_where_git_finds_no_repository_and_refuses_input_that_is_not_an_o
     }
 }
 
+// Outside a repository the hook says nothing: tests/cli.rs checks that with Git's ceiling
+// directories, as the temporary directory may itself be inside a repository.
+#[test]
+fn a_git_failure_other_than_finding_no_repository_is_an_error() {
+    let broken = std::env::temp_dir().join(format!("laconic-hook-broken-{}", std::process::id()));
+    fs::create_dir_all(&broken).unwrap();
+    fs::write(broken.join(".git"), "not a gitfile\n").unwrap();
+    let error = stop(&event(&broken, false)).unwrap_err();
+    assert!(error.starts_with("git rev-parse: fatal: "), "{error}");
+    let missing = broken.join("missing");
+    let error = stop(&event(&missing, false)).unwrap_err();
+    assert!(error.starts_with("git rev-parse: fatal: "), "{error}");
+    let _ = fs::remove_dir_all(&broken);
+}
+
+#[test]
+fn a_markdown_file_it_cannot_read_is_an_error_whatever_max_findings_allows() {
+    let dir = repository("unread");
+    fs::write(dir.join(PROJECT_FILE), "max-findings = 1\n").unwrap();
+    fs::write(dir.join("latin1.md"), b"Caf\xe9\n").unwrap();
+    let error = stop(&event(&dir, false)).unwrap_err();
+    assert!(error.starts_with("latin1.md: "), "{error}");
+    let _ = fs::remove_dir_all(&dir);
+}
+
 #[test]
 fn reads_markdown_paths_from_porcelain_status() {
     let status = b" M docs/a.md\0?? b.markdown\0 D gone.md\0D  staged-gone.md\0A  c.MD\0?? d.txt\0";
-    assert_eq!(markdown(status), ["docs/a.md", "b.markdown", "c.MD"]);
+    let paths = ["docs/a.md", "b.markdown", "c.MD"].map(PathBuf::from);
+    assert_eq!(markdown(status), Ok(paths.to_vec()));
+}
+
+#[cfg(unix)]
+#[test]
+fn keeps_a_path_that_is_not_utf8_and_a_top_level_name_that_ends_in_a_newline() {
+    use std::os::unix::ffi::OsStrExt;
+    let name = std::ffi::OsStr::from_bytes(b"caf\xe9.md");
+    assert_eq!(markdown(b"?? caf\xe9.md\0"), Ok(vec![PathBuf::from(name)]));
+    let dir = repository("newline\n");
+    fs::write(dir.join(name), "Pick a color.\n").unwrap();
+    let reason = reason(&stop(&event(&dir, false)).unwrap().unwrap());
+    assert!(reason.contains(": us-spelling: "), "{reason}");
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[cfg(not(unix))]
+#[test]
+fn refuses_a_path_that_is_not_utf8() {
+    let error = markdown(b"?? caf\xe9.md\0").unwrap_err();
+    assert!(
+        error.starts_with("git printed a path that is not UTF-8"),
+        "{error}"
+    );
 }

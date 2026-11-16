@@ -35,7 +35,8 @@ pub fn stop(input: &str) -> Result<Option<String>, String> {
     let Some(top) = git(&cwd, &["rev-parse", "--show-toplevel"])? else {
         return Ok(None);
     };
-    let root = PathBuf::from(String::from_utf8_lossy(&top).trim_end_matches(['\n', '\r']));
+    // Git ends the line with one newline; a directory's own name may end in another.
+    let root = path(top.strip_suffix(b"\n").unwrap_or(&top))?;
     let settings = settings(&root)?;
     let status = git(
         &root,
@@ -47,23 +48,21 @@ pub fn stop(input: &str) -> Result<Option<String>, String> {
             "--no-renames",
         ],
     )?
-    .ok_or("git status failed")?;
-    let failing: Vec<String> = markdown(&status)
-        .iter()
-        .flat_map(|path| failing(&root, path, &settings))
-        .collect();
-    Ok((failing.len() > settings.max_findings).then(|| decision(&failing)))
+    .ok_or("git status: not a Git repository")?;
+    let mut found = Vec::new();
+    for file in markdown(&status)? {
+        found.extend(failing(&root, &file, &settings)?);
+    }
+    Ok((found.len() > settings.max_findings).then(|| decision(&found)))
 }
 
-/// `lint`'s failing findings in one file, one line each as `lint` prints them, or the error
-/// that kept the file from being read.
-fn failing(root: &Path, path: &str, settings: &Settings) -> Vec<String> {
-    let text = match fs::read_to_string(root.join(path)) {
-        Ok(text) => text,
-        Err(e) => return vec![format!("{path}: {e}")],
-    };
+/// `lint`'s failing findings in one file, one line each as `lint` prints them. A file it cannot
+/// read is an error, so `max-findings` never lets an unread file through.
+fn failing(root: &Path, file: &Path, settings: &Settings) -> Result<Vec<String>, String> {
+    let path = file.display();
+    let text = fs::read_to_string(root.join(file)).map_err(|e| format!("{path}: {e}"))?;
     let lines: Vec<&str> = text.lines().collect();
-    lint::lint(&text)
+    Ok(lint::lint(&text)
         .into_iter()
         .filter(|f| {
             let line = f.line.checked_sub(1).and_then(|i| lines.get(i)).copied();
@@ -78,7 +77,7 @@ fn failing(root: &Path, path: &str, settings: &Settings) -> Vec<String> {
                 f.message
             )
         })
-        .collect()
+        .collect())
 }
 
 /// The block decision for these findings, listing the first LISTED.
@@ -106,9 +105,10 @@ fn decision(failing: &[String]) -> String {
     ]))
 }
 
-/// Git's output in `dir`, or `None` when Git fails there, as it does outside a repository. It
-/// runs with the file system monitor off, so a checkout's settings start no other program for
-/// these commands, and without optional locks, so it never writes the index.
+/// Git's output in `dir`, or `None` when Git finds no repository there. Any other failure is
+/// an error with Git's message. It runs with the file system monitor off, so a checkout's
+/// settings start no other program for these commands, without optional locks, so it never
+/// writes the index, and in the C locale, so its messages are in English.
 fn git(dir: &Path, args: &[&str]) -> Result<Option<Vec<u8>>, String> {
     let out = Command::new("git")
         .arg("-C")
@@ -116,11 +116,37 @@ fn git(dir: &Path, args: &[&str]) -> Result<Option<Vec<u8>>, String> {
         .args(["-c", "core.fsmonitor="])
         .args(args)
         .env("GIT_OPTIONAL_LOCKS", "0")
+        .env("LC_ALL", "C")
         .stdin(Stdio::null())
-        .stderr(Stdio::null())
         .output()
         .map_err(|e| format!("git: {e}"))?;
-    Ok(out.status.success().then_some(out.stdout))
+    if out.status.success() {
+        return Ok(Some(out.stdout));
+    }
+    let message = String::from_utf8_lossy(&out.stderr);
+    if message.starts_with("fatal: not a git repository (or any") {
+        return Ok(None);
+    }
+    Err(format!("git {}: {}", args[0], message.trim_end()))
+}
+
+/// A path Git printed: its bytes on Unix, where a file name may be any bytes, and UTF-8
+/// elsewhere, as Git for Windows prints it.
+fn path(bytes: &[u8]) -> Result<PathBuf, String> {
+    #[cfg(unix)]
+    {
+        use std::os::unix::ffi::OsStrExt;
+        Ok(PathBuf::from(std::ffi::OsStr::from_bytes(bytes)))
+    }
+    #[cfg(not(unix))]
+    {
+        std::str::from_utf8(bytes).map(PathBuf::from).map_err(|_| {
+            format!(
+                "git printed a path that is not UTF-8: {}",
+                String::from_utf8_lossy(bytes)
+            )
+        })
+    }
 }
 
 /// The project file at the repository's top level, or the default settings without one.
@@ -138,15 +164,14 @@ fn settings(root: &Path) -> Result<Settings, String> {
 /// added, changed or untracked; a deleted file has nothing to lint.
 // shortcut: this is all uncommitted Markdown, not only what the agent changed this turn, which
 // would need the transcript; a user's own unfinished edits are linted too.
-fn markdown(status: &[u8]) -> Vec<String> {
+fn markdown(status: &[u8]) -> Result<Vec<PathBuf>, String> {
     status
         .split(|&b| b == 0)
         .filter_map(|entry| {
-            let (code, path) = (entry.get(..2)?, entry.get(3..)?);
-            let path = String::from_utf8_lossy(path).into_owned();
-            let lower = path.to_lowercase();
-            let wanted = lower.ends_with(".md") || lower.ends_with(".markdown");
-            (wanted && !code.contains(&b'D')).then_some(path)
+            let (code, name) = (entry.get(..2)?, entry.get(3..)?);
+            let lower = name.to_ascii_lowercase();
+            let wanted = lower.ends_with(b".md") || lower.ends_with(b".markdown");
+            (wanted && !code.contains(&b'D')).then(|| path(name))
         })
         .collect()
 }

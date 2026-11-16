@@ -22,7 +22,7 @@ fn servers() -> Vec<Command> {
         node.arg(concat!(env!("CARGO_MANIFEST_DIR"), "/mcp/server.mjs"));
         servers.push(node);
     } else {
-        eprintln!("Node MCP server not tested: node is not on the PATH");
+        eprintln!("Node MCP server not tested: `node --version` did not run");
     }
     servers
 }

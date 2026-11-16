@@ -476,6 +476,34 @@ fn http_get_reads_a_whole_body_and_reports_a_failed_status_or_a_cut_body() {
 }
 
 #[test]
+fn http_get_times_out_when_the_body_stalls() {
+    use std::io::{BufRead, BufReader, Write};
+    use std::net::TcpListener;
+    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    let address = listener.local_addr().unwrap();
+    let (finished, wait) = std::sync::mpsc::channel::<()>();
+    let server = std::thread::spawn(move || {
+        let (mut stream, _) = listener.accept().unwrap();
+        let mut reader = BufReader::new(stream.try_clone().unwrap());
+        let mut line = String::new();
+        while reader.read_line(&mut line).unwrap() > 2 {
+            line.clear();
+        }
+        // Headers and part of the body, then silence until the client gives up.
+        write!(stream, "HTTP/1.1 200 OK\r\nContent-Length: 10\r\n\r\nxx").unwrap();
+        stream.flush().unwrap();
+        let _ = wait.recv();
+    });
+    let url = format!("http://{address}/f");
+    let started = std::time::Instant::now();
+    let error = get_with_timeout(&url, Duration::from_millis(200)).unwrap_err();
+    assert!(started.elapsed() < Duration::from_secs(10));
+    assert!(error.starts_with(&url), "{error}");
+    drop(finished);
+    server.join().unwrap();
+}
+
+#[test]
 fn report_prints_the_table_and_the_differences() {
     let counts = tally(&[(kinds(&["num"]), true, kinds(&["num"]))]);
     let out = report(&counts, &["t s01: missed ['num'], extra []".to_owned()]);

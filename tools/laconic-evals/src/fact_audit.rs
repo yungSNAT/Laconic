@@ -67,12 +67,18 @@ fn list_repr<'a>(items: impl IntoIterator<Item = &'a String>) -> String {
     format!("[{}]", shown.join(", "))
 }
 
-/// The body at `url`, following redirects, with Python's 60-second socket timeout for
-/// connecting and for the response.
+/// The body at `url`, following redirects, with Python's 60-second socket timeout.
 pub fn http_get(url: &str) -> Result<Vec<u8>, String> {
+    get_with_timeout(url, Duration::from_secs(60))
+}
+
+/// `timeout` bounds the connection and each read and write, as a socket timeout does, so a
+/// server that stalls part way through the body is an error, not a wait without end.
+fn get_with_timeout(url: &str, timeout: Duration) -> Result<Vec<u8>, String> {
     let agent: ureq::Agent = ureq::Agent::config_builder()
-        .timeout_connect(Some(Duration::from_secs(60)))
-        .timeout_recv_response(Some(Duration::from_secs(60)))
+        .timeout_connect(Some(timeout))
+        .timeout_per_read(Some(timeout))
+        .timeout_per_write(Some(timeout))
         .build()
         .into();
     let mut response = agent.get(url).call().map_err(|e| format!("{url}: {e}"))?;

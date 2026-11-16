@@ -15,7 +15,7 @@ const SKIP: &[&str] = &[
     "all", "any", "just", "only", "merely", "simply", "also", "it", "this", "that", "these",
     "those", "there", "their", "they", "them", "we", "you", "your", "our", "i", "he", "she", "his",
     "her", "its", "as", "at", "in", "on", "of", "for", "by", "with", "from", "will", "would",
-    "can", "could", "should", "may", "might", "must", "shall",
+    "can", "could", "should", "may", "might", "must", "shall", "more",
 ];
 
 /// After a negation, these add rather than negate: 'not just an app'.
@@ -68,7 +68,7 @@ fn words(sentence: &str) -> Vec<String> {
 }
 
 fn negation(word: &str) -> bool {
-    matches!(word, "not" | "never" | "cannot" | "no" | "none" | "without") || word.ends_with("n't")
+    matches!(word, "not" | "never" | "cannot" | "no" | "none") || word.ends_with("n't")
 }
 
 /// The content word right after each negation that negates: the first of the next 4 words
@@ -169,17 +169,15 @@ mod tests {
             ),
             ["'cast' is no longer negated in \"Every surface is milled and cast.\""]
         );
-        // 'no', 'none' and 'without' negate too.
-        for (original, edited) in [
-            ("No straps are included.", "Straps are included."),
-            ("None of the straps fit.", "The straps fit."),
-            ("It ships without straps.", "It ships with straps."),
+        // 'no' and 'none' negate too, and 'no more' negates the word after 'more'.
+        for (original, edited, target) in [
+            ("No straps are included.", "Straps are included.", "straps"),
+            ("None of the straps fit.", "The straps fit.", "straps"),
+            ("There are no more seats.", "There are more seats.", "seats"),
         ] {
-            assert_eq!(
-                reversals(original, edited).len(),
-                1,
-                "{original} -> {edited}"
-            );
+            let found = reversals(original, edited);
+            assert_eq!(found.len(), 1, "{original} -> {edited}");
+            assert!(found[0].starts_with(&format!("'{target}'")), "{found:?}");
         }
         // Curly apostrophes, and a contraction the edit expands away.
         assert_eq!(

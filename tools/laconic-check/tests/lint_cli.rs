@@ -103,6 +103,22 @@ fn reads_the_project_file_in_the_current_directory() {
 }
 
 #[test]
+fn accepted_words_in_the_project_file_are_not_flagged() {
+    let dir = folder(
+        "accept",
+        &[
+            ("two.md", TWO),
+            (".laconic-check", "accept = color\naccept = flavor\n"),
+        ],
+    );
+    assert_eq!(lint(&dir, &["two.md"]), (0, String::new(), String::new()));
+    std::fs::write(dir.join("capital.md"), "Color is red.\n").unwrap();
+    let (code, out, _) = lint(&dir, &["capital.md"]);
+    assert_eq!(code, 1);
+    assert!(out.starts_with("capital.md:1:1: us-spelling: "), "{out}");
+}
+
+#[test]
 fn usage_settings_and_read_errors_exit_2() {
     let dir = folder(
         "errors",

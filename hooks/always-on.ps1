@@ -42,7 +42,7 @@ try {
   }
 
   $banner = 'LACONIC MODE ACTIVE (always-on). The ruleset below applies to every response. ' +
-    "'stop laconic' turns it off for this session; delete "
+    "'stop laconic' or 'normal mode' turns it off for this session; delete "
   [Console]::Out.Write($banner + $flagPath + " to turn always-on off for good.`n`n" + $body + "`n")
 } catch {
   # Never block session start.

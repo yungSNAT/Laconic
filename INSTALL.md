@@ -892,6 +892,8 @@ In Claude Code, Qwen Code, Codex and Grok, no middle ground: if you did not turn
 
 **`/laconic` not in autocomplete.** Restart the agent. The plugin index is read at startup. On Grok, also run `grok plugin enable laconic` and confirm the install used `--trust`.
 
+**No Node for the always-on hook.** The plugin's hook runs with Node. Without it, add a `SessionStart` command hook to `~/.claude/settings.json` that runs `sh <laconic>/hooks/always-on.sh` (on Windows, `pwsh -NoProfile -File <laconic>\hooks\always-on.ps1`), where `<laconic>` is the installed plugin's folder or a clone of this repository. Each prints the same ruleset as the Node hook, and only when the flag exists.
+
 **Always-on flag has no effect.** Update the plugin (`claude plugin marketplace update laconic`, then `claude plugin update laconic@laconic`) and restart. Hooks are read at startup, and the flag needs the plugin version that ships `hooks/hooks.json`. Grok does not read `~/.claude/.laconic-always`; put the always-on block in `~/.grok/AGENTS.md` or `~/.grok/rules/laconic.md`.
 
 **`claude plugin marketplace add` fails.** Use the `owner/repo` form. A local path must point at the repo root, not `.claude-plugin/`.

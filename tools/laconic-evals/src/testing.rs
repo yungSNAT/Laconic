@@ -81,6 +81,26 @@ pub struct Run {
     pub timeout: Option<std::time::Duration>,
 }
 
+impl Run {
+    fn new(
+        command: &[String],
+        input: &Input,
+        cwd: Option<&Path>,
+        timeout: Option<std::time::Duration>,
+    ) -> Self {
+        Run {
+            command: command.to_vec(),
+            input: match input {
+                Input::Bytes(b) => Some(String::from_utf8_lossy(b).into_owned()),
+                _ => None,
+            },
+            null: matches!(input, Input::Null),
+            cwd: cwd.map(Path::to_path_buf),
+            timeout,
+        }
+    }
+}
+
 /// A stand-in for the runner calls of `run`, `judge` and `scenario run`: records each call
 /// and answers with `reply(call index, call)`.
 pub struct Runs<F> {
@@ -103,16 +123,7 @@ impl<F: Fn(usize, &Run) -> Result<Output, Failure> + Sync> Runs<F> {
         cwd: Option<&Path>,
         timeout: Option<std::time::Duration>,
     ) -> Result<Output, Failure> {
-        let call = Run {
-            command: command.to_vec(),
-            input: match input {
-                Input::Bytes(b) => Some(String::from_utf8_lossy(b).into_owned()),
-                _ => None,
-            },
-            null: matches!(input, Input::Null),
-            cwd: cwd.map(Path::to_path_buf),
-            timeout,
-        };
+        let call = Run::new(command, input, cwd, timeout);
         let index = {
             let mut calls = self.calls.lock().unwrap();
             calls.push(call.clone());

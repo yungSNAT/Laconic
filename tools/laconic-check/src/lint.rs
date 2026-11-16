@@ -1110,12 +1110,21 @@ fn acronym(word: &str) -> Option<&str> {
 /// Hearst's algorithm for finding abbreviation definitions.
 fn spells(before: &[char], acronym: &str) -> bool {
     let capitals = acronym.strip_suffix('s').unwrap_or(acronym);
-    let text: String = before.iter().collect();
-    let words: Vec<&str> = text.split_whitespace().collect();
     // The definition lies within min(|A| + 5, 2|A|) words before the parenthesis, after any
     // earlier use of the acronym itself, singular or plural.
     let limit = (capitals.len() + 5).min(capitals.len() * 2);
-    let mut window = &words[words.len().saturating_sub(limit)..];
+    // Read back only as far as those words, so each acronym costs the same however long the
+    // paragraph before it is.
+    let (mut start, mut counted) = (before.len(), 0);
+    while start > 0 && counted < limit {
+        start -= 1;
+        if !before[start].is_whitespace() && (start == 0 || before[start - 1].is_whitespace()) {
+            counted += 1;
+        }
+    }
+    let text: String = before[start..].iter().collect();
+    let words: Vec<&str> = text.split_whitespace().collect();
+    let mut window = &words[..];
     if let Some(last) = window.iter().rposition(|w| {
         let bare = w.trim_matches(|c: char| !c.is_alphanumeric());
         bare.strip_suffix('s').unwrap_or(bare) == capitals
@@ -3155,6 +3164,29 @@ mod tests {
         assert!(
             large < small * 24,
             "8 times the words took {:.1} times as long ({small:?} to {large:?})",
+            large.as_secs_f64() / small.as_secs_f64()
+        );
+    }
+
+    #[test]
+    fn checks_acronym_definitions_in_linear_time() {
+        // Each '(ACRONYM)' once read its whole paragraph back to the start, so 8 times the
+        // definitions in one paragraph took about 64 times as long.
+        let fastest = |repeats: usize| {
+            let text = "The Bureau of Meteorology (BOM) reports. ".repeat(repeats);
+            (0..3)
+                .map(|_| {
+                    let start = std::time::Instant::now();
+                    lint(&text);
+                    start.elapsed()
+                })
+                .min()
+                .unwrap()
+        };
+        let (small, large) = (fastest(500), fastest(4_000));
+        assert!(
+            large < small * 24,
+            "8 times the definitions took {:.1} times as long ({small:?} to {large:?})",
             large.as_secs_f64() / small.as_secs_f64()
         );
     }

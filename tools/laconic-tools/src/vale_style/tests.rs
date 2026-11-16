@@ -78,7 +78,8 @@ fn vale_expected() -> BTreeSet<(usize, &'static str)> {
 fn vale_flags_the_lines_and_rules_lint_flags_in_the_fixtures() {
     assert_eq!(lint(&fixture("clean.md")), []);
     let listed: Vec<&str> = NOT_GENERATED.iter().map(|(n, _)| *n).collect();
-    let from_lint: BTreeSet<(usize, &str)> = lint(&fixture("faults.md"))
+    let findings = lint(&fixture("faults.md"));
+    let from_lint: BTreeSet<(usize, &str)> = findings
         .iter()
         .map(|f| (f.line, f.rule.name()))
         .filter(|(_, rule)| !listed.contains(rule))

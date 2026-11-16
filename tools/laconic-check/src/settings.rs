@@ -1,55 +1,140 @@
 // Copyright 2026 Ryan Duguid
 // SPDX-License-Identifier: FSL-1.1-ALv2
 
-//! `lint`'s project settings, the `.laconic-check` file, which the command line and the
-//! language server both apply.
+//! `lint`'s project settings, the `.laconic-check` file, which the command line, the MCP
+//! server and the language server all apply.
 
-use crate::lint::{self, Finding, RuleId};
+use std::rc::Rc;
 
-/// The project file `lint` reads from the current directory, and the language server from the
-/// workspace folder that holds a document.
+use crate::lint::{self, Finding, Phrase, ProjectRule, RuleId};
+
+/// The project file `lint` and the MCP server read from the current directory, and the
+/// language server from the workspace folder that holds a document.
 pub const PROJECT_FILE: &str = ".laconic-check";
 
-/// Which findings `lint` reports and how many fail it.
+/// Which findings `lint` reports, how many fail it, and the project's own rules.
 #[derive(Debug, Default, PartialEq)]
 pub struct Settings {
-    pub disable: Vec<&'static str>,
-    pub only: Vec<&'static str>,
+    pub disable: Vec<String>,
+    pub only: Vec<String>,
     pub max_findings: usize,
     /// Words `us-spelling` does not flag, matched as written: same case, whole word.
     pub accept: Vec<String>,
+    /// The `[rules]` section's rules, in the order the file first names them.
+    pub rules: Vec<Rc<ProjectRule>>,
 }
 
 impl Settings {
     /// A project file: `key = value` lines for `disable`, `only`, `max-findings` and `accept`,
-    /// with blank lines and lines that start with `#` ignored. `path` names it in errors.
+    /// then optionally a `[rules]` section of `id: phrase = replacement` lines, with blank
+    /// lines and lines that start with `#` ignored. `path` names it in errors.
     pub fn parse(path: &str, text: &str) -> Result<Settings, String> {
         let mut settings = Settings::default();
+        let mut rules: Vec<ProjectRule> = Vec::new();
+        // Each phrase's line, for a duplicate's error.
+        let mut phrase_lines: Vec<(String, usize)> = Vec::new();
+        // Rule names in disable and only, checked once every project rule is known.
+        let mut named: Vec<(usize, String)> = Vec::new();
+        let mut in_rules = false;
         for (index, line) in text.trim_start_matches('\u{feff}').lines().enumerate() {
             let line = line.trim();
+            let number = index + 1;
+            let at = |message: String| format!("{path}:{number}: {message}");
             if line.is_empty() || line.starts_with('#') {
                 continue;
             }
-            let at = |message: String| format!("{path}:{}: {message}", index + 1);
+            if line.starts_with('[') {
+                if line != "[rules]" {
+                    return Err(at(format!(
+                        "unknown section '{line}'; the only section is [rules]"
+                    )));
+                }
+                in_rules = true;
+                continue;
+            }
+            if in_rules {
+                let (id, phrase) = rule_line(line).map_err(at)?;
+                if let Some((_, first)) = phrase_lines.iter().find(|(p, _)| *p == phrase.text) {
+                    return Err(at(format!(
+                        "'{}' is already a rule on line {first}",
+                        phrase.text
+                    )));
+                }
+                phrase_lines.push((phrase.text.clone(), number));
+                let name = format!("project/{id}");
+                match rules.iter_mut().find(|r| r.name == name) {
+                    Some(rule) => rule.phrases.push(phrase),
+                    None => rules.push(ProjectRule {
+                        name,
+                        phrases: vec![phrase],
+                    }),
+                }
+                continue;
+            }
             let Some((key, value)) = line.split_once('=') else {
                 return Err(at(format!("expected 'key = value', found '{line}'")));
             };
             let value = value.trim();
             match key.trim() {
-                "disable" => settings.disable.extend(rule_names(value).map_err(at)?),
-                "only" => settings.only.extend(rule_names(value).map_err(at)?),
+                "disable" | "only" => {
+                    let names = rule_names(value);
+                    named.extend(names.iter().map(|n| (number, n.clone())));
+                    if key.trim() == "disable" {
+                        settings.disable.extend(names);
+                    } else {
+                        settings.only.extend(names);
+                    }
+                }
                 "max-findings" => settings.max_findings = count(value).map_err(at)?,
                 "accept" => settings.accept.extend(words(value).map_err(at)?),
                 key => return Err(at(format!("unknown key '{key}'"))),
             }
         }
+        settings.rules = rules.into_iter().map(Rc::new).collect();
+        for (number, name) in named {
+            settings
+                .check_rule(&name)
+                .map_err(|message| format!("{path}:{number}: {message}"))?;
+        }
         Ok(settings)
+    }
+
+    /// Reads and parses the project file at `path`.
+    pub fn read(path: &str) -> Result<Settings, String> {
+        let text = std::fs::read_to_string(path).map_err(|e| format!("{path}: {e}"))?;
+        Settings::parse(path, &text)
+    }
+
+    /// The project file in the current directory, or the defaults when there is none.
+    pub fn current_dir() -> Result<Settings, String> {
+        if std::path::Path::new(PROJECT_FILE).is_file() {
+            Settings::read(PROJECT_FILE)
+        } else {
+            Ok(Settings::default())
+        }
+    }
+
+    /// An error unless `name` is a house rule or one of this file's project rules.
+    pub fn check_rule(&self, name: &str) -> Result<(), String> {
+        if RuleId::named(name).is_some() || self.rules.iter().any(|r| r.name == name) {
+            Ok(())
+        } else if name.starts_with("project/") {
+            Err(format!(
+                "unknown rule '{name}'; the project file's [rules] section does not name it"
+            ))
+        } else {
+            Err(format!(
+                "unknown rule '{name}'; the rules are in {}",
+                lint::RULES_URL
+            ))
+        }
     }
 
     /// Whether `lint` reports a finding, given the text of the line it is on.
     pub fn keeps(&self, finding: &Finding, line: &str) -> bool {
         let name = finding.rule.name();
-        if self.disable.contains(&name) || !(self.only.is_empty() || self.only.contains(&name)) {
+        let listed = |names: &[String]| names.iter().any(|n| n == name);
+        if listed(&self.disable) || !(self.only.is_empty() || listed(&self.only)) {
             return false;
         }
         // A `us-spelling` finding's column is the first letter of a whole run of letters
@@ -66,19 +151,54 @@ impl Settings {
     }
 }
 
-/// A comma-separated list of rule names, each one in the rule table.
-pub fn rule_names(list: &str) -> Result<Vec<&'static str>, String> {
+/// A `[rules]` line, `id: phrase = replacement`: the id, of lower-case letters, digits and
+/// inner hyphens, and the phrase, of words of letters and digits with inner hyphens or
+/// apostrophes. Nothing after `=` bans the phrase.
+fn rule_line(line: &str) -> Result<(&str, Phrase), String> {
+    let expected = || {
+        format!("expected 'id: phrase = replacement', found '{line}'; settings go before [rules]")
+    };
+    let (id, rest) = line.split_once(':').ok_or_else(expected)?;
+    let (phrase, replacement) = rest.split_once('=').ok_or_else(expected)?;
+    let id = id.trim();
+    let id_char = |c: char| c.is_ascii_lowercase() || c.is_ascii_digit();
+    if !(id.chars().all(|c| id_char(c) || c == '-')
+        && id.starts_with(id_char)
+        && id.ends_with(id_char))
+    {
+        return Err(format!(
+            "'{id}' is not a rule id; use lower-case letters, digits and hyphens"
+        ));
+    }
+    let words: Vec<&str> = phrase.split_whitespace().collect();
+    let word = |w: &&str| {
+        w.chars()
+            .all(|c| c.is_alphanumeric() || matches!(c, '-' | '\'' | '\u{2019}'))
+            && w.starts_with(char::is_alphanumeric)
+            && w.ends_with(char::is_alphanumeric)
+    };
+    if words.is_empty() || !words.iter().all(word) {
+        return Err(format!(
+            "'{}' is not a phrase of words of letters and digits",
+            phrase.trim()
+        ));
+    }
+    let replacement = replacement.trim();
+    Ok((
+        id,
+        Phrase {
+            text: words.join(" "),
+            replacement: (!replacement.is_empty()).then(|| replacement.to_owned()),
+        },
+    ))
+}
+
+/// A comma-separated list of rule names; `Settings::check_rule` says whether each is one.
+pub fn rule_names(list: &str) -> Vec<String> {
     list.split(',')
         .map(str::trim)
         .filter(|name| !name.is_empty())
-        .map(|name| {
-            RuleId::named(name).map(RuleId::name).ok_or_else(|| {
-                format!(
-                    "unknown rule '{name}'; the rules are in {}",
-                    lint::RULES_URL
-                )
-            })
-        })
+        .map(str::to_owned)
         .collect()
 }
 
@@ -105,70 +225,4 @@ fn words(list: &str) -> Result<Vec<String>, String> {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn a_project_file_names_the_line_of_its_first_error() {
-        for (text, wanted) in [
-            (
-                "disable = em-dash\nseverity = high\n",
-                "f:2: unknown key 'severity'",
-            ),
-            (
-                "\n\ndisable em-dash\n",
-                "f:3: expected 'key = value', found 'disable em-dash'",
-            ),
-            ("only = em-dashes\n", "f:1: unknown rule 'em-dashes'"),
-            ("max-findings = many\n", "f:1: 'many' is not a whole number"),
-            (
-                "accept = Color, ice cream\n",
-                "f:1: 'ice cream' is not one word",
-            ),
-            ("accept = e-mail\n", "f:1: 'e-mail' is not one word"),
-        ] {
-            let error = Settings::parse("f", text).unwrap_err();
-            assert!(error.starts_with(wanted), "{text:?}: {error}");
-        }
-    }
-
-    #[test]
-    fn accepted_words_pass_us_spelling_as_written_and_whole() {
-        let settings = Settings::parse("f", "accept = Color, analyze,\naccept = center\n").unwrap();
-        assert_eq!(settings.accept, ["Color", "analyze", "center"]);
-        let text = "Color is the product. We analyze the color and the colors.\n\
-                    The center box. Analyze it.";
-        let kept: Vec<(usize, usize)> = lint::lint(text)
-            .iter()
-            .filter(|f| {
-                let line = text.lines().nth(f.line - 1).unwrap();
-                settings.keeps(f, line)
-            })
-            .map(|f| (f.line, f.column))
-            .collect();
-        // 'color' and 'colors' differ from 'Color'; 'Analyze' differs from 'analyze'.
-        assert_eq!(kept, [(1, 38), (1, 52), (2, 17)]);
-        let everything = lint::lint(text).len();
-        assert_eq!(everything, 6, "{:?}", lint::lint(text));
-    }
-
-    #[test]
-    fn disable_and_only_drop_findings_and_disable_wins() {
-        let text = "The color \u{2014} red.";
-        let found = lint::lint(text);
-        let names = |settings: &Settings| -> Vec<&str> {
-            let mut kept: Vec<&str> = found
-                .iter()
-                .filter(|f| settings.keeps(f, text))
-                .map(|f| f.rule.name())
-                .collect();
-            kept.sort_unstable();
-            kept
-        };
-        assert_eq!(names(&Settings::default()), ["em-dash", "us-spelling"]);
-        let only = Settings::parse("f", "only = em-dash").unwrap();
-        assert_eq!(names(&only), ["em-dash"]);
-        let both = Settings::parse("f", "only = em-dash\ndisable = em-dash").unwrap();
-        assert!(names(&both).is_empty());
-    }
-}
+mod tests;

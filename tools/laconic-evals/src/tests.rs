@@ -418,7 +418,8 @@ fn fact_setups_writes_runners_and_preflight_checks_them() {
         call(&["fact-setups", "--preflight", &arg(&here)], &NONE),
         (Ok(0), String::new())
     );
-    assert!(call(&["fact-setups", ""], &NONE).0.is_err());
+    // An empty folder is refused as a bad argument.
+    assert!(Cli::try_parse_from(["laconic-evals", "fact-setups", ""]).is_err());
 }
 
 #[test]

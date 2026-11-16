@@ -758,7 +758,8 @@ mod tests {
         assert_eq!(mean_f64([0.1, 0.1, 0.1]), Some(0.1));
         assert_eq!(mean_f64([1e308, 1e308]), Some(1e308));
         assert_eq!(mean_f64([-0.5, -0.25]), Some(-0.375));
-        assert_eq!(mean_f64([5e-324, 0.0]), Some(5e-324));
+        // Half the smallest float is a tie, which rounds to the even 0.0, as Python gives.
+        assert_eq!(mean_f64([5e-324, 0.0]), Some(0.0));
         assert_eq!(mean_f64([5e-324, 5e-324, 0.0]), Some(5e-324));
         assert_eq!(mean_f64([-0.0]), Some(0.0));
         assert_eq!(

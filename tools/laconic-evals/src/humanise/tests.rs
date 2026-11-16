@@ -17,7 +17,7 @@ fn reply(
 
 fn cases() -> BTreeMap<String, Value> {
     BTreeMap::from([(
-        "c1".to_owned(),
+        py::key(&json!("c1")),
         json!({"prompt": "Do it.\n\none two three four"}),
     )])
 }
@@ -107,7 +107,7 @@ fn summary_rejects_rows_it_cannot_measure() {
         error,
         r#"'condition' is not text in {'case_id': 'c1', 'condition': 3, 'response': 'one'}"#
     );
-    let empty = BTreeMap::from([("c1".to_owned(), json!({"prompt": "Do it.\n\n "}))]);
+    let empty = BTreeMap::from([(py::key(&json!("c1")), json!({"prompt": "Do it.\n\n "}))]);
     let error = summarise(&[row(json!("a"))], &empty, &ok, &none).unwrap_err();
     assert_eq!(error, "division by zero: a source text has no words");
     let uneven = |text: &str| -> Result<Metrics, String> {

@@ -756,6 +756,37 @@ fn weekdays(text: &str) -> Vec<String> {
         .collect()
 }
 
+/// Words before 'H:MM' that make it a time: 'at 5:30', 'between 6:00 and 8:00'.
+const TIME_BEFORE: &[&str] = &[
+    "at", "by", "after", "before", "from", "until", "till", "between", "around", "about", "to",
+    "and",
+];
+
+/// Whether the 'H:MM' at `chars[start..end]` reads as a time: 'am', 'pm', 'a.m.' or 'p.m.'
+/// follows it, or a word in TIME_BEFORE comes before it.
+fn time_context(chars: &[char], start: usize, end: usize) -> bool {
+    let after: String = chars[end..chars.len().min(end + 5)]
+        .iter()
+        .collect::<String>()
+        .to_lowercase();
+    let after = after.strip_prefix(' ').unwrap_or(&after);
+    let meridiem = ["am", "pm", "a.m", "p.m"].iter().any(|m| {
+        after
+            .strip_prefix(m)
+            .is_some_and(|rest| !rest.starts_with(char::is_alphanumeric))
+    });
+    let mut before: Vec<char> = chars[..start]
+        .iter()
+        .rev()
+        .skip_while(|c| **c == ' ')
+        .take_while(|c| c.is_alphabetic())
+        .copied()
+        .collect();
+    before.reverse();
+    let before = before.into_iter().collect::<String>().to_lowercase();
+    meridiem || TIME_BEFORE.contains(&before.as_str())
+}
+
 /// Numbers with their sign and currency; `pounds` lists the values that 'pounds' after a
 /// number names as money.
 fn numbers(text: &str, pounds: &HashSet<String>) -> Vec<String> {
@@ -780,7 +811,8 @@ fn numbers(text: &str, pounds: &HashSet<String>) -> Vec<String> {
                 .trim_end_matches(['.', ','])
                 .to_string();
             // A time is one number, its hour and minutes, and ':00' adds nothing to the hour:
-            // '5:00 p.m.' and '5pm' name the same time, but '5:30' is not 5.
+            // '5:00 p.m.' and '5pm' name the same time, but '5:30' is not 5. Out of a time's
+            // context, as in the ratio '5:30' or 'John 3:16', each side is its own number.
             let minutes = chars
                 .get(j + 1..j + 3)
                 .filter(|m| m.iter().all(char::is_ascii_digit));
@@ -788,6 +820,7 @@ fn numbers(text: &str, pounds: &HashSet<String>) -> Vec<String> {
                 && chars[j] == ':'
                 && token.chars().all(|c| c.is_ascii_digit())
                 && !chars.get(j + 3).is_some_and(char::is_ascii_digit)
+                && time_context(&chars, i, j + 3)
             {
                 if minutes != ['0', '0'] {
                     token = format!("{token}:{}", minutes.iter().collect::<String>());
@@ -1498,6 +1531,27 @@ mod tests {
             missing("A 16:9 screen.", "A screen.")["number"],
             vec!["16", "9"]
         );
+    }
+
+    #[test]
+    fn a_colon_number_is_a_time_only_in_a_time_context() {
+        for (original, edited) in [
+            ("Stop by 5:00 p.m.", "Stop by 5 p.m."),
+            ("Call between 6:00 and 8:00 AM.", "Call between 6 and 8 am."),
+            ("The ratio is 5:30.", "The ratio is 5 to 30."),
+        ] {
+            assert!(
+                !missing(original, edited).contains_key("number"),
+                "{original} -> {edited}"
+            );
+        }
+        for (original, edited, dropped) in [
+            ("The ratio is 5:00.", "The ratio is 5.", "00"),
+            ("Read John 5:30.", "Read John 5:31.", "30"),
+            ("Start at 5:30:15.", "Start at 5:30:16.", "15"),
+        ] {
+            assert_eq!(missing(original, edited)["number"], vec![dropped]);
+        }
     }
 
     #[test]

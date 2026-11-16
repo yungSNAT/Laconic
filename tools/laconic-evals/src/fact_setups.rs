@@ -6,7 +6,7 @@
 //! Run: `laconic-evals fact-setups evals/results/<new folder>`
 //! Then: `laconic-evals fact-setups --preflight evals/results/<that folder>`
 
-use crate::cases::{append, parse, read_text, root};
+use crate::cases::{append, parse, read_text, root, write};
 use crate::fact_survival::to_float;
 use crate::proc::{self, Failure, Input, Output};
 use crate::py;
@@ -80,10 +80,6 @@ pub fn check_call(command: &[String]) -> Result<(), String> {
 
 fn strings(parts: &[&str]) -> Vec<String> {
     parts.iter().map(|&part| part.to_owned()).collect()
-}
-
-fn write(path: &Path, text: &str) -> Result<(), String> {
-    fs::write(path, text).map_err(|e| format!("{}: {e}", path.display()))
 }
 
 /// A rival's checkout at its pinned commit, cloned from `base` (https://github.com) unless

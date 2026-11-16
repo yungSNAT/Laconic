@@ -157,6 +157,11 @@ pub fn dumps_pretty(value: &Value) -> String {
     dumps(value, Some(2), true)
 }
 
+/// `print(line)` to `out`.
+pub fn print(out: &mut dyn std::io::Write, line: &str) -> Result<(), String> {
+    writeln!(out, "{line}").map_err(|e| e.to_string())
+}
+
 /// `json.dumps(value, ensure_ascii=False)`, as the commands write JSON Lines rows.
 pub fn dumps_row(value: &Value) -> String {
     dumps(value, None, false)
@@ -383,13 +388,16 @@ impl Num {
 /// `sum()` of floats as CPython 3.12 and later computes it: the first term is added to the
 /// int 0, then Neumaier's compensated summation, adding the compensation at the end.
 pub fn sum(values: impl IntoIterator<Item = f64>) -> f64 {
-    let mut values = values.into_iter();
-    let Some(first) = values.next() else {
+    sum_of(&values.into_iter().collect::<Vec<_>>())
+}
+
+fn sum_of(values: &[f64]) -> f64 {
+    let Some((&first, rest)) = values.split_first() else {
         return 0.0;
     };
     let mut total = 0.0 + first;
     let mut compensation = 0.0;
-    for x in values {
+    for &x in rest {
         let t = total + x;
         if total.abs() >= x.abs() {
             compensation += (total - t) + x;
@@ -470,10 +478,14 @@ fn divide(p: &BigInt, q: &BigUint) -> f64 {
 /// `statistics.mean`: the exact mean, as an int when every value is an int and the mean is
 /// whole, otherwise the float nearest the exact mean. None for no values.
 pub fn mean(values: impl IntoIterator<Item = Num>) -> Option<Num> {
+    mean_of(&values.into_iter().collect::<Vec<_>>())
+}
+
+fn mean_of(values: &[Num]) -> Option<Num> {
     let mut total = BigInt::from(0);
     let mut count = 0u64;
     let mut any_float = false;
-    for value in values {
+    for &value in values {
         count += 1;
         total += match value {
             Num::Int(i) => BigInt::from(i) << 1074u32,

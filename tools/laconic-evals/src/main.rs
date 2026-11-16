@@ -159,8 +159,8 @@ enum Command {
         #[arg(long, default_value = "laconic-check")]
         laconic_check: String,
         /// Where the downloads are kept [default: evals/results/fact-audit].
-        #[arg(long)]
-        cache: Option<PathBuf>,
+        #[arg(long, default_value_os_t = evals("results").join("fact-audit"), hide_default_value = true)]
+        cache: PathBuf,
         /// Run preserve with --loose.
         #[arg(long)]
         loose: bool,
@@ -637,7 +637,6 @@ fn run(cli: Cli, out: &mut dyn Write, tools: &Tools) -> Result<u8, Stop> {
             let check = |binary: &str, source: &str, rewrite: &str| {
                 fact_audit::preserve(binary, source, rewrite, loose, tools.preserve)
             };
-            let cache = cache.unwrap_or_else(|| evals("results").join("fact-audit"));
             let (counts, differences) =
                 fact_audit::run(&binary.display().to_string(), &cache, &check, tools.get)?;
             fact_audit::report(&counts, &differences)

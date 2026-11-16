@@ -372,6 +372,35 @@ fn fetch_downloads_once_into_the_cache() {
 }
 
 #[test]
+fn fetch_names_the_file_it_cannot_write() {
+    let dir = tempfile::tempdir().unwrap();
+    let get = |_: &str| Ok(b"{}\n".to_vec());
+    let url = "https://example.com/f";
+    let shown = |path: &Path| path.display().to_string();
+    // The cache folder is a file.
+    fs::write(dir.path().join("file"), "").unwrap();
+    let error = fetch(url, &dir.path().join("file/x.jsonl"), &get).unwrap_err();
+    assert!(
+        error.starts_with(&shown(&dir.path().join("file"))),
+        "{error}"
+    );
+    // The partial download's name is taken by a folder.
+    fs::create_dir(dir.path().join("a.jsonl.partial")).unwrap();
+    let error = fetch(url, &dir.path().join("a.jsonl"), &get).unwrap_err();
+    assert!(
+        error.starts_with(&shown(&dir.path().join("a.jsonl.partial"))),
+        "{error}"
+    );
+    // The cached name is taken by a folder with something in it.
+    fs::create_dir_all(dir.path().join("b.jsonl/inside")).unwrap();
+    let error = fetch(url, &dir.path().join("b.jsonl"), &get).unwrap_err();
+    assert!(
+        error.starts_with(&shown(&dir.path().join("b.jsonl"))),
+        "{error}"
+    );
+}
+
+#[test]
 fn fetch_refuses_a_scheme_other_than_http() {
     let dir = tempfile::tempdir().unwrap();
     for url in ["file:///etc/hosts", "ftp://example.com/f", "example.com/f"] {
@@ -443,6 +472,34 @@ fn http_get_reads_a_whole_body_and_reports_a_failed_status_or_a_cut_body() {
     );
     assert!(http_get(&url).unwrap_err().starts_with(&url));
     assert!(http_get(&url).unwrap_err().starts_with(&url));
+    server.join().unwrap();
+}
+
+#[test]
+fn http_get_times_out_when_the_body_stalls() {
+    use std::io::{BufRead, BufReader, Write};
+    use std::net::TcpListener;
+    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    let address = listener.local_addr().unwrap();
+    let (finished, wait) = std::sync::mpsc::channel::<()>();
+    let server = std::thread::spawn(move || {
+        let (mut stream, _) = listener.accept().unwrap();
+        let mut reader = BufReader::new(stream.try_clone().unwrap());
+        let mut line = String::new();
+        while reader.read_line(&mut line).unwrap() > 2 {
+            line.clear();
+        }
+        // Headers and part of the body, then silence until the client gives up.
+        write!(stream, "HTTP/1.1 200 OK\r\nContent-Length: 10\r\n\r\nxx").unwrap();
+        stream.flush().unwrap();
+        let _ = wait.recv();
+    });
+    let url = format!("http://{address}/f");
+    let started = std::time::Instant::now();
+    let error = get_with_timeout(&url, Duration::from_millis(200)).unwrap_err();
+    assert!(started.elapsed() < Duration::from_secs(10));
+    assert!(error.starts_with(&url), "{error}");
+    drop(finished);
     server.join().unwrap();
 }
 

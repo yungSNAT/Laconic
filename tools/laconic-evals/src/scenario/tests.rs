@@ -418,6 +418,9 @@ fn invalid_inputs_and_existing_output_do_not_start_provider() {
     fs::write(dir.path().join("file"), "").unwrap();
     args.output = dir.path().join("file/response.jsonl");
     assert!(capture(&args, &|c, i, d, t| runs.exec(c, i, d, t)).is_err());
+    // An output with no folder part names no file.
+    args.output = PathBuf::new();
+    assert!(capture(&args, &|c, i, d, t| runs.exec(c, i, d, t)).is_err());
     assert!(runs.calls().is_empty());
 }
 

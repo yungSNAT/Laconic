@@ -34,6 +34,7 @@ The manifests other than Claude Code's still declare plugin 0.5.0, so a build fr
 
 ### Plugin: fixed
 
+- The always-on banner names 'normal mode' beside 'stop laconic', as the skill turns off on either, and INSTALL.md shows how to run the shell and PowerShell versions of the hook where Node is missing.
 - Claude Code installs follow each commit: `.claude-plugin/plugin.json` no longer declares a version, so `claude plugin update` stops skipping changes made since 0.5.0.
 - Validate eval inputs and record requested model metadata (#20).
 - Make hook trimming linear (#29).

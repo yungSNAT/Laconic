@@ -222,7 +222,7 @@ fn verdicts_that_break_the_contract_name_their_case() {
             json!({"A": verdict(9, false), "B": verdict(3, false)}),
             &both
         ),
-        "direct-answer/trial 1/label B: correctness must be between 1 and 5, got 9"
+        "direct-answer/trial 1/label A: correctness must be between 1 and 5, got 9"
     );
     assert_eq!(
         value(json!({"A": wrong, "B": verdict(3, false)}), &both),
@@ -667,7 +667,7 @@ fn calibration_fails_where_python_did() {
             std::slice::from_ref(&fixture),
             &cases,
             "r",
-            &reply(json!([{}]), json!([])),
+            &reply(json!([{}]), json!([1])),
         ),
         "float() argument",
     );
@@ -965,7 +965,7 @@ fn the_command_stops_on_what_python_raised() {
         let result = json!({"A": fixture_verdict(), "B": fixture_verdict()}).to_string();
         done(
             0,
-            &json!({"result": result, "total_cost_usd": []}).to_string(),
+            &json!({"result": result, "total_cost_usd": [1]}).to_string(),
             "",
         )
     });
@@ -1046,7 +1046,7 @@ fn unsortable_groups_are_errors() {
         format!(
             "{}{}",
             lines.concat(),
-            json!({"case_id": "a", "trial": 1, "condition": "candidate", "response": "x"})
+            json!({"case_id": "b", "trial": 1, "condition": "candidate", "response": "x"})
         ),
     )
     .unwrap();

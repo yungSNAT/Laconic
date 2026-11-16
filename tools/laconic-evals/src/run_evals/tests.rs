@@ -1094,7 +1094,7 @@ fn a_resumed_run_counts_its_earlier_cost_against_the_budget() {
         "skip completed baseline trial 1: probe\nbaseline trial 2: probe\n"
     );
     let mut bad = prior[0].clone();
-    bad["cost_usd"] = json!([]);
+    bad["cost_usd"] = json!([1]);
     fs::write(&args.output, format!("{bad}\n")).unwrap();
     fails(run(&args, &world).0, "float() argument");
 }
@@ -1202,8 +1202,10 @@ fn generation_runs_outside_the_repository() {
         .as_str()
         .unwrap()
         .to_owned();
-    let place = Path::new(&response).canonicalize().unwrap();
-    assert!(!place.starts_with(root().canonicalize().unwrap()));
+    // The folder is gone once the run ends, so compare the printed path as it stands.
+    let place = Path::new(&response);
+    assert!(place.is_absolute(), "{response}");
+    assert!(!place.starts_with(root()) && !place.starts_with(root().canonicalize().unwrap()));
 }
 
 #[test]

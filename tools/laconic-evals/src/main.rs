@@ -55,7 +55,7 @@ enum Command {
         /// [default: evals/cases.jsonl]
         #[arg(long)]
         cases: Option<PathBuf>,
-        #[arg(long, default_value_t = 3, value_parser = clap::value_parser!(i64).range(1..))]
+        #[arg(long, allow_negative_numbers = true, default_value_t = 3, value_parser = clap::value_parser!(i64).range(1..))]
         trials: i64,
         #[arg(long)]
         include_comparator: bool,
@@ -97,21 +97,21 @@ enum Command {
         condition_skill: Option<PathBuf>,
         #[arg(long)]
         case: Vec<String>,
-        #[arg(long, default_value_t = 3, value_parser = clap::value_parser!(i64).range(1..))]
+        #[arg(long, allow_negative_numbers = true, default_value_t = 3, value_parser = clap::value_parser!(i64).range(1..))]
         trials: i64,
-        #[arg(long, default_value_t = 2)]
+        #[arg(long, allow_negative_numbers = true, default_value_t = 2)]
         retries: i64,
         /// Send the task unchanged; the runner config supplies the setup being compared.
         #[arg(long)]
         no_injection: bool,
         /// Seconds before one model call counts as failed.
-        #[arg(long, default_value_t = 300.0)]
+        #[arg(long, allow_negative_numbers = true, default_value_t = 300.0)]
         call_timeout: f64,
         /// Model calls to run at once; the budget is a soft threshold that up to jobs - 1
         /// running calls can pass.
-        #[arg(long, default_value_t = 1)]
+        #[arg(long, allow_negative_numbers = true, default_value_t = 1)]
         jobs: i64,
-        #[arg(long, default_value_t = 25.0)]
+        #[arg(long, allow_negative_numbers = true, default_value_t = 25.0)]
         budget_usd: f64,
         #[arg(long)]
         allow_unmetered: bool,
@@ -140,10 +140,10 @@ enum Command {
         /// Conditions that every response group must contain.
         #[arg(long, num_args = 1.., value_parser = CONDITIONS, default_values = ["baseline", "candidate"])]
         conditions: Vec<String>,
-        #[arg(long, default_value_t = 2)]
+        #[arg(long, allow_negative_numbers = true, default_value_t = 2)]
         retries: i64,
         /// Seconds before one judge call counts as failed.
-        #[arg(long, default_value_t = 300.0)]
+        #[arg(long, allow_negative_numbers = true, default_value_t = 300.0)]
         call_timeout: f64,
         #[arg(long)]
         output: Option<PathBuf>,
@@ -211,9 +211,9 @@ enum Scenario {
         condition_skill: Option<PathBuf>,
         #[arg(long)]
         model: String,
-        #[arg(long, default_value_t = 1)]
+        #[arg(long, allow_negative_numbers = true, default_value_t = 1)]
         trial: i64,
-        #[arg(long)]
+        #[arg(long, allow_negative_numbers = true)]
         budget_usd: f64,
         #[arg(long)]
         output: PathBuf,
@@ -238,14 +238,14 @@ enum Survival {
         ledgers: Option<PathBuf>,
         #[arg(long)]
         output: PathBuf,
-        #[arg(long, default_value_t = 4)]
+        #[arg(long, allow_negative_numbers = true, default_value_t = 4)]
         jobs: i64,
         /// [default: evals/fact-cases.jsonl]
         #[arg(long)]
         cases: Option<PathBuf>,
-        #[arg(long, default_value_t = 12.0)]
+        #[arg(long, allow_negative_numbers = true, default_value_t = 12.0)]
         budget_usd: f64,
-        #[arg(long, default_value_t = 300.0)]
+        #[arg(long, allow_negative_numbers = true, default_value_t = 300.0)]
         call_timeout: f64,
     },
     /// Measures the judge against hand-labelled rewrites.
@@ -266,7 +266,7 @@ enum Survival {
     /// Exit 1 once reported cost reaches the cap.
     Spend {
         folder: PathBuf,
-        #[arg(long)]
+        #[arg(long, allow_negative_numbers = true)]
         cap: f64,
     },
     /// Summarises each setup's scores against the reference setup.
@@ -277,7 +277,7 @@ enum Survival {
         cases: PathBuf,
         #[arg(long)]
         reference: String,
-        #[arg(long, default_value_t = 2)]
+        #[arg(long, allow_negative_numbers = true, default_value_t = 2)]
         trials: i64,
     },
 }

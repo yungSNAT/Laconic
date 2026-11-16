@@ -90,7 +90,7 @@ fn applies_the_project_file_and_skips_advisory_findings_and_deleted_files() {
     fs::remove_file(dir.join("gone.md")).unwrap();
     // A stacked hedge is advisory and never fails lint.
     let text = "It could potentially rain. Pick a color.\n";
-    assert!(lint::lint(text).iter().any(|f| f.rule.rule().advisory));
+    assert!(lint::lint(text).iter().any(|f| f.rule.advisory()));
     fs::write(dir.join("a.md"), text).unwrap();
     let reason = reason(&stop(&event(&dir, false)).unwrap().unwrap());
     assert!(
@@ -104,6 +104,43 @@ fn applies_the_project_file_and_skips_advisory_findings_and_deleted_files() {
     fs::write(dir.join(PROJECT_FILE), "colour = yes\n").unwrap();
     let error = stop(&event(&dir, false)).unwrap_err();
     assert!(error.ends_with(":1: unknown key 'colour'"), "{error}");
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn reports_the_project_files_own_rules() {
+    let dir = repository("rules");
+    fs::write(
+        dir.join("a.md"),
+        "We utilise it.
+",
+    )
+    .unwrap();
+    fs::write(
+        dir.join(PROJECT_FILE),
+        "[rules]
+plain: utilise = use
+",
+    )
+    .unwrap();
+    let reason = reason(&stop(&event(&dir, false)).unwrap().unwrap());
+    assert!(
+        reason.contains(
+            "
+a.md:1:4: project/plain: 'utilise': the project file prefers 'use'
+"
+        ),
+        "{reason}"
+    );
+    fs::write(
+        dir.join(PROJECT_FILE),
+        "disable = project/plain
+[rules]
+plain: utilise = use
+",
+    )
+    .unwrap();
+    assert_eq!(stop(&event(&dir, false)), Ok(None));
     let _ = fs::remove_dir_all(&dir);
 }
 

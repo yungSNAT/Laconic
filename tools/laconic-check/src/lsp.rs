@@ -12,7 +12,7 @@ use std::fs;
 use std::io::{self, BufRead, Read, Write};
 use std::path::{Component, PathBuf};
 
-use crate::lint;
+use crate::lint::{self, RuleRef};
 use crate::mcp::{self, Json, object, text};
 use crate::sarif;
 use crate::settings::{PROJECT_FILE, Settings};
@@ -250,7 +250,8 @@ impl Server {
         } else {
             char::len_utf16
         };
-        lint::lint(body)
+        lint::lint_counting(body, &settings.rules)
+            .0
             .into_iter()
             .filter_map(|finding| {
                 let line = lines
@@ -261,14 +262,13 @@ impl Server {
                     return None;
                 }
                 let (start, end) = sarif::span(line, finding.column, width);
-                let rule = finding.rule.rule();
-                let severity = if rule.advisory { 3 } else { 2 };
+                let severity = if finding.rule.advisory() { 3 } else { 2 };
                 Some(diagnostic(
                     finding.line - 1,
                     start,
                     end,
                     severity,
-                    Some(rule.name),
+                    Some(&finding.rule),
                     &finding.message,
                 ))
             })
@@ -307,7 +307,7 @@ fn diagnostic(
     start: usize,
     end: usize,
     severity: usize,
-    rule: Option<&str>,
+    rule: Option<&RuleRef>,
     message: &str,
 ) -> Json {
     let position = |character| {
@@ -326,9 +326,11 @@ fn diagnostic(
         ("message", text(message)),
     ];
     if let Some(rule) = rule {
-        members.push(("code", text(rule)));
-        let href = format!("{}#{rule}", lint::RULES_URL);
-        members.push(("codeDescription", object(vec![("href", text(&href))])));
+        members.push(("code", text(rule.name())));
+        // A project file's rule has no entry in the rule reference.
+        if let Some(href) = rule.url() {
+            members.push(("codeDescription", object(vec![("href", text(&href))])));
+        }
     }
     object(members)
 }

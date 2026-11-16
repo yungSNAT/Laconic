@@ -40,8 +40,9 @@ impl Split {
         self.articles += 1;
         self.words += text.split_whitespace().count();
         let mut seen = BTreeMap::new();
-        for finding in lint(text) {
-            *seen.entry(finding.rule.name()).or_insert(0) += 1;
+        // `lint` without a project file reports house rules only.
+        for rule in lint(text).iter().filter_map(|f| f.rule.house()) {
+            *seen.entry(rule.name()).or_insert(0) += 1;
         }
         for (rule, n) in seen {
             let entry = self.rules.entry(rule).or_default();

@@ -164,7 +164,10 @@ fn corpus() -> String {
 }
 
 fn rules(text: &str) -> Vec<&'static str> {
-    lint(text).into_iter().map(|f| f.rule.name()).collect()
+    lint(text)
+        .into_iter()
+        .map(|f| f.rule.house().unwrap().name())
+        .collect()
 }
 
 #[test]
@@ -256,7 +259,7 @@ fn human_corpus_findings_stay_under_the_ceiling() {
     let (advisory, findings): (Vec<_>, Vec<_>) = human_corpus()
         .iter()
         .flat_map(|text| lint(text))
-        .partition(|f| f.rule.rule().advisory);
+        .partition(|f| f.rule.advisory());
     assert!(
         findings.len() <= HUMAN_CORPUS_CEILING,
         "{} findings on the human corpus, ceiling {HUMAN_CORPUS_CEILING}",
@@ -430,7 +433,9 @@ fn reference() -> String {
     let words: usize = corpus.iter().map(|t| t.split_whitespace().count()).sum();
     let mut counts: BTreeMap<&str, usize> = BTreeMap::new();
     for finding in corpus.iter().flat_map(|t| lint(t)) {
-        *counts.entry(finding.rule.name()).or_default() += 1;
+        *counts
+            .entry(finding.rule.house().unwrap().name())
+            .or_default() += 1;
     }
     let human = |name: &str| {
         let n = counts.get(name).copied().unwrap_or(0);

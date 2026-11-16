@@ -68,7 +68,7 @@ fn words(sentence: &str) -> Vec<String> {
 }
 
 fn negation(word: &str) -> bool {
-    matches!(word, "not" | "never" | "cannot") || word.ends_with("n't")
+    matches!(word, "not" | "never" | "cannot" | "no" | "none" | "without") || word.ends_with("n't")
 }
 
 /// The content word right after each negation that negates: the first of the next 4 words
@@ -169,6 +169,18 @@ mod tests {
             ),
             ["'cast' is no longer negated in \"Every surface is milled and cast.\""]
         );
+        // 'no', 'none' and 'without' negate too.
+        for (original, edited) in [
+            ("No straps are included.", "Straps are included."),
+            ("None of the straps fit.", "The straps fit."),
+            ("It ships without straps.", "It ships with straps."),
+        ] {
+            assert_eq!(
+                reversals(original, edited).len(),
+                1,
+                "{original} -> {edited}"
+            );
+        }
         // Curly apostrophes, and a contraction the edit expands away.
         assert_eq!(
             reversals(

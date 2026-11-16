@@ -756,15 +756,19 @@ fn weekdays(text: &str) -> Vec<String> {
         .collect()
 }
 
-/// Words before 'H:MM' that make it a time: 'at 5:30', 'between 6:00 and 8:00'.
+/// Words before 'H:MM' that make it a time: 'at 5:30', 'between 6:00'.
 const TIME_BEFORE: &[&str] = &[
-    "at", "by", "after", "before", "from", "until", "till", "between", "around", "about", "to",
-    "and",
+    "at", "by", "after", "before", "from", "until", "till", "between", "around", "about",
 ];
 
+/// Words that join a time to the next one in a range: 'from 6:00 to 8:00', 'between 6:00 PM
+/// and 8:00'. After any other number they join 2 ratios or scores, so they make no time.
+const TIME_RANGE: &[&str] = &["to", "and"];
+
 /// Whether the 'H:MM' at `chars[start..end]` reads as a time: 'am', 'pm', 'a.m.' or 'p.m.'
-/// follows it, or a word in TIME_BEFORE comes before it.
-fn time_context(chars: &[char], start: usize, end: usize) -> bool {
+/// follows it, a word in TIME_BEFORE comes before it, or, when `after_time` says a time ends
+/// just before it, a word in TIME_RANGE does.
+fn time_context(chars: &[char], start: usize, end: usize, after_time: bool) -> bool {
     let after: String = chars[end..chars.len().min(end + 5)]
         .iter()
         .collect::<String>()
@@ -784,8 +788,13 @@ fn time_context(chars: &[char], start: usize, end: usize) -> bool {
         .collect();
     before.reverse();
     let before = before.into_iter().collect::<String>().to_lowercase();
-    meridiem || TIME_BEFORE.contains(&before.as_str())
+    meridiem
+        || TIME_BEFORE.contains(&before.as_str())
+        || (after_time && TIME_RANGE.contains(&before.as_str()))
 }
+
+/// The most characters between a time and the next one in a range, as in ' PM and '.
+const RANGE_GAP: usize = 10;
 
 /// Numbers with their sign and currency; `pounds` lists the values that 'pounds' after a
 /// number names as money.
@@ -795,6 +804,8 @@ fn numbers(text: &str, pounds: &HashSet<String>) -> Vec<String> {
     let mut out = Vec::new();
     // Where the last number started and ended, and its currency.
     let mut last: Option<(usize, usize, String)> = None;
+    // Where the last time ended.
+    let mut last_time: Option<usize> = None;
     let mut i = 0;
     while i < chars.len() {
         let starts = chars[i].is_ascii_digit() && (i == 0 || !chars[i - 1].is_alphanumeric());
@@ -820,12 +831,18 @@ fn numbers(text: &str, pounds: &HashSet<String>) -> Vec<String> {
                 && chars[j] == ':'
                 && token.chars().all(|c| c.is_ascii_digit())
                 && !chars.get(j + 3).is_some_and(char::is_ascii_digit)
-                && time_context(&chars, i, j + 3)
+                && time_context(
+                    &chars,
+                    i,
+                    j + 3,
+                    last_time.is_some_and(|end| i - end <= RANGE_GAP),
+                )
             {
                 if minutes != ['0', '0'] {
                     token = format!("{token}:{}", minutes.iter().collect::<String>());
                 }
                 j += 3;
+                last_time = Some(j);
             }
             let after: String = chars[j..chars.len().min(j + 12)].iter().collect();
             let percent = !token.ends_with('%') && starts_with_percent(&after);
@@ -1538,6 +1555,7 @@ mod tests {
         for (original, edited) in [
             ("Stop by 5:00 p.m.", "Stop by 5 p.m."),
             ("Call between 6:00 and 8:00 AM.", "Call between 6 and 8 am."),
+            ("Open from 6:00 PM to 8:00.", "Open from 6 PM to 8."),
             ("The ratio is 5:30.", "The ratio is 5 to 30."),
         ] {
             assert!(
@@ -1549,6 +1567,17 @@ mod tests {
             ("The ratio is 5:00.", "The ratio is 5.", "00"),
             ("Read John 5:30.", "Read John 5:31.", "30"),
             ("Start at 5:30:15.", "Start at 5:30:16.", "15"),
+            // 'and' or 'to' after a number that is not a time makes no time.
+            (
+                "We offer a 3:15 and 4:00 slot.",
+                "We offer a 3:15 and 4 slot.",
+                "00",
+            ),
+            (
+                "The ratio 2:30 to 3:15 held.",
+                "The ratio 2:30 to 3:14 held.",
+                "15",
+            ),
         ] {
             assert_eq!(missing(original, edited)["number"], vec![dropped]);
         }

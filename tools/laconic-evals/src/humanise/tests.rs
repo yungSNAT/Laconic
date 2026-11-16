@@ -292,6 +292,37 @@ fn a_detector_report_without_its_fields_is_an_error() {
 }
 
 #[test]
+fn a_detector_that_fails_stops_the_measurement() {
+    for (checkers, detector) in [
+        (
+            Checkers {
+                avoid: Some(Path::new("avoid.js")),
+                dslop: None,
+            },
+            "node",
+        ),
+        (
+            Checkers {
+                avoid: None,
+                dslop: Some(Path::new("dslop.toml")),
+            },
+            "uvx",
+        ),
+    ] {
+        let exec = |command: &[String], _: &Input| {
+            if command[0] == detector {
+                done(2, "", "crashed")
+            } else {
+                done(0, "", "")
+            }
+        };
+        let error = checkers.measure(&exec, "text").unwrap_err();
+        assert!(error.starts_with(detector), "{error}");
+        assert!(error.ends_with("exited 2: crashed"), "{error}");
+    }
+}
+
+#[test]
 fn preserve_gets_both_texts_as_files_and_no_input() {
     let recorder = Recorder::new();
     let exec = |command: &[String], input: &Input| {

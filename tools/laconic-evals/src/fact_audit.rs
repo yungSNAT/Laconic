@@ -13,7 +13,7 @@
 //! reports, and on what `preserve` fails the documents the paper marks fully kept. Nothing
 //! downloaded is stored in this repository.
 
-use crate::cases::{parse, read_text};
+use crate::cases::{parse, read_text, write};
 use crate::proc::{self, Input};
 use crate::py;
 use serde_json::Value;
@@ -67,12 +67,18 @@ fn list_repr<'a>(items: impl IntoIterator<Item = &'a String>) -> String {
     format!("[{}]", shown.join(", "))
 }
 
-/// The body at `url`, following redirects, with Python's 60-second socket timeout for
-/// connecting and for the response.
+/// The body at `url`, following redirects, with Python's 60-second socket timeout.
 pub fn http_get(url: &str) -> Result<Vec<u8>, String> {
+    get_with_timeout(url, Duration::from_secs(60))
+}
+
+/// `timeout` bounds the connection and each read and write, as a socket timeout does, so a
+/// server that stalls part way through the body is an error, not a wait without end.
+fn get_with_timeout(url: &str, timeout: Duration) -> Result<Vec<u8>, String> {
     let agent: ureq::Agent = ureq::Agent::config_builder()
-        .timeout_connect(Some(Duration::from_secs(60)))
-        .timeout_recv_response(Some(Duration::from_secs(60)))
+        .timeout_connect(Some(timeout))
+        .timeout_per_read(Some(timeout))
+        .timeout_per_write(Some(timeout))
         .build()
         .into();
     let mut response = agent.get(url).call().map_err(|e| format!("{url}: {e}"))?;
@@ -207,6 +213,19 @@ pub fn exec(command: &[String], input: &Input) -> Result<proc::Output, proc::Fai
     proc::run(command, input, None, None)
 }
 
+/// `source` and `rewrite` as `original.md` and `edited.md` in a fresh folder, for a `preserve`
+/// call; the folder goes when the returned guard drops.
+pub fn preserve_files(
+    source: &str,
+    rewrite: &str,
+) -> Result<(tempfile::TempDir, [String; 2]), String> {
+    let dir = crate::run_evals::neutral_cwd(".tmp")?;
+    let (original, edited) = (dir.path().join("original.md"), dir.path().join("edited.md"));
+    write(&original, source)?;
+    write(&edited, rewrite)?;
+    Ok((dir, [original, edited].map(|p| p.display().to_string())))
+}
+
 /// Whether `preserve` fails the rewrite, and what it flags, run with `--loose` when `loose`.
 /// `binary` is the executable file `main` resolved; exit 0 is a pass, 1 a failure and any
 /// other status an error.
@@ -217,15 +236,12 @@ pub fn preserve(
     loose: bool,
     exec: Exec,
 ) -> Result<(bool, Kinds), String> {
-    let dir = tempfile::tempdir().map_err(|e| e.to_string())?;
-    let (original, edited) = (dir.path().join("original.md"), dir.path().join("edited.md"));
-    fs::write(&original, source).map_err(|e| e.to_string())?;
-    fs::write(&edited, rewrite).map_err(|e| e.to_string())?;
+    let (_dir, files) = preserve_files(source, rewrite)?;
     let mut command = vec![binary.to_owned(), "preserve".to_owned()];
     if loose {
         command.push("--loose".to_owned());
     }
-    command.extend([original, edited].map(|p| p.display().to_string()));
+    command.extend(files);
     let done = exec(&command, &Input::Inherit).map_err(|e| e.message(binary))?;
     if done.code != 0 && done.code != 1 {
         let stderr = proc::text(&done.stderr)?;

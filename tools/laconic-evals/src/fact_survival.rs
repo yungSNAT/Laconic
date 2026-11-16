@@ -623,14 +623,11 @@ pub fn total_spend(folder: &Path) -> Result<f64, String> {
 
 /// The production preserve call for `summarise`: how many items the rewrite added.
 pub fn added_count(exec: Exec, source: &str, rewrite: &str) -> Result<i64, String> {
-    let dir = tempfile::tempdir().map_err(|e| e.to_string())?;
-    let (original, edited) = (dir.path().join("original.md"), dir.path().join("edited.md"));
-    fs::write(&original, source).map_err(|e| e.to_string())?;
-    fs::write(&edited, rewrite).map_err(|e| e.to_string())?;
+    let (_dir, files) = crate::fact_audit::preserve_files(source, rewrite)?;
     let command: Vec<String> = ["laconic-check", "preserve"]
         .into_iter()
         .map(str::to_owned)
-        .chain([original.display().to_string(), edited.display().to_string()])
+        .chain(files)
         .collect();
     let done = exec(&command, &Input::Inherit).map_err(|e| e.message("laconic-check"))?;
     let stdout = proc::text(&done.stdout)?;

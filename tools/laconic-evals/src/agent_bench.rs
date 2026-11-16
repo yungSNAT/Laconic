@@ -90,6 +90,10 @@ pub fn tests_pass(python: &Path, root: &Path, run: Run) -> Result<bool, String> 
 }
 
 fn number(value: &Value) -> Result<Num, String> {
+    // An int past i64 would otherwise become a rounded float.
+    if value.is_u64() && !value.is_i64() {
+        return Err(format!("the token count {value} is out of range"));
+    }
     value
         .as_i64()
         .map(Num::Int)
@@ -184,8 +188,13 @@ pub fn run(claude: &Path, rules: &str, root: &Path, run: Run) -> Result<Value, S
         .iter()
         .map(|t| if let Num::Int(i) = t { Some(*i) } else { None })
         .collect();
+    // Python adds ints exactly; a total past 64 bits is refused, never wrapped.
     let input_tokens = match ints {
-        Some(ints) => Num::Int(ints.iter().sum()),
+        Some(ints) => Num::Int(
+            ints.iter()
+                .try_fold(0_i64, |total, &i| total.checked_add(i))
+                .ok_or("the input token total is out of range")?,
+        ),
         None => Num::Float(py::sum(tokens.iter().map(|t| t.as_f64()))),
     };
     let field =
@@ -254,7 +263,7 @@ pub fn command(
                 if done.contains(&key) {
                     continue;
                 }
-                let dir = tempfile::tempdir().map_err(|e| e.to_string())?;
+                let dir = crate::run_evals::neutral_cwd(".tmp")?;
                 build(task, dir.path())?;
                 if tests_pass(python, dir.path(), run)? {
                     return Err(format!("{task} should start failing"));

@@ -217,6 +217,21 @@ fn normalising_folds_case_as_python_casefold() {
 }
 
 #[test]
+fn normalising_folds_with_python_3_15s_unicode_17_data() {
+    // Unicode 18 gave these case foldings; Python 3.15 (Unicode 17) leaves each unchanged,
+    // so a quote differing from its source only here must not match.
+    let unicode_18 = [
+        0xA7DD, 0xA7E2, 0xAB6C, 0xAB6D, 0x1DF40, 0x1DF48, 0x1DF4A, 0x1DF4D, 0x1DF51, 0x1DF68,
+        0x1DF6A, 0x1DF6C, 0x1DF6E, 0x1DF72, 0x1DF74, 0x1DF76, 0x1DF78, 0x1DF7A, 0x1DF7C, 0x1DF7E,
+        0x1DF95,
+    ];
+    for code in unicode_18 {
+        let text = char::from_u32(code).unwrap().to_string();
+        assert_eq!(normalise(&text), text, "U+{code:04X}");
+    }
+}
+
+#[test]
 fn a_verbatim_copy_reaches_the_judge_and_disagreements_are_counted() {
     let fixtures = [
         json!({"name": "copy", "case_id": "c", "rewrite": "@source", "default": "kept", "expected": {}, "invented": false}),

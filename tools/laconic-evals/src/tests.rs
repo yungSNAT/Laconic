@@ -236,10 +236,9 @@ fn judge_resumes_and_prints_its_cost() {
             json!({"runner": "b", "case_id": case, "trial": 1, "response": "y"}),
         ],
     );
-    write_rows(
-        &output,
-        &[json!({"setup": "a", "case_id": case, "trial": 1, "cost": 0.5})],
-    );
+    // A finished row ends its line, as the command writes it.
+    let finished = json!({"setup": "a", "case_id": case, "trial": 1, "cost": 0.5});
+    fs::write(&output, format!("{finished}\n")).unwrap();
     let timeouts = Mutex::new(Vec::new());
     let judge = |_: &str, timeout: Duration| {
         timeouts.lock().unwrap().push(timeout);
@@ -504,14 +503,16 @@ fn agent_bench_runs_and_records_an_unfinished_session() {
     let dir = tempfile::tempdir().unwrap();
     let out = dir.path().join("out.jsonl");
     let (last, _) = agent_bench::TASKS.last().unwrap();
-    let rows: Vec<Value> = agent_bench::TASKS
+    // Every run but the last task's under B is finished, each row ending its line.
+    let rows: String = agent_bench::TASKS
         .iter()
         .flat_map(|(task, _)| {
             ["A", "B"].map(|setup| json!({"task": task, "setup": setup, "trial": 1}))
         })
         .filter(|row| !(row["task"] == last.as_str() && row["setup"] == "B"))
+        .map(|row| format!("{row}\n"))
         .collect();
-    write_rows(&out, &rows);
+    fs::write(&out, rows).unwrap();
     let commands = Mutex::new(Vec::new());
     let run_in = |command: &[String], _: &Input, _: &Path, _: Duration| {
         commands.lock().unwrap().push(command[0].clone());

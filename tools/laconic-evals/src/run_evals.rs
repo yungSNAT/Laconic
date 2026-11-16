@@ -1127,14 +1127,10 @@ pub fn run_evaluations(args: &RunArgs, world: &World, out: &mut dyn Write) -> Re
     if !(args.budget_usd > 0.0 && args.budget_usd <= 25.0) {
         return Err("--budget-usd must be greater than 0 and no more than 25".into());
     }
-    if args.jobs < 1 {
-        return Err("--jobs must be at least 1".into());
-    }
-    let jobs = usize::try_from(args.jobs).map_err(|e| e.to_string())?;
+    let jobs = usize::try_from(args.jobs).ok().filter(|&jobs| jobs >= 1);
+    let jobs = jobs.ok_or("--jobs must be at least 1")?;
     // The requested model, not an attestation of the provider's resolved backend.
     let model = runner_model(&runner.command);
-    let write =
-        |out: &mut dyn Write, line: String| writeln!(out, "{line}").map_err(|e| e.to_string());
     let mut pending = Vec::new();
     for trial in 1..=args.trials {
         for case in &cases {
@@ -1148,9 +1144,9 @@ pub fn run_evaluations(args: &RunArgs, world: &World, out: &mut dyn Write) -> Re
                 args.condition.clone(),
                 args.runner.clone(),
             )) {
-                write(
+                py::print(
                     out,
-                    format!("skip completed {} trial {trial}: {id}", args.condition),
+                    &format!("skip completed {} trial {trial}: {id}", args.condition),
                 )?;
                 continue;
             }
@@ -1211,9 +1207,9 @@ pub fn run_evaluations(args: &RunArgs, world: &World, out: &mut dyn Write) -> Re
                 let written = to_float(Some(&row["cost_usd"])).and_then(|cost| {
                     reported_cost += cost;
                     append(&args.output, &format!("{}\n", py::dumps_row(&row)))?;
-                    write(
+                    py::print(
                         out,
-                        format!(
+                        &format!(
                             "{} trial {}: {}",
                             args.condition,
                             row["trial"],
@@ -1234,7 +1230,7 @@ pub fn run_evaluations(args: &RunArgs, world: &World, out: &mut dyn Write) -> Re
         eprintln!("Budget exhausted; stopping.");
         return Ok(2);
     }
-    write(out, format!("Reported cost: ${reported_cost:.4}"))?;
+    py::print(out, &format!("Reported cost: ${reported_cost:.4}"))?;
     Ok(0)
 }
 
@@ -1242,7 +1238,7 @@ pub fn run_evaluations(args: &RunArgs, world: &World, out: &mut dyn Write) -> Re
 pub fn validate(cases: &Path, out: &mut dyn Write) -> Result<u8, String> {
     let errors = validate_cases(&load_cases(cases)?);
     if errors.is_empty() {
-        writeln!(out, "Evaluation cases are valid.").map_err(|e| e.to_string())?;
+        py::print(out, "Evaluation cases are valid.")?;
         return Ok(0);
     }
     for error in errors {

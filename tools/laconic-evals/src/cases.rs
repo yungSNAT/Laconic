@@ -29,6 +29,11 @@ pub fn read_text(path: &Path) -> Result<String, String> {
         .map_err(|e| format!("{}: {e}", path.display()))
 }
 
+/// Writes `text` to `path`, replacing the file; an error names the file.
+pub fn write(path: &Path, text: &str) -> Result<(), String> {
+    fs::write(path, text).map_err(|e| format!("{}: {e}", path.display()))
+}
+
 /// Appends `text` to `path`, creating the file; an error names the file.
 pub fn append(path: &Path, text: &str) -> Result<(), String> {
     OpenOptions::new()
@@ -265,6 +270,10 @@ mod tests {
             "c\n"
         );
         let error = append(dir.path(), "row\n").unwrap_err();
+        assert!(error.starts_with(&format!("{}: ", dir.path().display())));
+        write(&path, "c\n").unwrap();
+        assert_eq!(fs::read_to_string(&path).unwrap(), "c\n");
+        let error = write(dir.path(), "row\n").unwrap_err();
         assert!(error.starts_with(&format!("{}: ", dir.path().display())));
     }
 

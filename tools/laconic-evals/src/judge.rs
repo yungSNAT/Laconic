@@ -561,8 +561,6 @@ pub fn command(
     sleep: Sleep,
     out: &mut dyn Write,
 ) -> Result<u8, String> {
-    let print =
-        |out: &mut dyn Write, line: String| writeln!(out, "{line}").map_err(|e| e.to_string());
     let rubric = grader_rubric(&read_text(&args.rubric)?);
     let cases = cases_by_id(&args.cases)?;
     let runner = load_runner(&args.runner_config, &args.runner)?;
@@ -581,7 +579,7 @@ pub fn command(
             group(prompt, case_id, name, labels).map_err(JudgeError::message)
         };
         let result = calibrate(&read_jsonl(fixtures)?, &cases, &rubric, &judge)?;
-        print(out, py::dumps_pretty(&result))?;
+        py::print(out, &py::dumps_pretty(&result))?;
         return Ok(0);
     }
     let (Some(responses), Some(output)) = (&args.responses, &args.output) else {
@@ -650,7 +648,7 @@ pub fn command(
     for g in complete {
         let place = format!("{}/trial {}", py::to_str(&g.case_id), py::to_str(&g.trial));
         if judged.contains(&g.key()) {
-            print(out, format!("skip judged {place}"))?;
+            py::print(out, &format!("skip judged {place}"))?;
             continue;
         }
         let case = cases.get(&py::key(&g.case_id)).ok_or_else(|| {
@@ -680,10 +678,10 @@ pub fn command(
             .map(|row| format!("{}\n", py::dumps_row(row)))
             .collect();
         append(output, &lines)?;
-        print(out, format!("judged {place}"))?;
+        py::print(out, &format!("judged {place}"))?;
     }
     if total_cost != 0.0 {
-        print(out, format!("Reported judge cost: ${total_cost:.4}"))?;
+        py::print(out, &format!("Reported judge cost: ${total_cost:.4}"))?;
     }
     if !skipped.is_empty() {
         eprintln!(

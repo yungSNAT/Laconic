@@ -1,4 +1,4 @@
-# dslop settings for evals/humanise_metrics.py. Every negation counts as a
+# dslop settings for laconic-evals humanise-metrics. Every negation counts as a
 # finding by default; a humanised rewrite must keep negations, so that rule is off.
 [patterns]
 banned-negation = false

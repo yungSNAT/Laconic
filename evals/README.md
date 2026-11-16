@@ -69,6 +69,17 @@ python3 scripts/run_evals.py run --runner-config setups.json --runner setup-laco
 
 Judge with `--conditions candidate comparator`, then score and measure with `--reference comparator`, which compares the candidate with the comparator in place of a baseline. Give every setup the same tools and the same reachable files, or the comparison measures access rather than instructions.
 
+## The benchmark tool
+
+The benchmarks below run `laconic-evals`, a Rust tool in `tools/laconic-evals`. Build it and put it on the PATH from the repository root:
+
+```bash
+cargo build --release --locked --manifest-path tools/laconic-evals/Cargo.toml
+export PATH="$PWD/tools/laconic-evals/target/release:$PATH"
+```
+
+Its default paths point into the checkout it was built from. `laconic-evals --help` lists the commands, and `--help` after a command lists its options.
+
 ## Humanising benchmark
 
 `humanise-cases.jsonl` holds 20 AI-written texts to humanise for an Australian reader, each with regex checks for the facts that must survive and the patterns that must go. To compare humanisers, install each as a Claude Code plugin in its own runner (`--plugin-dir`, `--add-dir`, `--tools Skill,Read` and an `--append-system-prompt-file` naming the skill to use), run each with `--no-injection` as one of the 3 conditions, then judge all 3 together:
@@ -78,28 +89,28 @@ python3 scripts/run_evals.py run --cases evals/humanise-cases.jsonl --runner-con
 python3 scripts/judge.py --runner claude --cases evals/humanise-cases.jsonl --conditions baseline candidate comparator --responses evals/results/responses.jsonl --output evals/results/scores.jsonl
 python3 scripts/judge.py --runner claude --rubric evals/humanise-rubric-neutral.md --cases evals/humanise-cases.jsonl --conditions baseline candidate comparator --responses evals/results/responses.jsonl --output evals/results/scores-neutral.jsonl
 python3 scripts/run_evals.py checks evals/results/responses.jsonl --cases evals/humanise-cases.jsonl
-python3 evals/humanise_metrics.py evals/results/responses.jsonl --avoid path/to/avoid-ai-writing/bin/avoid-ai-writing.js --dslop
+laconic-evals humanise-metrics evals/results/responses.jsonl --avoid path/to/avoid-ai-writing/bin/avoid-ai-writing.js --dslop
 ```
 
-`humanise-rubric-neutral.md` is the rubric without Laconic's house mechanics, so a humaniser is not marked down for house rules it never claims to follow. `humanise_metrics.py` reports each condition's length as a share of the source, `laconic-check` lint findings, its `bold-label` runs and `preserve` drops, and optionally the avoid-ai-writing detector and dslop (with negation findings off), beside the same measures on the source texts. Read `preserve` drops before citing them: removing a staged contrast drops its 'not' legitimately. It calls whichever `laconic-check` is on the PATH, so record that build with published counts: later versions add rules. A checker that exits with an error raises rather than counting as zero findings.
+`humanise-rubric-neutral.md` is the rubric without Laconic's house mechanics, so a humaniser is not marked down for house rules it never claims to follow. `humanise-metrics` reports each condition's length as a share of the source, `laconic-check` lint findings, its `bold-label` runs and `preserve` drops, and optionally the avoid-ai-writing detector and dslop (with negation findings off), beside the same measures on the source texts. Read `preserve` drops before citing them: removing a staged contrast drops its 'not' legitimately. It calls whichever `laconic-check` is on the PATH, so record that build with published counts: later versions add rules. A checker that exits with an error stops the run rather than counting as zero findings.
 
 ## Fact-survival benchmark
 
 This tests the core promise directly: does a shorter rewrite keep what the reader needs? `fact-ledgers.jsonl` lists 99 facts and 33 qualifiers (hedges, conditions, limits and commitments) from the 20 humanising sources. It was written from the sources alone, before any rewrite existed. `fact-cases.jsonl` gives every setup the same instruction, which names none of them.
 
 ```bash
-python3 evals/fact_setups.py evals/results/facts
-python3 evals/fact_setups.py --preflight evals/results/facts
-python3 evals/fact_survival.py calibrate --overhead evals/results/facts/overhead.jsonl
+laconic-evals fact-setups evals/results/facts
+laconic-evals fact-setups --preflight evals/results/facts
+laconic-evals fact-survival calibrate --overhead evals/results/facts/overhead.jsonl
 for pair in laconic-prose:6 laconic-session:6 humanizer:7 avoid:15 stop-slop:4 caveman:4 concise-control:2 no-skill:2; do
   setup=${pair%:*}; budget=${pair#*:}
-  python3 evals/fact_survival.py spend evals/results/facts --cap 48 || break
+  laconic-evals fact-survival spend evals/results/facts --cap 48 || break
   python3 scripts/run_evals.py run --cases evals/fact-cases.jsonl --runner-config evals/results/facts/runners.json --runner "$setup" --condition candidate --no-injection --trials 2 --jobs 4 --budget-usd "$budget" --output "evals/results/facts/run-$setup.jsonl"
 done
 cat evals/results/facts/run-*.jsonl > evals/results/facts/responses.jsonl
-python3 evals/fact_survival.py spend evals/results/facts --cap 48 && python3 evals/fact_survival.py judge evals/results/facts/responses.jsonl --output evals/results/facts/scores.jsonl
-python3 evals/fact_survival.py spend evals/results/facts --cap 60
-python3 evals/fact_survival.py report evals/results/facts/scores.jsonl evals/results/facts/responses.jsonl --cases evals/fact-cases.jsonl --reference laconic-prose
+laconic-evals fact-survival spend evals/results/facts --cap 48 && laconic-evals fact-survival judge evals/results/facts/responses.jsonl --output evals/results/facts/scores.jsonl
+laconic-evals fact-survival spend evals/results/facts --cap 60
+laconic-evals fact-survival report evals/results/facts/scores.jsonl evals/results/facts/responses.jsonl --cases evals/fact-cases.jsonl --reference laconic-prose
 ```
 
 The plan is US$46 of generation, about US$2 of preflight and calibration, and US$12 of judging: US$60. `spend` adds up the reported cost of every stage and stops the next one once the US$48 mark is reached. Budgets are soft thresholds, so calls already running can pass them; `spend` reports any overrun. A setup that stops early leaves `report` refusing to compare, because every setup must cover every text and trial exactly once. Preflight and calibration must pass before any result is cited.
@@ -112,12 +123,12 @@ Survival alone proves little, since copying the source scores 100%. Decided befo
 
 ## Fact-audit agreement
 
-This measures `laconic-check preserve` against a fact checker Laconic's author did not write, on rewrites Laconic did not make. The [AI Humanizer Benchmark](https://huggingface.co/datasets/ai-humanizer-benchmark/ai-humanizer-benchmark) publishes the AI-written texts of each monthly cycle and each commercial humaniser's rewrite of them. The paper [Humanized but Still True?](https://arxiv.org/abs/2611.00359) judged each number, name and quotation of 3 or more words in the 2026-10 cycle's rewrites as kept or altered, and published the judgements with its checker, [humanizer-fact-audit](https://github.com/zwang-devv/humanizer-fact-audit). `fact_audit_agreement.py` downloads both at pinned revisions into `evals/results/fact-audit`, which Git ignores, runs `preserve` on each source and rewrite, and prints the table below and the documents where the 2 checkers differ on numbers or quotations:
+This measures `laconic-check preserve` against a fact checker Laconic's author did not write, on rewrites Laconic did not make. The [AI Humanizer Benchmark](https://huggingface.co/datasets/ai-humanizer-benchmark/ai-humanizer-benchmark) publishes the AI-written texts of each monthly cycle and each commercial humaniser's rewrite of them. The paper [Humanized but Still True?](https://arxiv.org/abs/2611.00359) judged each number, name and quotation of 3 or more words in the 2026-10 cycle's rewrites as kept or altered, and published the judgements with its checker, [humanizer-fact-audit](https://github.com/zwang-devv/humanizer-fact-audit). `laconic-evals fact-audit` downloads both at pinned revisions into `evals/results/fact-audit`, which Git ignores, runs `preserve` on each source and rewrite, and prints the table below and the documents where the 2 checkers differ on numbers or quotations:
 
 ```bash
 cargo build --release --manifest-path tools/laconic-check/Cargo.toml
-python3 evals/fact_audit_agreement.py --laconic-check tools/laconic-check/target/release/laconic-check
-python3 evals/fact_audit_agreement.py --laconic-check tools/laconic-check/target/release/laconic-check --loose
+laconic-evals fact-audit --laconic-check tools/laconic-check/target/release/laconic-check
+laconic-evals fact-audit --laconic-check tools/laconic-check/target/release/laconic-check --loose
 ```
 
 Measured on 13 November 2026 over the 363 rewrites the paper judged (11 commercial humanisers, 33 texts each), benchmark revision `6306b2043736dd958cf39ee1d9a64956c54dd78a` and `humanizer-fact-audit` commit `e665dda0506a64c834886c94d8f328d447119a07`. A document counts under a kind when the paper marks at least one of its units of that kind altered, and `preserve` counts as reporting it when it reports any dropped item of that kind, not necessarily the same unit, so '43 of 47' is not a recall figure. Both versions ran on Linux (x86_64) as release binaries; the 0.5.0 counts, rerun on 14 November, match those first measured on commit `882cb7e` before its release:
@@ -155,10 +166,10 @@ Laconic minus `humanizer`: +5.97 percentage points under Opus 5.5 (95% interval 
 
 ## Agent cost benchmark
 
-`evals/agent_bench.py` measures whether a rule set changes how an agent works, not just how it writes. It builds 5 small Python repositories with one failing test each and asks Claude Code to fix them with tools limited to Read, Edit, Glob, Grep and `python -m unittest`. It records whether the tests pass afterwards, plus turns, tokens, cost and permission denials. It compares 2 rule files:
+`laconic-evals agent-bench` measures whether a rule set changes how an agent works, not just how it writes. It builds 5 small Python repositories with one failing test each and asks Claude Code to fix them with tools limited to Read, Edit, Glob, Grep and `python -m unittest`. It records whether the tests pass afterwards, plus turns, tokens, cost and permission denials. It compares 2 rule files:
 
 ```bash
-python3 evals/agent_bench.py rules-a.md rules-b.md 2 evals/results/agent-bench.jsonl
+laconic-evals agent-bench rules-a.md rules-b.md 2 evals/results/agent-bench.jsonl
 ```
 
 Everything runs in temporary folders, and each call is capped with `--max-budget-usd 1.5`.

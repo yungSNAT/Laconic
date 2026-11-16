@@ -212,7 +212,7 @@ pub struct Finding {
     pub message: String,
 }
 
-const CLOSERS: &[&str] = &[
+pub const CLOSERS: &[&str] = &[
     "hope this helps",
     "let me know if",
     "feel free to",
@@ -225,7 +225,7 @@ const CLOSERS: &[&str] = &[
 /// Stock phrases from the pattern catalogue that rarely carry meaning: staged
 /// openers, emphasis crutches, summary labels and business jargon. Matched as whole
 /// words, so 'circle backwards' is not a finding.
-const STOCK_PHRASES: &[&str] = &[
+pub const STOCK_PHRASES: &[&str] = &[
     "here's the thing",
     "let me be clear",
     "make no mistake",
@@ -260,7 +260,7 @@ const STOCK_PHRASES: &[&str] = &[
 /// Stacked hedges: a modal followed at once by a second qualifier. Advisory, as human
 /// writers stack them too; 'can possibly' is left out, as it is usually emphatic ('how can
 /// we possibly').
-const STACKED_HEDGES: &[&str] = &[
+pub const STACKED_HEDGES: &[&str] = &[
     "could potentially",
     "could possibly",
     "could perhaps",
@@ -282,7 +282,7 @@ const STACKED_HEDGES: &[&str] = &[
 /// Unnecessary hyphens: set phrases the house writes open and established compounds
 /// it writes closed, each with the suffixes that keep it the same word. A whole-word
 /// match only, so 'code-based' and 'data-setting' are not 'codebase' and 'dataset'.
-const HYPHENATED_FORMS: &[(&str, &str, &[&str])] = &[
+pub const HYPHENATED_FORMS: &[(&str, &str, &[&str])] = &[
     ("open-source", "open source", &["", "d"]),
     ("plain-language", "plain language", &[""]),
     ("public-sector", "public sector", &[""]),
@@ -303,7 +303,7 @@ const HYPHENATED_FORMS: &[(&str, &str, &[&str])] = &[
 
 /// Openers of a staged contrast ('not just a tool, it's a platform'). 'Not only ...
 /// but' is left alone: it is ordinary formal English and common in human prose.
-const CONTRAST_OPENERS: &[&str] = &[
+pub const CONTRAST_OPENERS: &[&str] = &[
     "not just ",
     "not simply ",
     "not merely ",
@@ -319,7 +319,7 @@ const CONTRAST_OPENERS: &[&str] = &[
 ];
 
 /// What follows the turn of a staged contrast, after a comma, semicolon or dash.
-const CONTRAST_TURNS: &[&str] = &[
+pub const CONTRAST_TURNS: &[&str] = &[
     "it's ",
     "it is ",
     "it was ",
@@ -332,7 +332,7 @@ const CONTRAST_TURNS: &[&str] = &[
 
 /// Reveal questions answered in the next sentence ('The result? A 40% cut.'). An explicit
 /// list: a general 'short question' test flags ordinary questions ('The dog died?').
-const REVEAL_PHRASES: &[&str] = &[
+pub const REVEAL_PHRASES: &[&str] = &[
     "the result",
     "the results",
     "the outcome",
@@ -359,13 +359,13 @@ const REVEAL_PHRASES: &[&str] = &[
 ];
 
 /// Auxiliary verbs that open a question; a reveal's answer never starts with one.
-const QUESTION_OPENERS: &[&str] = &[
+pub const QUESTION_OPENERS: &[&str] = &[
     "do", "does", "did", "is", "are", "was", "were", "can", "could", "will", "would", "should",
     "has", "have", "had", "don't", "doesn't", "didn't", "isn't", "aren't", "wasn't",
 ];
 
 /// US forms that are not caught by the -ize/-yze rule, with the Australian form.
-const US_WORDS: &[(&str, &str)] = &[
+pub const US_WORDS: &[(&str, &str)] = &[
     ("color", "colour"),
     ("colors", "colours"),
     ("colored", "coloured"),
@@ -401,10 +401,10 @@ const US_WORDS: &[(&str, &str)] = &[
 ];
 
 /// House overrides of the Style Manual, which prefers while and among.
-const WORD_CHOICES: &[(&str, &str)] = &[("while", "whilst"), ("among", "amongst")];
+pub const WORD_CHOICES: &[(&str, &str)] = &[("while", "whilst"), ("among", "amongst")];
 
 /// Words before 'while' that make it a noun: a while, a short while, worth your while.
-const WHILE_NOUN_BEFORE: &[&str] = &[
+pub const WHILE_NOUN_BEFORE: &[&str] = &[
     "a", "the", "this", "that", "short", "long", "little", "good", "great", "whole", "my", "your",
     "his", "her", "its", "our", "their",
 ];
@@ -452,7 +452,7 @@ const MARKERS_BEFORE_COMMA: &[&str] = &[
 /// Words that open a parenthetical segment between commas ('a folder, not a repository,').
 const PARENTHETICAL_OPENERS: &[&str] = &["which", "not"];
 
-const MONTHS: [&str; 12] = [
+pub const MONTHS: [&str; 12] = [
     "january",
     "february",
     "march",
@@ -470,7 +470,7 @@ const MONTHS: [&str; 12] = [
 /// Stems whose -ize is part of the word, not a US suffix, alone or compounded and inflected:
 /// downsizing, outsized, capsize, prized, seizing. US -ise words with these endings, such as
 /// emphasize, are in the word lists, which are checked first.
-const IZE_STEMS: &[&str] = &["size", "seize", "prize", "maize", "baize"];
+pub const IZE_STEMS: &[&str] = &["size", "seize", "prize", "maize", "baize"];
 
 fn ize_is_part_of_word(word: &str) -> bool {
     let base = match word.strip_suffix("ing") {
@@ -1150,7 +1150,7 @@ fn spells(before: &[char], acronym: &str) -> bool {
 }
 
 /// Chat-tool leftovers: citation markers and tracking tags in links.
-const RESIDUE_MARKERS: &[&str] = &[
+pub const RESIDUE_MARKERS: &[&str] = &[
     "oaicite",
     "contentreference",
     "utm_source=chatgpt",
@@ -2116,30 +2116,35 @@ fn capitalise(word: &str) -> String {
         .unwrap_or_default()
 }
 
-/// Numbers from 2 to 20 written as words. 'Zero' and 'one' stay as words.
+/// The numbers from 2 to 20 as words, in order. 'Zero' and 'one' stay as words.
+pub const NUMBER_WORDS: [&str; 19] = [
+    "two",
+    "three",
+    "four",
+    "five",
+    "six",
+    "seven",
+    "eight",
+    "nine",
+    "ten",
+    "eleven",
+    "twelve",
+    "thirteen",
+    "fourteen",
+    "fifteen",
+    "sixteen",
+    "seventeen",
+    "eighteen",
+    "nineteen",
+    "twenty",
+];
+
+/// A number from 2 to 20 written as a word, as its value.
 fn number_word(word: &str) -> Option<u8> {
-    const WORDS: [&str; 19] = [
-        "two",
-        "three",
-        "four",
-        "five",
-        "six",
-        "seven",
-        "eight",
-        "nine",
-        "ten",
-        "eleven",
-        "twelve",
-        "thirteen",
-        "fourteen",
-        "fifteen",
-        "sixteen",
-        "seventeen",
-        "eighteen",
-        "nineteen",
-        "twenty",
-    ];
-    WORDS.iter().position(|w| *w == word).map(|i| i as u8 + 2)
+    NUMBER_WORDS
+        .iter()
+        .position(|w| *w == word)
+        .map(|i| i as u8 + 2)
 }
 
 /// The word before position `s`, lower case, or an empty string.
@@ -2184,7 +2189,8 @@ fn starts_sentence(chars: &[char], s: usize) -> bool {
 /// by `laconic-tools gen-au-words`, one "us au" pair per line.
 const ESDB_US_WORDS: &str = include_str!("us_words.txt");
 
-fn esdb_us_words() -> &'static HashMap<&'static str, &'static str> {
+/// The generated US forms and their Australian spelling, keyed by the US form.
+pub fn esdb_us_words() -> &'static HashMap<&'static str, &'static str> {
     static MAP: OnceLock<HashMap<&'static str, &'static str>> = OnceLock::new();
     MAP.get_or_init(|| {
         ESDB_US_WORDS

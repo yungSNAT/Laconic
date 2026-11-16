@@ -879,6 +879,26 @@ This is enough for routine chat, comments, handoffs, emails, short repository pr
 </details>
 
 
+## The checker (optional)
+
+`laconic-check` lints prose for the house style and checks that an edit kept the source's facts; when it is on the PATH, both skills run it on written deliverables before sending. Put a binary from a [`laconic-check-v*` release](https://github.com/yungSNAT/Laconic/releases) on the PATH, install it with Scoop on Windows or build it with Rust:
+
+```bash
+scoop install https://github.com/yungSNAT/Laconic/releases/latest/download/laconic-check.json
+cargo install --locked --git https://github.com/yungSNAT/Laconic laconic-check
+```
+
+To give an agent its `lint` and `preserve` tools over MCP, add the server once in your host:
+
+```bash
+claude mcp add --scope user laconic-check -- laconic-check mcp    # Claude Code
+codex mcp add laconic-check -- laconic-check mcp                  # Codex
+gemini mcp add --scope user laconic-check laconic-check mcp       # Gemini CLI
+opencode mcp add laconic-check -- laconic-check mcp               # OpenCode 2
+```
+
+Other hosts that start local MCP servers take the command `laconic-check` with the argument `mcp`. [README.md](README.md#checker) describes both checks.
+
 ## How activation works
 
 1. **Installed, not invoked.** In Claude Code, Qwen Code, Codex and Grok, nothing happens until you invoke the skill explicitly. Claude Code, Qwen Code and Grok honour `disable-model-invocation: true` in `SKILL.md`; Codex honours `policy.allow_implicit_invocation: false` in `agents/openai.yaml`. Other harnesses may load every skill's description at startup and activate the skill themselves.

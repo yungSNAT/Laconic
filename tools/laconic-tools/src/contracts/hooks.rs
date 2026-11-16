@@ -181,6 +181,11 @@ fn runtimes_strip_frontmatter_with_trailing_whitespace() {
     for (name, output) in &outputs {
         assert!(!output.contains("name: fixture"), "{name}: {output}");
         assert!(output.contains("\n\nFixture body.\n"), "{name}: {output}");
+        // The banner names both phrases the skill stops on.
+        assert!(
+            output.contains("'stop laconic' or 'normal mode' turns it off"),
+            "{name}: {output}"
+        );
     }
     assert_one_output(&outputs);
 }

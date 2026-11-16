@@ -8,7 +8,8 @@ use crate::py;
 use fancy_regex::{Regex, RegexBuilder};
 use serde_json::Value;
 use std::collections::HashSet;
-use std::fs;
+use std::fs::{self, OpenOptions};
+use std::io::Write;
 use std::path::{Path, PathBuf};
 
 /// The repository root: two levels above this crate.
@@ -25,6 +26,21 @@ pub fn root() -> PathBuf {
 pub fn read_text(path: &Path) -> Result<String, String> {
     fs::read_to_string(path)
         .map(|text| py::universal_newlines(&text))
+        .map_err(|e| format!("{}: {e}", path.display()))
+}
+
+/// Writes `text` to `path`, replacing the file; an error names the file.
+pub fn write(path: &Path, text: &str) -> Result<(), String> {
+    fs::write(path, text).map_err(|e| format!("{}: {e}", path.display()))
+}
+
+/// Appends `text` to `path`, creating the file; an error names the file.
+pub fn append(path: &Path, text: &str) -> Result<(), String> {
+    OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(path)
+        .and_then(|mut file| file.write_all(text.as_bytes()))
         .map_err(|e| format!("{}: {e}", path.display()))
 }
 
@@ -62,10 +78,6 @@ pub fn load_cases(path: &Path) -> Result<Vec<Value>, String> {
 }
 
 /// The catalogue's problems, in the order the Python reported them.
-#[cfg_attr(
-    not(test),
-    expect(dead_code, reason = "run_evals validate calls it once ported")
-)]
 pub fn validate_cases(cases: &[Value]) -> Vec<String> {
     let mut errors = Vec::new();
     let mut seen = HashSet::new();
@@ -119,10 +131,6 @@ pub fn validate_cases(cases: &[Value]) -> Vec<String> {
 }
 
 /// A pattern compiled as `re.compile(pattern, re.I)`.
-#[cfg_attr(
-    not(test),
-    expect(dead_code, reason = "run_evals validate calls it once ported")
-)]
 pub fn compile(pattern: &str) -> Result<Regex, String> {
     RegexBuilder::new(pattern)
         .case_insensitive(true)
@@ -132,10 +140,6 @@ pub fn compile(pattern: &str) -> Result<Regex, String> {
 
 /// The strings of a checks field, or None when it is not a list of strings. A missing field
 /// is an empty list.
-#[cfg_attr(
-    not(test),
-    expect(dead_code, reason = "run_evals validate calls it once ported")
-)]
 fn strings<'a>(checks: &'a Value, field: &str) -> Option<Vec<&'a str>> {
     match py::get(checks, field) {
         None => Some(Vec::new()),
@@ -146,10 +150,6 @@ fn strings<'a>(checks: &'a Value, field: &str) -> Option<Vec<&'a str>> {
 
 /// A case's optional regex checks must compile, and must accept every known-good example and
 /// reject every known-bad one, so a broken check fails before a paid run.
-#[cfg_attr(
-    not(test),
-    expect(dead_code, reason = "run_evals validate calls it once ported")
-)]
 pub fn validate_checks(checks: &Value) -> Vec<String> {
     if !checks.is_object() {
         return vec!["checks must be an object".into()];
@@ -207,19 +207,11 @@ pub fn validate_checks(checks: &Value) -> Vec<String> {
 
 /// Whether `pattern` matches anywhere in `text`, case-insensitively. Patterns are validated
 /// before use; one that cannot compile or run never matches.
-#[cfg_attr(
-    not(test),
-    expect(dead_code, reason = "run_evals validate calls it once ported")
-)]
 fn found(pattern: &str, text: &str) -> bool {
     compile(pattern).is_ok_and(|re| re.is_match(text).unwrap_or(false))
 }
 
 /// The checks a response fails (case-insensitive regex search).
-#[cfg_attr(
-    not(test),
-    expect(dead_code, reason = "run_evals validate calls it once ported")
-)]
 pub fn check_response(checks: &Value, text: &str) -> Vec<String> {
     let list = |field| strings(checks, field).unwrap_or_default();
     let mut failed: Vec<String> = list("must_include")
@@ -265,6 +257,31 @@ mod tests {
         let (_dir, path) = temp_file("{\"id\": \"ok\"}\r\nnot-json\n");
         assert!(read_jsonl(&path).unwrap_err().contains("line 2: "));
         assert!(read_jsonl(&path.with_extension("missing")).is_err());
+    }
+
+    #[test]
+    fn append_adds_to_the_file_and_names_it_on_failure() {
+        let (dir, path) = temp_file("a\n");
+        append(&path, "b\n").unwrap();
+        append(&dir.path().join("new.jsonl"), "c\n").unwrap();
+        assert_eq!(fs::read_to_string(&path).unwrap(), "a\nb\n");
+        assert_eq!(
+            fs::read_to_string(dir.path().join("new.jsonl")).unwrap(),
+            "c\n"
+        );
+        let error = append(dir.path(), "row\n").unwrap_err();
+        assert!(error.starts_with(&format!("{}: ", dir.path().display())));
+        write(&path, "c\n").unwrap();
+        assert_eq!(fs::read_to_string(&path).unwrap(), "c\n");
+        let error = write(dir.path(), "row\n").unwrap_err();
+        assert!(error.starts_with(&format!("{}: ", dir.path().display())));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_full_disk_is_an_error_naming_the_file() {
+        let error = append(Path::new("/dev/full"), "row\n").unwrap_err();
+        assert!(error.starts_with("/dev/full: "), "{error}");
     }
 
     #[test]

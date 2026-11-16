@@ -2,11 +2,22 @@
 
 The harness compares response quality, not just length. Cases live in `cases.jsonl`; the scoring contract lives in `rubric.md`.
 
+## The evaluation tool
+
+Every command below runs `laconic-evals`, a Rust tool in `tools/laconic-evals`. Build it and put it on the PATH from the repository root:
+
+```bash
+cargo build --release --locked --manifest-path tools/laconic-evals/Cargo.toml
+export PATH="$PWD/tools/laconic-evals/target/release:$PATH"
+```
+
+Its default paths point into the checkout it was built from. `laconic-evals --help` lists the commands, and `--help` after a command lists its options.
+
 ## Validate and plan
 
 ```bash
-python3 scripts/run_evals.py validate
-python3 scripts/run_evals.py plan --trials 3 --include-comparator
+laconic-evals validate
+laconic-evals plan --trials 3 --include-comparator
 ```
 
 ## Run
@@ -14,14 +25,14 @@ python3 scripts/run_evals.py plan --trials 3 --include-comparator
 Run each condition into the same results file. Candidate and comparator instructions are injected from the supplied skill file; task prompts remain identical.
 
 ```bash
-python3 scripts/run_evals.py run \
+laconic-evals run \
   --runner claude \
   --condition baseline \
   --trials 3 \
   --budget-usd 12.50 \
   --output evals/results/responses.jsonl
 
-python3 scripts/run_evals.py run \
+laconic-evals run \
   --runner claude \
   --condition candidate \
   --condition-skill skills/laconic/SKILL.md \
@@ -45,7 +56,7 @@ Runs are resumable: rerun the same command after a provider failure and complete
 A skill should beat a plain 'be brief' instruction, not only no instruction at all; comparing against an empty prompt credits the skill with the generic effect of asking for brevity. `evals/controls/terse.md` holds that instruction ('Answer concisely.'). Run it as the comparator, either injected or as a whole setup:
 
 ```bash
-python3 scripts/run_evals.py run --runner claude --condition comparator --condition-skill evals/controls/terse.md --trials 2 --budget-usd 8 --output evals/results/responses.jsonl
+laconic-evals run --runner claude --condition comparator --condition-skill evals/controls/terse.md --trials 2 --budget-usd 8 --output evals/results/responses.jsonl
 ```
 
 ## Regex checks
@@ -53,7 +64,7 @@ python3 scripts/run_evals.py run --runner claude --condition comparator --condit
 A case may carry `checks`: `must_include` and `must_not_include` regular expressions (case-insensitive search) with known-good `pass` and known-bad `fail` example answers. `validate` rejects a case whose checks reject a good example or accept a bad one, so a broken check fails before a paid run. Score recorded responses without a judge:
 
 ```bash
-python3 scripts/run_evals.py checks evals/results/responses.jsonl
+laconic-evals checks evals/results/responses.jsonl
 ```
 
 A case with `target_words` asks for a length ('about 400 words'), and the summary gives each response's length in words as a share of it (`target_length`, `mean_target_share`), so a draft that falls well short of a requested length shows. The same responses always get the same result, so checks can be fixed and rescored without new calls. A check sees only what its patterns test: read the failures before citing a pass rate, and keep the blind judge for everything else. The summary does not enforce matching coverage, so confirm that conditions share the same checked case and trial pairs before comparing their rates.
@@ -63,32 +74,21 @@ A case with `target_words` asks for a length ('about 400 words'), and the summar
 To compare installed setups instead of injected skill text, give each setup its own runner in a runner config (for example `--plugin-dir`, `--add-dir` and `--append-system-prompt-file` for Claude Code), then run each with `--no-injection` so the task is sent unchanged:
 
 ```bash
-python3 scripts/run_evals.py run --runner-config setups.json --runner setup-current   --condition comparator --no-injection --trials 2 --budget-usd 8 --output evals/results/setups.jsonl
-python3 scripts/run_evals.py run --runner-config setups.json --runner setup-laconic   --condition candidate --no-injection --trials 2 --budget-usd 8 --output evals/results/setups.jsonl
+laconic-evals run --runner-config setups.json --runner setup-current   --condition comparator --no-injection --trials 2 --budget-usd 8 --output evals/results/setups.jsonl
+laconic-evals run --runner-config setups.json --runner setup-laconic   --condition candidate --no-injection --trials 2 --budget-usd 8 --output evals/results/setups.jsonl
 ```
 
 Judge with `--conditions candidate comparator`, then score and measure with `--reference comparator`, which compares the candidate with the comparator in place of a baseline. Give every setup the same tools and the same reachable files, or the comparison measures access rather than instructions.
-
-## The benchmark tool
-
-The benchmarks below run `laconic-evals`, a Rust tool in `tools/laconic-evals`. Build it and put it on the PATH from the repository root:
-
-```bash
-cargo build --release --locked --manifest-path tools/laconic-evals/Cargo.toml
-export PATH="$PWD/tools/laconic-evals/target/release:$PATH"
-```
-
-Its default paths point into the checkout it was built from. `laconic-evals --help` lists the commands, and `--help` after a command lists its options.
 
 ## Humanising benchmark
 
 `humanise-cases.jsonl` holds 20 AI-written texts to humanise for an Australian reader, each with regex checks for the facts that must survive and the patterns that must go. To compare humanisers, install each as a Claude Code plugin in its own runner (`--plugin-dir`, `--add-dir`, `--tools Skill,Read` and an `--append-system-prompt-file` naming the skill to use), run each with `--no-injection` as one of the 3 conditions, then judge all 3 together:
 
 ```bash
-python3 scripts/run_evals.py run --cases evals/humanise-cases.jsonl --runner-config setups.json --runner hum-laconic --condition candidate --no-injection --trials 2 --budget-usd 12 --output evals/results/hum-laconic.jsonl
-python3 scripts/judge.py --runner claude --cases evals/humanise-cases.jsonl --conditions baseline candidate comparator --responses evals/results/responses.jsonl --output evals/results/scores.jsonl
-python3 scripts/judge.py --runner claude --rubric evals/humanise-rubric-neutral.md --cases evals/humanise-cases.jsonl --conditions baseline candidate comparator --responses evals/results/responses.jsonl --output evals/results/scores-neutral.jsonl
-python3 scripts/run_evals.py checks evals/results/responses.jsonl --cases evals/humanise-cases.jsonl
+laconic-evals run --cases evals/humanise-cases.jsonl --runner-config setups.json --runner hum-laconic --condition candidate --no-injection --trials 2 --budget-usd 12 --output evals/results/hum-laconic.jsonl
+laconic-evals judge --runner claude --cases evals/humanise-cases.jsonl --conditions baseline candidate comparator --responses evals/results/responses.jsonl --output evals/results/scores.jsonl
+laconic-evals judge --runner claude --rubric evals/humanise-rubric-neutral.md --cases evals/humanise-cases.jsonl --conditions baseline candidate comparator --responses evals/results/responses.jsonl --output evals/results/scores-neutral.jsonl
+laconic-evals checks evals/results/responses.jsonl --cases evals/humanise-cases.jsonl
 laconic-evals humanise-metrics evals/results/responses.jsonl --avoid path/to/avoid-ai-writing/bin/avoid-ai-writing.js --dslop
 ```
 
@@ -105,7 +105,7 @@ laconic-evals fact-survival calibrate --overhead evals/results/facts/overhead.js
 for pair in laconic-prose:6 laconic-session:6 humanizer:7 avoid:15 stop-slop:4 caveman:4 concise-control:2 no-skill:2; do
   setup=${pair%:*}; budget=${pair#*:}
   laconic-evals fact-survival spend evals/results/facts --cap 48 || break
-  python3 scripts/run_evals.py run --cases evals/fact-cases.jsonl --runner-config evals/results/facts/runners.json --runner "$setup" --condition candidate --no-injection --trials 2 --jobs 4 --budget-usd "$budget" --output "evals/results/facts/run-$setup.jsonl"
+  laconic-evals run --cases evals/fact-cases.jsonl --runner-config evals/results/facts/runners.json --runner "$setup" --condition candidate --no-injection --trials 2 --jobs 4 --budget-usd "$budget" --output "evals/results/facts/run-$setup.jsonl"
 done
 cat evals/results/facts/run-*.jsonl > evals/results/facts/responses.jsonl
 laconic-evals fact-survival spend evals/results/facts --cap 48 && laconic-evals fact-survival judge evals/results/facts/responses.jsonl --output evals/results/facts/scores.jsonl
@@ -149,6 +149,29 @@ The default stays as it is, on a hand reading of the 41 documents that `--loose`
 
 The paper's judgements are the reference here, so the table measures agreement with them, not the accuracy of either checker. `preserve` never fails on a name, and it also fails on words such as 'not', 'must' and 'before', which the paper does not judge. The texts are CC BY 4.0 (AI Humanizer Benchmark); `humanizer-fact-audit` is by Ziyuan Wang, Genliang Zhu and Xiaobo Chen, its code MIT and its data CC BY 4.0. Nothing from either is stored in this repository.
 
+Two documents the paper marks kept, cleverhumanizer's s24 and s28, keep scare-quoted terms ('flexible leave', 'safe zone') but drop their quotation marks, and `preserve` reports each as a dropped quotation. It keeps counting the marks: without them, a reader takes words the source set apart as the writer's own. Ignoring the marks would let neither document pass, as each also fails on a dropped meaning word with or without `--loose` ('subject to' in s24; 'every', 'might' and 'before' in s28).
+
+### Against other fact checkers
+
+Two rival humanisers ship a deterministic check that a rewrite kept the source's facts. On 16 November 2026, each ran on the same 363 pairs as `laconic-check` built from commit `9a9323a`, all on Linux (x86_64):
+
+- [avoid-ai-writing](https://github.com/conorbronsdon/avoid-ai-writing) 3.38.0, `node detector/validate.js before.md after.md --residual-policy warn` (Node 26.13.1). The policy fails a rewrite only on its preservation checks, not on growth of its own AI-writing patterns.
+- [Zero Slop](https://github.com/manavmishra/ZeroSlop) at commit `42e4c952de7216ae915270b8cb0658ec08857650` (release 2.12.40), `python3 scripts/slopscore.py --fidelity before.md after.md` (Python 3.14.10). It fails a rewrite that drops a figure, name, quotation or link, or adds one.
+
+Each fails a rewrite with exit status 1. Both ran through the functions behind those commands (`validate` and `fidelity`), on the pairs `laconic-evals fact-audit` downloads.
+
+| Documents the paper marks as | Documents | `preserve` fails | `preserve --loose` fails | `validate.js` fails | Zero Slop fails |
+| --- | --- | --- | --- | --- | --- |
+| Any unit altered | 105 | 105 | 105 | 23 | 105 |
+| Numbers altered | 47 | 47 | 47 | 9 | 47 |
+| Quotations of 3 or more words altered | 58 | 58 | 58 | 15 | 58 |
+| Names altered | 28 | 28 | 28 | 5 | 28 |
+| Every unit kept | 258 | 235 | 194 | 25 | 243 |
+
+A failure need not name the altered unit. Of the 47 documents with an altered number, `preserve` reports a dropped number or quantity in 43 and Zero Slop a dropped figure in 30; `validate.js` warns of a missing number in 20 but fails only on a changed heading structure. Of the 58 with an altered quotation, `preserve` and Zero Slop report a dropped quotation in all 58; `validate.js` has no check for a quotation inside a paragraph. Of the 28 with an altered name, Zero Slop reports a dropped name in 27 and `preserve` lists one to check in 20, though it never fails on a name.
+
+Of the 258 kept documents, `preserve` fails 223 only on meaning words such as 'often' and 'not', which the paper does not judge, and 12 on a number, quantity or quotation. Zero Slop fails 191 only on dropped names, 17 on a dropped figure or quotation, 4 on a changed structure (such as headings or code) and 31 only on additions. `validate.js` passes 233 of them, but also 82 of the 105 altered documents. The judgements are the paper's; Laconic's author chose the 2 rivals and ran all 3 checks.
+
 ## Public-set fact check
 
 Run on 14 November 2026, with the method committed before any rewrite. The sources are the 99 public texts of the 2026-09, 2026-10 and 2026-11 cycles of the [AI Humanizer Benchmark](https://huggingface.co/datasets/ai-humanizer-benchmark/ai-humanizer-benchmark) at revision `35cf47ea697819c30d2d7845d37389db318e0363`, 33 a cycle. Laconic's prose skill at commit `2ea470ad1b34ae342052bb6153b8e9ec6556ce9b` and [humanizer](https://github.com/blader/humanizer/tree/v4.0.0) 4.0.0 (`b48c832f0f809c1b5658edbb838c2521b72f2413`) each rewrote every text twice, 3 texts to a fresh context, with the same request. Laconic received its `SKILL.md` with its edit-and-audit, patterns and style-manual-rules references flattened into labelled sections; `humanizer` received its complete `SKILL.md`. One round used `claude-opus-5-5` at high effort through Claude Code 2.1.322, the other `gpt-6.1-sol` at high reasoning through Codex CLI 0.169.0; the Opus round was added after the Codex round, with the method unchanged. All 396 planned rewrites in each round were valid.
@@ -163,6 +186,27 @@ Run on 14 November 2026, with the method committed before any rewrite. The sourc
 | `gpt-6.1-sol` | `humanizer` | 20 of 134 | 12 of 440 | 18 of 164 | 0 of 70 | 0.932 |
 
 Laconic minus `humanizer`: +5.97 percentage points under Opus 5.5 (95% interval 0.00 to +12.32) and 0.00 under `gpt-6.1-sol` (−2.21 to +2.14). The checker can flag a harmless paraphrase and misses changed conditions, negations, commitments and invented claims, so these are unit-loss rates, not full factual fidelity. The rounds used different models and runners and are not pooled. The run scripts, rewrites and scores are kept by Laconic's author and are not stored here; the texts are CC BY 4.0 and the checker's code is MIT.
+
+## Lint on outside corpora
+
+Run on 17 November 2026 with `laconic-check lint` built from `main` at `9a9323a`. The AI-tell rules here are `em-dash`, `clause-dashes`, `closer`, `stock-phrase`, `stacked-hedge`, `bold-label`, `staged-contrast`, `reveal-question` and `residue`; the rest check house style. Neither corpus is stored here.
+
+[SlopBench](https://github.com/pablocaeg/sloptotal/tree/7552b062f84b4e638235a08c57eff6a7fef9144b/tests/eval/slopbench) (sloptotal at `7552b062f84b4e638235a08c57eff6a7fef9144b`, a licence per row) pairs 1,626 human texts written before November 2022, such as encyclopedia articles, news, essays and Reddit posts, with 1,626 texts from 14 models on the same topics at the same lengths:
+
+| Texts | Words | Texts an AI-tell rule flags | Excluding the 2 dash rules | `staged-contrast` | AI-tell findings per 1,000 words |
+| --- | --- | --- | --- | --- | --- |
+| Human, 1,626 | 478,824 | 199 (12.2%) | 40 | 14 | 0.87 |
+| AI, 1,626 | 477,149 | 514 (31.6%) | 160 | 121 | 2.48 |
+
+The rules flag AI text 2.6 times as often as human text, but miss 68% of it, so a clean `lint` result says little about who wrote a text. They are prompts to revise, not a detector. Each human genre's count comes from one loop; this one prints 27 for its 90 news articles:
+
+```bash
+jq -c '.text' tests/eval/slopbench/corpus/human-news-ccnews.jsonl | while IFS= read -r t; do
+  jq -r . <<<"$t" | laconic-check lint --json - | jq -r '[.findings[].rule] | unique | join(" ")'
+done | grep -c -w -E 'em-dash|clause-dashes|closer|stock-phrase|stacked-hedge|bold-label|staged-contrast|reveal-question|residue'
+```
+
+[agent-style](https://github.com/yzhao062/agent-style/tree/bec03e7ee2d4dfad3b55b879cdd003a59099aa84/docs/bench-0.3.0-drafts/claude) publishes 40 drafts by Claude Opus 4.7 (`claude-opus-4-7`) for 10 writing tasks, 20 without its rules and 20 with them, and its own scorer's counts. Its `RULE-B` (em or en dashes as casual punctuation) is the one rule both checkers share. Without the rules, 10 drafts hold 22 em dashes and 6 hold 13 en dashes; `lint` flags all 22 em dashes and no en dash, and agent-style counts 27 `RULE-B` violations. With the rules, the drafts hold no dash of either kind and both counts are 0. Its other rules (long sentences, contractions and title-case headings) have no counterpart in `lint`.
 
 ## Agent cost benchmark
 
@@ -179,7 +223,7 @@ Everything runs in temporary folders, and each call is capped with `--max-budget
 Aggregate token usage, reported cost and response length from the completed responses file:
 
 ```bash
-python3 scripts/run_evals.py measure evals/results/responses.jsonl
+laconic-evals measure evals/results/responses.jsonl
 ```
 
 The summary reports input/output token totals, reported generation cost, stored
@@ -207,10 +251,10 @@ The command is read-only and makes no model calls.
 
 ## Judge and score
 
-`scripts/judge.py` grades the responses and writes the score rows for you:
+`laconic-evals judge` grades the responses and writes the score rows for you:
 
 ```bash
-python3 scripts/judge.py \
+laconic-evals judge \
   --runner claude \
   --responses evals/results/responses.jsonl \
   --output evals/results/scores.jsonl
@@ -240,7 +284,7 @@ stderr and left out rather than silently dropped.
 Before citing blocker counts, check the judge against hand labels. `judge-calibration.jsonl` holds 10 responses to existing cases, each labelled blocker or not: a correct and a wrong product, a destructive command with and without confirmation, a list missing Tasmania, a US spelling left in an edit, a status note with and without invented verification, a brief reply and a long but sound recommendation. `--calibrate` judges each alone with the same prompt and reports agreement:
 
 ```bash
-python3 scripts/judge.py --runner claude --calibrate evals/judge-calibration.jsonl
+laconic-evals judge --runner claude --calibrate evals/judge-calibration.jsonl
 ```
 
 On 1 November 2026 (Claude Code 2.1.312, `claude-opus-5-5`, 1 trial) it agreed on all 10, at a reported US$0.34. Read any disagreement before judging; the labels cover the blocker field only, not the 1 to 5 scores.
@@ -257,7 +301,7 @@ yourself and write one JSON object per response with these fields.
 Either way, apply the release gate:
 
 ```bash
-python3 scripts/run_evals.py score evals/results/scores.jsonl
+laconic-evals score evals/results/scores.jsonl
 ```
 
 Record the exact CLI and model versions with published results, including measured token and cost numbers. Do not compare conditions produced with different cases, models, trial counts or rubrics.

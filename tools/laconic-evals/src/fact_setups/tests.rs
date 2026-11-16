@@ -187,6 +187,15 @@ fn plugins_and_runners_refuse_to_overwrite() {
     assert!(runners(&missing, &[("a", missing.clone(), "a")]).is_err());
 }
 
+#[test]
+fn copying_names_a_folder_it_cannot_make() {
+    let dir = tempfile::tempdir().unwrap();
+    fs::write(dir.path().join("file"), "").unwrap();
+    let to = dir.path().join("file/copy");
+    let error = copy_tree(dir.path(), &to).unwrap_err();
+    assert!(error.starts_with(&to.display().to_string()), "{error}");
+}
+
 #[cfg(unix)]
 #[test]
 fn copying_reports_a_link_to_nothing() {
@@ -313,6 +322,11 @@ fn preflight_passes_when_every_setup_calls_its_skill() {
     assert_eq!(
         String::from_utf8(printed).unwrap(),
         "caveman: wanted caveman, called ['caveman']\n\n\n"
+    );
+    let mut closed: &mut [u8] = &mut [];
+    assert_eq!(
+        preflight(dir.path(), &fake, &mut closed),
+        Err("failed to write whole buffer".into())
     );
 }
 

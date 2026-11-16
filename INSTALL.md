@@ -879,6 +879,26 @@ This is enough for routine chat, comments, handoffs, emails, short repository pr
 </details>
 
 
+## The checker (optional)
+
+`laconic-check` lints prose for the house style and checks that an edit kept the source's facts; when it is on the PATH, both skills run it on written deliverables before sending. Put a binary from a [`laconic-check-v*` release](https://github.com/yungSNAT/Laconic/releases) on the PATH, install it with Scoop on Windows or build it with Rust:
+
+```bash
+scoop install https://github.com/yungSNAT/Laconic/releases/latest/download/laconic-check.json
+cargo install --locked --git https://github.com/yungSNAT/Laconic laconic-check
+```
+
+To give an agent its `lint` and `preserve` tools over MCP, add the server once in your host:
+
+```bash
+claude mcp add --scope user laconic-check -- laconic-check mcp    # Claude Code
+codex mcp add laconic-check -- laconic-check mcp                  # Codex
+gemini mcp add --scope user laconic-check laconic-check mcp       # Gemini CLI
+opencode mcp add laconic-check -- laconic-check mcp               # OpenCode 2
+```
+
+Other hosts that start local MCP servers take the command `laconic-check` with the argument `mcp`. [README.md](README.md#checker) describes both checks.
+
 ## How activation works
 
 1. **Installed, not invoked.** In Claude Code, Qwen Code, Codex and Grok, nothing happens until you invoke the skill explicitly. Claude Code, Qwen Code and Grok honour `disable-model-invocation: true` in `SKILL.md`; Codex honours `policy.allow_implicit_invocation: false` in `agents/openai.yaml`. Other harnesses may load every skill's description at startup and activate the skill themselves.
@@ -891,6 +911,8 @@ In Claude Code, Qwen Code, Codex and Grok, no middle ground: if you did not turn
 ## Troubleshooting
 
 **`/laconic` not in autocomplete.** Restart the agent. The plugin index is read at startup. On Grok, also run `grok plugin enable laconic` and confirm the install used `--trust`.
+
+**No Node for the always-on hook.** The plugin's hook runs with Node. Without it, add a `SessionStart` command hook to `~/.claude/settings.json` that runs `sh <laconic>/hooks/always-on.sh` (on Windows, `pwsh -NoProfile -File <laconic>\hooks\always-on.ps1`), where `<laconic>` is the installed plugin's folder or a clone of this repository. Each prints the same ruleset as the Node hook, and only when the flag exists.
 
 **Always-on flag has no effect.** Update the plugin (`claude plugin marketplace update laconic`, then `claude plugin update laconic@laconic`) and restart. Hooks are read at startup, and the flag needs the plugin version that ships `hooks/hooks.json`. Grok does not read `~/.claude/.laconic-always`; put the always-on block in `~/.grok/AGENTS.md` or `~/.grok/rules/laconic.md`.
 

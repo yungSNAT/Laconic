@@ -1343,7 +1343,20 @@ fn starts_with(chars: &[char], at: usize, s: &str) -> bool {
 fn opens_quote(chars: &[char], i: usize) -> bool {
     let before = if i == 0 { ' ' } else { chars[i - 1] };
     let after = chars.get(i + 1).copied().unwrap_or(' ');
-    !before.is_alphanumeric() && !after.is_whitespace()
+    !before.is_alphanumeric() && !after.is_whitespace() && !elides(chars, i)
+}
+
+/// Whether the apostrophe at `i` stands for the elided start of a year ('90s, '22) or of
+/// 'them', 'until', 'it is' or 'it was', so it opens no quotation.
+fn elides(chars: &[char], i: usize) -> bool {
+    let word: String = chars[i + 1..]
+        .iter()
+        .take_while(|c| c.is_alphanumeric())
+        .collect::<String>()
+        .to_lowercase();
+    let year = word.strip_suffix('s').unwrap_or(&word);
+    (year.len() == 2 && year.chars().all(|c| c.is_ascii_digit()))
+        || ["em", "til", "tis", "twas"].contains(&word.as_str())
 }
 
 fn closes_quote(chars: &[char], j: usize) -> bool {
@@ -2672,6 +2685,28 @@ mod tests {
             "Close the sum with $ (1) as its number.",
             "Set `x = 5 %` and `$ 27.99`.",
             "She quoted '5 %' and '$ 27.99' as faults.",
+        ] {
+            assert!(rules(text).is_empty(), "{text}: {:?}", rules(text));
+        }
+    }
+
+    #[test]
+    fn an_elided_year_or_word_opens_no_quotation() {
+        for text in [
+            "In the '90s, organized teams' work was good.",
+            "In the \u{2018}90s, organized teams\u{2019} work was good.",
+            "The class of '22 organized the teams' work.",
+            "Tell 'em the organized teams' work is good.",
+            "Wait 'til the organized teams' work is done.",
+            "'Tis organized, and the teams' work is good.",
+            "'Twas organized, and the teams' work was good.",
+        ] {
+            assert_eq!(rules(text), vec!["us-spelling"], "{text}");
+        }
+        for text in [
+            "She said 'the organized teams' work.",
+            "Quote '1980's organized' in the guide.",
+            "She quoted '5 organized' as a fault.",
         ] {
             assert!(rules(text).is_empty(), "{text}: {:?}", rules(text));
         }

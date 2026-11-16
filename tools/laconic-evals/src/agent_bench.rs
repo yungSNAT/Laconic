@@ -79,11 +79,19 @@ pub fn python(which: &dyn Fn(&str) -> Option<PathBuf>) -> Result<PathBuf, String
         .ok_or_else(|| "agent-bench: no python3 or python on PATH".to_owned())
 }
 
+/// Whether the repository's tests pass. Each run compiles into its own empty bytecode cache: an
+/// edit that keeps a file's size and modification second would otherwise reuse the bytecode of
+/// the code it replaced, from an earlier run or the agent's own.
 pub fn tests_pass(python: &Path, root: &Path, run: Run) -> Result<bool, String> {
-    let command: Vec<String> = [python.display().to_string()]
-        .into_iter()
-        .chain(["-m", "unittest", "discover", "-s", "tests", "-t", "."].map(str::to_owned))
-        .collect();
+    let cache = crate::run_evals::neutral_cwd(".tmp")?;
+    let command: Vec<String> = [
+        python.display().to_string(),
+        "-X".to_owned(),
+        format!("pycache_prefix={}", cache.path().display()),
+    ]
+    .into_iter()
+    .chain(["-m", "unittest", "discover", "-s", "tests", "-t", "."].map(str::to_owned))
+    .collect();
     let done = run(&command, &Input::Inherit, root, Duration::from_secs(120))
         .map_err(|e| e.message(&command[0]))?;
     Ok(done.code == 0)

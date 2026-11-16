@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: FSL-1.1-ALv2
 
 //! Top-level options: `--version` and `--help` succeed on standard output; anything else
-//! unknown is a usage error on standard error.
+//! unknown is a usage error on standard error. Also `lsp`'s exit statuses.
 
 use std::process::Command;
 
@@ -38,5 +38,43 @@ fn an_unknown_option_is_still_a_usage_error() {
         let (code, out, err) = run(args);
         assert_eq!((code, out.as_str()), (2, ""), "{args:?}");
         assert!(err.starts_with("usage:\n"), "{args:?}: {err}");
+    }
+}
+
+/// `lsp` exits 0 after `shutdown` and `exit`, 1 for `exit` alone, and 2 on a broken header.
+#[test]
+fn lsp_exit_statuses_follow_the_protocol() {
+    use std::io::Write;
+    use std::process::Stdio;
+    let frame = |body: &str| format!("Content-Length: {}\r\n\r\n{body}", body.len());
+    let init =
+        frame(r#"{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"capabilities":{}}}"#);
+    let shutdown = frame(r#"{"jsonrpc":"2.0","id":2,"method":"shutdown"}"#);
+    let exit = frame(r#"{"jsonrpc":"2.0","method":"exit"}"#);
+    for (input, wanted) in [
+        (format!("{init}{shutdown}{exit}"), 0),
+        (format!("{init}{exit}"), 1),
+        ("Content-Type: x\r\n\r\n".to_owned(), 2),
+    ] {
+        let mut child = Command::new(env!("CARGO_BIN_EXE_laconic-check"))
+            .arg("lsp")
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .unwrap();
+        child
+            .stdin
+            .take()
+            .unwrap()
+            .write_all(input.as_bytes())
+            .unwrap();
+        let out = child.wait_with_output().unwrap();
+        assert_eq!(out.status.code(), Some(wanted), "{input:?}");
+        let stdout = String::from_utf8(out.stdout).unwrap();
+        assert_eq!(
+            stdout.matches("Content-Length:").count(),
+            [2, 1, 0][wanted as usize]
+        );
     }
 }

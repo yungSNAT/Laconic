@@ -241,11 +241,13 @@ To run `lint` as a gate in CI or a pre-commit hook, these options set what it re
 | `--commit-msg` | Reads each file as a Git commit message, without comment lines or anything below the scissors line. |
 | `--config <file>` | Reads settings from this file instead of `.laconic-check`. |
 
-A `.laconic-check` file in the directory `lint` runs from holds `key = value` lines for `disable`, `only` and `max-findings`, and `#` comment lines. Rules on the command line add to its lists, and `--max-findings` replaces its count:
+A `.laconic-check` file in the directory `lint` runs from holds `key = value` lines for `disable`, `only` and `max-findings`, and `#` comment lines. An `accept` line lists words of letters only that `us-spelling` does not flag, each matched as a whole word in the same case, so `accept = color` keeps 'Color' at the start of a sentence flagged (on `main`, not yet in a release). Rules on the command line add to its lists, and `--max-findings` replaces its count:
 
 ```text
-# CSS property names such as color are expected here.
-disable = us-spelling
+# The CSS property names color and center are expected here.
+accept = color, center
+# This project uses serial commas.
+disable = serial-comma
 ```
 
 To silence one finding, put a comment naming its rule on its own line before it. It covers the next non-blank line only, and `lint` reports each named rule that silences nothing as `unused-suppression`, even when the comment silences another:
@@ -257,9 +259,9 @@ Set the color property of the heading to red.
 
 | Exit status | Meaning |
 | --- | --- |
-| 0 | `lint` found no more failing findings than `--max-findings` allows, or ran with `--warn`; `preserve` found nothing dropped, and nothing added under `--strict`; `mcp` reached the end of its input; `--version` or `--help` printed its text. |
-| 1 | `lint` found more failing findings than allowed; `preserve` found an item dropped, or one added under `--strict`. |
-| 2 | A usage, project file or read error, or an input or output error in `mcp`. After a read error, `lint` still lints the other files (on `main`, not yet in a release). |
+| 0 | `lint` found no more failing findings than `--max-findings` allows, or ran with `--warn`; `preserve` found nothing dropped, and nothing added under `--strict`; `mcp` reached the end of its input; `lsp` received `exit` after `shutdown`; `--version` or `--help` printed its text. |
+| 1 | `lint` found more failing findings than allowed; `preserve` found an item dropped, or one added under `--strict`; `lsp` received `exit` without `shutdown`, or its input ended. |
+| 2 | A usage, project file or read error, or an input or output error in `mcp` or `lsp`. After a read error, `lint` still lints the other files (on `main`, not yet in a release). |
 
 To run it with [pre-commit](https://pre-commit.com), put `laconic-check` on the PATH and add its hooks; the commit message hook also needs `pre-commit install --hook-type commit-msg`, and laconic-check 0.4.0 or later, as 0.3.0 lacks `--commit-msg`:
 
@@ -316,6 +318,29 @@ It is in laconic-check 0.3.0 and later. A laconic-check 0.2.0 binary needs the e
 
 ```bash
 claude mcp add --scope user laconic-check -- node /path/to/laconic/tools/laconic-check/mcp/server.mjs
+```
+
+`laconic-check lsp` is a language server over standard input and output, so an editor shows `lint`'s findings as you type (on `main`, not yet in a release). It lints each open Markdown document whenever it changes and marks each finding as a warning, or a hint if advisory, linked to its rule. It applies the `.laconic-check` file of the workspace folder that holds the document, the innermost when folders nest, and shows a file it cannot read or parse as an error on the first line. It offers nothing but diagnostics. In Neovim 0.11 or later, which makes the folder holding `.laconic-check` or `.git` the workspace folder:
+
+```lua
+vim.lsp.config('laconic_check', {
+  cmd = { 'laconic-check', 'lsp' },
+  filetypes = { 'markdown' },
+  root_markers = { '.laconic-check', '.git' },
+})
+vim.lsp.enable('laconic_check')
+```
+
+In Helix's `languages.toml`, where the list replaces Helix's default Markdown servers, so add any others you use:
+
+```toml
+[language-server.laconic-check]
+command = "laconic-check"
+args = ["lsp"]
+
+[[language]]
+name = "markdown"
+language-servers = ["laconic-check"]
 ```
 
 ## Always on

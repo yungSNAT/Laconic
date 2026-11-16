@@ -48,6 +48,8 @@ The manifests other than Claude Code's still declare plugin 0.5.0, so a build fr
 
 ### laconic-check: added
 
+- `laconic-check lsp`, a language server over standard input and output: it publishes `lint`'s findings for each open Markdown document as diagnostics, warnings or hints for advisory rules, each linked to its rule, with the settings of the `.laconic-check` file in the innermost workspace folder that holds the document. A project file it cannot read or parse is one error diagnostic. Positions are in UTF-8 when the client offers it and UTF-16 otherwise.
+- An `accept` line in `.laconic-check` lists words of letters only that `us-spelling` does not flag, each matched as a whole word in the same case.
 - `lint --sarif` prints a SARIF 2.1.0 log for GitHub code scanning: every rule with its description and link, and each finding at level `warning`, or `note` if advisory, located by the file's absolute `file` URI and a one-character region in UTF-16 code units. The exit status is unchanged; `--sarif` cannot be combined with `--json`.
 - The MCP `preserve` tool takes an optional boolean `loose`, which does what `preserve --loose` does; without it, or with `false`, a lost word such as 'often' is still reported as dropped. Any other value is an error.
 - `preserve --loose` lists a lost word of frequency, quantity, ability, prediction, cause or hedging, such as 'often', 'some', 'can', 'will', 'because' or 'likely', on a `check meaning word:` line that does not fail; without it, these losses fail as before. On the fact audit, 64 of the 258 rewrites the paper marks fully kept pass with `--loose` (23 without), and all 105 it marks altered still fail. `evals/fact_audit_agreement.py --loose` measures it.

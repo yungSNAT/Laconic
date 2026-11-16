@@ -2,11 +2,22 @@
 
 The harness compares response quality, not just length. Cases live in `cases.jsonl`; the scoring contract lives in `rubric.md`.
 
+## The evaluation tool
+
+Every command below runs `laconic-evals`, a Rust tool in `tools/laconic-evals`. Build it and put it on the PATH from the repository root:
+
+```bash
+cargo build --release --locked --manifest-path tools/laconic-evals/Cargo.toml
+export PATH="$PWD/tools/laconic-evals/target/release:$PATH"
+```
+
+Its default paths point into the checkout it was built from. `laconic-evals --help` lists the commands, and `--help` after a command lists its options.
+
 ## Validate and plan
 
 ```bash
-python3 scripts/run_evals.py validate
-python3 scripts/run_evals.py plan --trials 3 --include-comparator
+laconic-evals validate
+laconic-evals plan --trials 3 --include-comparator
 ```
 
 ## Run
@@ -14,14 +25,14 @@ python3 scripts/run_evals.py plan --trials 3 --include-comparator
 Run each condition into the same results file. Candidate and comparator instructions are injected from the supplied skill file; task prompts remain identical.
 
 ```bash
-python3 scripts/run_evals.py run \
+laconic-evals run \
   --runner claude \
   --condition baseline \
   --trials 3 \
   --budget-usd 12.50 \
   --output evals/results/responses.jsonl
 
-python3 scripts/run_evals.py run \
+laconic-evals run \
   --runner claude \
   --condition candidate \
   --condition-skill skills/laconic/SKILL.md \
@@ -45,7 +56,7 @@ Runs are resumable: rerun the same command after a provider failure and complete
 A skill should beat a plain 'be brief' instruction, not only no instruction at all; comparing against an empty prompt credits the skill with the generic effect of asking for brevity. `evals/controls/terse.md` holds that instruction ('Answer concisely.'). Run it as the comparator, either injected or as a whole setup:
 
 ```bash
-python3 scripts/run_evals.py run --runner claude --condition comparator --condition-skill evals/controls/terse.md --trials 2 --budget-usd 8 --output evals/results/responses.jsonl
+laconic-evals run --runner claude --condition comparator --condition-skill evals/controls/terse.md --trials 2 --budget-usd 8 --output evals/results/responses.jsonl
 ```
 
 ## Regex checks
@@ -53,7 +64,7 @@ python3 scripts/run_evals.py run --runner claude --condition comparator --condit
 A case may carry `checks`: `must_include` and `must_not_include` regular expressions (case-insensitive search) with known-good `pass` and known-bad `fail` example answers. `validate` rejects a case whose checks reject a good example or accept a bad one, so a broken check fails before a paid run. Score recorded responses without a judge:
 
 ```bash
-python3 scripts/run_evals.py checks evals/results/responses.jsonl
+laconic-evals checks evals/results/responses.jsonl
 ```
 
 A case with `target_words` asks for a length ('about 400 words'), and the summary gives each response's length in words as a share of it (`target_length`, `mean_target_share`), so a draft that falls well short of a requested length shows. The same responses always get the same result, so checks can be fixed and rescored without new calls. A check sees only what its patterns test: read the failures before citing a pass rate, and keep the blind judge for everything else. The summary does not enforce matching coverage, so confirm that conditions share the same checked case and trial pairs before comparing their rates.
@@ -63,32 +74,21 @@ A case with `target_words` asks for a length ('about 400 words'), and the summar
 To compare installed setups instead of injected skill text, give each setup its own runner in a runner config (for example `--plugin-dir`, `--add-dir` and `--append-system-prompt-file` for Claude Code), then run each with `--no-injection` so the task is sent unchanged:
 
 ```bash
-python3 scripts/run_evals.py run --runner-config setups.json --runner setup-current   --condition comparator --no-injection --trials 2 --budget-usd 8 --output evals/results/setups.jsonl
-python3 scripts/run_evals.py run --runner-config setups.json --runner setup-laconic   --condition candidate --no-injection --trials 2 --budget-usd 8 --output evals/results/setups.jsonl
+laconic-evals run --runner-config setups.json --runner setup-current   --condition comparator --no-injection --trials 2 --budget-usd 8 --output evals/results/setups.jsonl
+laconic-evals run --runner-config setups.json --runner setup-laconic   --condition candidate --no-injection --trials 2 --budget-usd 8 --output evals/results/setups.jsonl
 ```
 
 Judge with `--conditions candidate comparator`, then score and measure with `--reference comparator`, which compares the candidate with the comparator in place of a baseline. Give every setup the same tools and the same reachable files, or the comparison measures access rather than instructions.
-
-## The benchmark tool
-
-The benchmarks below run `laconic-evals`, a Rust tool in `tools/laconic-evals`. Build it and put it on the PATH from the repository root:
-
-```bash
-cargo build --release --locked --manifest-path tools/laconic-evals/Cargo.toml
-export PATH="$PWD/tools/laconic-evals/target/release:$PATH"
-```
-
-Its default paths point into the checkout it was built from. `laconic-evals --help` lists the commands, and `--help` after a command lists its options.
 
 ## Humanising benchmark
 
 `humanise-cases.jsonl` holds 20 AI-written texts to humanise for an Australian reader, each with regex checks for the facts that must survive and the patterns that must go. To compare humanisers, install each as a Claude Code plugin in its own runner (`--plugin-dir`, `--add-dir`, `--tools Skill,Read` and an `--append-system-prompt-file` naming the skill to use), run each with `--no-injection` as one of the 3 conditions, then judge all 3 together:
 
 ```bash
-python3 scripts/run_evals.py run --cases evals/humanise-cases.jsonl --runner-config setups.json --runner hum-laconic --condition candidate --no-injection --trials 2 --budget-usd 12 --output evals/results/hum-laconic.jsonl
-python3 scripts/judge.py --runner claude --cases evals/humanise-cases.jsonl --conditions baseline candidate comparator --responses evals/results/responses.jsonl --output evals/results/scores.jsonl
-python3 scripts/judge.py --runner claude --rubric evals/humanise-rubric-neutral.md --cases evals/humanise-cases.jsonl --conditions baseline candidate comparator --responses evals/results/responses.jsonl --output evals/results/scores-neutral.jsonl
-python3 scripts/run_evals.py checks evals/results/responses.jsonl --cases evals/humanise-cases.jsonl
+laconic-evals run --cases evals/humanise-cases.jsonl --runner-config setups.json --runner hum-laconic --condition candidate --no-injection --trials 2 --budget-usd 12 --output evals/results/hum-laconic.jsonl
+laconic-evals judge --runner claude --cases evals/humanise-cases.jsonl --conditions baseline candidate comparator --responses evals/results/responses.jsonl --output evals/results/scores.jsonl
+laconic-evals judge --runner claude --rubric evals/humanise-rubric-neutral.md --cases evals/humanise-cases.jsonl --conditions baseline candidate comparator --responses evals/results/responses.jsonl --output evals/results/scores-neutral.jsonl
+laconic-evals checks evals/results/responses.jsonl --cases evals/humanise-cases.jsonl
 laconic-evals humanise-metrics evals/results/responses.jsonl --avoid path/to/avoid-ai-writing/bin/avoid-ai-writing.js --dslop
 ```
 
@@ -105,7 +105,7 @@ laconic-evals fact-survival calibrate --overhead evals/results/facts/overhead.js
 for pair in laconic-prose:6 laconic-session:6 humanizer:7 avoid:15 stop-slop:4 caveman:4 concise-control:2 no-skill:2; do
   setup=${pair%:*}; budget=${pair#*:}
   laconic-evals fact-survival spend evals/results/facts --cap 48 || break
-  python3 scripts/run_evals.py run --cases evals/fact-cases.jsonl --runner-config evals/results/facts/runners.json --runner "$setup" --condition candidate --no-injection --trials 2 --jobs 4 --budget-usd "$budget" --output "evals/results/facts/run-$setup.jsonl"
+  laconic-evals run --cases evals/fact-cases.jsonl --runner-config evals/results/facts/runners.json --runner "$setup" --condition candidate --no-injection --trials 2 --jobs 4 --budget-usd "$budget" --output "evals/results/facts/run-$setup.jsonl"
 done
 cat evals/results/facts/run-*.jsonl > evals/results/facts/responses.jsonl
 laconic-evals fact-survival spend evals/results/facts --cap 48 && laconic-evals fact-survival judge evals/results/facts/responses.jsonl --output evals/results/facts/scores.jsonl
@@ -223,7 +223,7 @@ Everything runs in temporary folders, and each call is capped with `--max-budget
 Aggregate token usage, reported cost and response length from the completed responses file:
 
 ```bash
-python3 scripts/run_evals.py measure evals/results/responses.jsonl
+laconic-evals measure evals/results/responses.jsonl
 ```
 
 The summary reports input/output token totals, reported generation cost, stored
@@ -251,10 +251,10 @@ The command is read-only and makes no model calls.
 
 ## Judge and score
 
-`scripts/judge.py` grades the responses and writes the score rows for you:
+`laconic-evals judge` grades the responses and writes the score rows for you:
 
 ```bash
-python3 scripts/judge.py \
+laconic-evals judge \
   --runner claude \
   --responses evals/results/responses.jsonl \
   --output evals/results/scores.jsonl
@@ -284,7 +284,7 @@ stderr and left out rather than silently dropped.
 Before citing blocker counts, check the judge against hand labels. `judge-calibration.jsonl` holds 10 responses to existing cases, each labelled blocker or not: a correct and a wrong product, a destructive command with and without confirmation, a list missing Tasmania, a US spelling left in an edit, a status note with and without invented verification, a brief reply and a long but sound recommendation. `--calibrate` judges each alone with the same prompt and reports agreement:
 
 ```bash
-python3 scripts/judge.py --runner claude --calibrate evals/judge-calibration.jsonl
+laconic-evals judge --runner claude --calibrate evals/judge-calibration.jsonl
 ```
 
 On 1 November 2026 (Claude Code 2.1.312, `claude-opus-5-5`, 1 trial) it agreed on all 10, at a reported US$0.34. Read any disagreement before judging; the labels cover the blocker field only, not the 1 to 5 scores.
@@ -301,7 +301,7 @@ yourself and write one JSON object per response with these fields.
 Either way, apply the release gate:
 
 ```bash
-python3 scripts/run_evals.py score evals/results/scores.jsonl
+laconic-evals score evals/results/scores.jsonl
 ```
 
 Record the exact CLI and model versions with published results, including measured token and cost numbers. Do not compare conditions produced with different cases, models, trial counts or rubrics.

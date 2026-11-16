@@ -49,16 +49,6 @@ fn judge_one(
     }
 }
 
-fn append(path: &Path, line: &str) -> Result<(), String> {
-    let mut file = OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(path)
-        .map_err(|e| format!("{}: {e}", path.display()))?;
-    file.write_all(line.as_bytes())
-        .map_err(|e| format!("{}: {e}", path.display()))
-}
-
 /// Judge rows not yet in `output`; resumable. Returns the cost of this run.
 ///
 /// Up to `jobs` rows are judged at once, in a fixed shuffled order that spreads a budget stop

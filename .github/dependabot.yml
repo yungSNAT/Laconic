@@ -46,10 +46,3 @@ updates:
         update-types:
           - version-update:semver-minor
           - version-update:semver-major
-  # Coverage for the Codecov upload, pinned by hash in requirements-coverage.txt.
-  - package-ecosystem: pip
-    directory: /ci
-    schedule:
-      interval: weekly
-    cooldown:
-      default-days: 7

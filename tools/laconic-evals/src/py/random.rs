@@ -18,21 +18,16 @@ impl Random {
                 .wrapping_mul(previous ^ (previous >> 30))
                 .wrapping_add(u32::try_from(i).expect("below 624"));
         }
-        let key = [seed];
-        let (mut i, mut j) = (1usize, 0usize);
+        // The key is the one word `seed`, so its index j is always 0 and adds nothing.
+        let mut i = 1usize;
         for _ in 0..624 {
             let previous = state[i - 1];
             state[i] = (state[i] ^ (previous ^ (previous >> 30)).wrapping_mul(1_664_525))
-                .wrapping_add(key[j])
-                .wrapping_add(u32::try_from(j).expect("below 1"));
+                .wrapping_add(seed);
             i += 1;
-            j += 1;
             if i >= 624 {
                 state[0] = state[623];
                 i = 1;
-            }
-            if j >= key.len() {
-                j = 0;
             }
         }
         for _ in 0..623 {

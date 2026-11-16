@@ -88,6 +88,38 @@ fn the_fixtures_are_the_ones_python_built() {
         build("missing", Path::new(".")),
         Err("no task missing".into())
     );
+    let dir = tempfile::tempdir().unwrap();
+    let file = dir.path().join("file");
+    fs::write(&file, "").unwrap();
+    let (task, files) = &TASKS[0];
+    let error = build(task, &file).unwrap_err();
+    let first = file.join(&files[0].0);
+    assert!(
+        error.starts_with(&format!("{}: ", first.display())),
+        "{error}"
+    );
+}
+
+#[test]
+fn main_reports_a_closed_standard_output() {
+    let dir = tempfile::tempdir().unwrap();
+    let out = dir.path().join("out.jsonl");
+    let before = std::cell::Cell::new(true);
+    let tests = |_: &[String], _: &Input, _: &Path, _: Duration| {
+        done(i32::from(before.replace(!before.get())), "", "")
+    };
+    let session = |_: &Path, _: &str, _: &Path| Ok(json!({"turns": 1}));
+    let mut closed: &mut [u8] = &mut [];
+    let error = command(
+        &args(&out),
+        Some(Path::new("claude")),
+        Path::new("python3"),
+        &session,
+        &tests,
+        &mut closed,
+    );
+    assert_eq!(error, Err("failed to write whole buffer".into()));
+    assert_eq!(fs::read_to_string(&out).unwrap().lines().count(), 1);
 }
 
 fn args(out: &Path) -> Vec<String> {
@@ -242,6 +274,7 @@ fn run_sums_tokens_and_counts_denials_as_python_did() {
     let text = session(&reply(r#"{"usage": null, "permission_denials": "ab"}"#));
     assert_eq!(text["denials"], 2);
     assert_eq!(text["input_tokens"], 0);
+    assert_eq!(session(&reply("{}"))["denials"], 0);
 }
 
 #[test]

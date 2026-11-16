@@ -1,0 +1,35 @@
+{
+  "a": {
+    "texts": 4,
+    "survival_by_text": 0.875,
+    "fact_survival": 0.75,
+    "qualifier_survival": 1.0,
+    "hardened": 0,
+    "dropped": 1,
+    "unverified_quotes": 0,
+    "items": 6,
+    "length_share": 0.5833333333333333,
+    "invented_per_text": 0.75,
+    "added_per_text": 1,
+    "generation_cost": 0.6
+  },
+  "b": {
+    "texts": 4,
+    "survival_by_text": 0.5,
+    "fact_survival": 0.75,
+    "qualifier_survival": 0.0,
+    "hardened": 1,
+    "dropped": 2,
+    "unverified_quotes": 0,
+    "items": 6,
+    "length_share": 0.875,
+    "invented_per_text": 0,
+    "added_per_text": 1,
+    "generation_cost": 0.4,
+    "reference_gap": {
+      "mean": 0.375,
+      "low": 0.25,
+      "high": 0.5
+    }
+  }
+}

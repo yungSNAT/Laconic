@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en-AU">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src {{SCRIPT_HASH}} 'wasm-unsafe-eval'; style-src {{STYLE_HASH}}; base-uri 'none'; form-action 'none'">
+<title>laconic-check in the browser</title>
+<style>
+:root { color-scheme: dark; }
+body { margin: 0 auto; max-width: 60rem; padding: 1.5rem; background: #000000; color: #FFFFF0; font: 1rem/1.5 system-ui, sans-serif; }
+h1, h2 { font-weight: 600; }
+p.note, label { color: #E5E4E2; }
+textarea { box-sizing: border-box; width: 100%; min-height: 9rem; padding: 0.5rem; background: #000000; color: #FFFFF0; border: 1px solid #E5E4E2; font: 0.95rem/1.4 ui-monospace, monospace; }
+.pair { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr)); }
+button { margin: 0.75rem 0.75rem 0.75rem 0; padding: 0.5rem 1rem; background: #990024; color: #FFFFF0; border: 1px solid #FFFFF0; font: inherit; cursor: pointer; }
+textarea:focus-visible, button:focus-visible, input:focus-visible { outline: 3px solid #FFD32A; outline-offset: 2px; }
+.status { display: inline-block; padding: 0.1rem 0.5rem; border: 1px solid #FFFFF0; }
+.status.pass { background: #0F4B32; }
+.status.fail { background: #990024; }
+ol, ul { padding-left: 1.5rem; }
+li { margin: 0.25rem 0; }
+.rule { color: #FFD32A; font-family: ui-monospace, monospace; }
+</style>
+</head>
+<body>
+<h1>laconic-check in the browser</h1>
+<p class="note">The checker runs here, compiled to WebAssembly. Your text never leaves this page: its security policy blocks every network request.</p>
+
+<h2 id="lint-heading">Lint</h2>
+<p class="note">Flags house-style candidates in Markdown prose. A finding is a reason to look, not proof of a defect.</p>
+<label for="lint-text">Text to lint</label>
+<textarea id="lint-text" spellcheck="false">We analyzed the color data — it's three days late.</textarea>
+<button type="button" id="lint-run">Lint</button>
+<div aria-live="polite" aria-labelledby="lint-heading">
+<p id="lint-status"></p>
+<ol id="lint-findings"></ol>
+</div>
+
+<h2 id="preserve-heading">Preserve</h2>
+<p class="note">Lists numbers, code, URLs, quotations and words such as 'not' that the edit dropped or added.</p>
+<div class="pair">
+<div><label for="original">Original</label><textarea id="original" spellcheck="false">Revenue rose 5% to $47.3 million, but costs did not fall.</textarea></div>
+<div><label for="edited">Edit</label><textarea id="edited" spellcheck="false">Revenue rose to $47.3 billion and costs fell.</textarea></div>
+</div>
+<p>
+<label><input type="checkbox" id="loose"> Loose: list a lost word of frequency, cause or hedging to check instead of failing</label><br>
+<label><input type="checkbox" id="strict"> Strict: fail on an added item too</label>
+</p>
+<button type="button" id="preserve-run">Check the edit</button>
+<div aria-live="polite" aria-labelledby="preserve-heading">
+<p id="preserve-status"></p>
+<ul id="preserve-lines"></ul>
+</div>
+
+<script>
+"use strict";
+const encoder = new TextEncoder();
+const decoder = new TextDecoder();
+const byId = (id) => document.getElementById(id);
+let wasm;
+
+// Writes each text into its slot, runs the check and parses its JSON report.
+function call(texts, run) {
+  texts.forEach((text, slot) => {
+    const bytes = encoder.encode(text);
+    const at = wasm.input(slot, bytes.length);
+    new Uint8Array(wasm.memory.buffer, at, bytes.length).set(bytes);
+  });
+  const length = run();
+  return JSON.parse(decoder.decode(new Uint8Array(wasm.memory.buffer, wasm.output(), length)));
+}
+
+function show(statusId, passed, text) {
+  const status = byId(statusId);
+  status.className = "status " + (passed ? "pass" : "fail");
+  status.textContent = text;
+}
+
+function item(list, parts) {
+  const li = document.createElement("li");
+  for (const [text, className] of parts) {
+    const span = document.createElement("span");
+    span.textContent = text;
+    if (className) span.className = className;
+    li.append(span);
+  }
+  list.append(li);
+}
+
+function lint() {
+  const report = call([byId("lint-text").value], () => wasm.lint());
+  const list = byId("lint-findings");
+  list.replaceChildren();
+  if (report.error) return show("lint-status", false, report.error);
+  for (const f of report.findings) {
+    item(list, [["line " + f.line + ", column " + f.column + ": "], [f.rule, "rule"], [": " + f.message]]);
+  }
+  const n = report.findings.length;
+  show("lint-status", n === 0, n === 0 ? "No findings." : n + (n === 1 ? " finding" : " findings"));
+}
+
+function preserve() {
+  const strict = byId("strict").checked;
+  const report = call([byId("original").value, byId("edited").value], () => wasm.preserve(byId("loose").checked));
+  const list = byId("preserve-lines");
+  list.replaceChildren();
+  if (report.error) return show("preserve-status", false, report.error);
+  for (const line of report.lines) item(list, [[line]]);
+  const failed = report.dropped || (strict && report.added);
+  show("preserve-status", !failed, failed ? "Fails: the edit changed a protected item." : "Passes.");
+}
+
+WebAssembly.instantiate(Uint8Array.from(atob("{{WASM}}"), (c) => c.charCodeAt(0))).then(
+  ({ instance }) => {
+    wasm = instance.exports;
+    byId("lint-run").addEventListener("click", lint);
+    byId("preserve-run").addEventListener("click", preserve);
+    lint();
+    preserve();
+  },
+  (error) => show("lint-status", false, "The checker did not load: " + error),
+);
+</script>
+</body>
+</html>

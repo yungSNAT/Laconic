@@ -69,3 +69,70 @@ pub fn write_rows(path: &Path, rows: &[serde_json::Value]) {
     let lines: Vec<String> = rows.iter().map(|r| r.to_string()).collect();
     fs::write(path, lines.join("\n")).unwrap();
 }
+
+/// One recorded call of a `run_evals::Exec` stand-in.
+#[derive(Debug, Clone)]
+pub struct Run {
+    pub command: Vec<String>,
+    /// What the runner read on standard input; None when it read nothing or inherited it.
+    pub input: Option<String>,
+    pub null: bool,
+    pub cwd: Option<std::path::PathBuf>,
+    pub timeout: Option<std::time::Duration>,
+}
+
+impl Run {
+    fn new(
+        command: &[String],
+        input: &Input,
+        cwd: Option<&Path>,
+        timeout: Option<std::time::Duration>,
+    ) -> Self {
+        Run {
+            command: command.to_vec(),
+            input: match input {
+                Input::Bytes(b) => Some(String::from_utf8_lossy(b).into_owned()),
+                _ => None,
+            },
+            null: matches!(input, Input::Null),
+            cwd: cwd.map(Path::to_path_buf),
+            timeout,
+        }
+    }
+}
+
+/// A stand-in for the runner calls of `run`, `judge` and `scenario run`: records each call
+/// and answers with `reply(call index, call)`.
+pub struct Runs<F> {
+    calls: Mutex<Vec<Run>>,
+    reply: F,
+}
+
+impl<F: Fn(usize, &Run) -> Result<Output, Failure> + Sync> Runs<F> {
+    pub fn new(reply: F) -> Self {
+        Runs {
+            calls: Mutex::new(Vec::new()),
+            reply,
+        }
+    }
+
+    pub fn exec(
+        &self,
+        command: &[String],
+        input: &Input,
+        cwd: Option<&Path>,
+        timeout: Option<std::time::Duration>,
+    ) -> Result<Output, Failure> {
+        let call = Run::new(command, input, cwd, timeout);
+        let index = {
+            let mut calls = self.calls.lock().unwrap();
+            calls.push(call.clone());
+            calls.len() - 1
+        };
+        (self.reply)(index, &call)
+    }
+
+    pub fn calls(&self) -> Vec<Run> {
+        self.calls.lock().unwrap().clone()
+    }
+}

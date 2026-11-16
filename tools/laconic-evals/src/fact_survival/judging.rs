@@ -42,21 +42,11 @@ fn judge_one(
                     ("invented", Value::from(invented)),
                 ]));
             }
-            Err(ReplyError::Fatal(error)) => return Err(failed(error, 0.0)),
+            Err(ReplyError::Fatal(error)) => return Err(failed(error, cost)),
             Err(ReplyError::Retry(error)) if attempt == 3 => return Err(failed(error, cost)),
             Err(ReplyError::Retry(_)) => {}
         }
     }
-}
-
-fn append(path: &Path, line: &str) -> Result<(), String> {
-    let mut file = OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(path)
-        .map_err(|e| format!("{}: {e}", path.display()))?;
-    file.write_all(line.as_bytes())
-        .map_err(|e| format!("{}: {e}", path.display()))
 }
 
 /// Judge rows not yet in `output`; resumable. Returns the cost of this run.

@@ -226,7 +226,7 @@ scoop install https://github.com/yungSNAT/Laconic/releases/latest/download/lacon
 
 The Homebrew formula and winget manifests are attached for a tap and the winget catalogue, which do not list laconic-check yet.
 
-[docs/rules.md](docs/rules.md) describes each rule under its name, with examples, its Style Manual section and how often it flags human prose; it also shows which Style Manual sections the checker covers. Report a false positive with the [issue form](https://github.com/yungSNAT/Laconic/issues/new?template=false-positive.yml).
+[docs/rules.md](docs/rules.md) describes each rule under its name, with examples, its Style Manual section and how often it flags human prose; it also shows which Style Manual sections the checker covers. Report a false positive with the [issue form](https://github.com/yungSNAT/Laconic/issues/new?template=false-positive.yml). [docs/humanizer-coverage.md](docs/humanizer-coverage.md) maps each of the 26 patterns in `humanizer` 4.0.0 to the rule and the prose skill section that cover it: the skill covers all 26, and `lint` flags some form of 8.
 
 To run `lint` as a gate in CI or a pre-commit hook, these options set what it reports and what fails:
 
@@ -304,7 +304,9 @@ On 13 November 2026, `preserve` ran on the 363 rewrites by 11 commercial humanis
 | Numbers altered | 47 | 44 report a dropped number or quantity | 43 | 43 |
 | Quotations of 3 or more words altered | 58 | 58 report a dropped quotation | 58 | 58 |
 | Names altered | 28 | 20 list a name to check | 20 | 20 |
-| Every unit kept | 258 | 17 pass; 224 fail only on meaning words; 0 fail on a month, inline code or URL; 17 fail on a number, quantity or quotation | 23 pass; 222; 0; 13 | 64 pass; 181; 0; 13 |
+| Every unit kept | 258 | 17 pass; 224 fail only on meaning words; 0 fail on a month, inline code or URL; 17 fail on a number, quantity or quotation | 23 pass; 222; 0; 13 | 64 pass; 182; 0; 12 |
+
+On the same documents, avoid-ai-writing's `validate.js` fails 23 of the 105 altered and Zero Slop's fidelity check all 105; they pass 233 and 15 of the 258 kept, against 23 for `preserve` and 64 with `--loose` ([evals/README.md](evals/README.md#against-other-fact-checkers), 16 November 2026).
 
 `laconic-check mcp` serves `lint` and `preserve` as MCP tools over standard input and output, with nothing else to install. The `preserve` tool takes `loose: true` for what `--loose` does (on `main`, not yet in a release):
 
@@ -371,12 +373,13 @@ Delete the file to turn session mode off. Choose one or the other: session mode 
 
 ## Development
 
-The Codecov badge measures the Python evaluation scripts. The Rust checks run in CI.
+The Codecov badge measures `laconic-evals`, the evaluation harness in `tools/laconic-evals`. The other Rust checks run in CI.
 
 ```sh
 cargo test --manifest-path tools/laconic-tools/Cargo.toml
+cargo test --manifest-path tools/laconic-evals/Cargo.toml
+cargo run --quiet --locked --manifest-path tools/laconic-evals/Cargo.toml -- validate
 python3 -m unittest discover -s tests -v
-python3 scripts/run_evals.py validate
 ```
 
 [CONTRIBUTING.md](CONTRIBUTING.md) covers verification, evaluations and the release gate.

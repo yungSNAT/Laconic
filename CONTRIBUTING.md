@@ -74,7 +74,7 @@ Keep `.opencode/command/laconic.md` frontmatter as a JSON object between the `--
 
 ## Verification
 
-New functionality and bug fixes come with automated tests. Repository contracts (hooks, the OpenCode plugin, manifests, skills, install docs and CI guards) live in `tools/laconic-tools/src/contracts/`; the `tests` workflow runs them with `cargo test` for `tools/laconic-tools`, which also checks that every always-on snippet in `INSTALL.md` matches `rules/laconic.md`. The evaluation harness has Python tests in `tests/`, run by `python -m unittest discover -s tests -v` in the same workflow. `laconic-check` has its Rust test modules and `tools/laconic-check/tests/`, run by `cargo test` in the `laconic-check` workflow.
+New functionality and bug fixes come with automated tests. Repository contracts (hooks, the OpenCode plugin, manifests, skills, install docs and CI guards) live in `tools/laconic-tools/src/contracts/`; the `tests` workflow runs them with `cargo test` for `tools/laconic-tools`, which also checks that every always-on snippet in `INSTALL.md` matches `rules/laconic.md`. The evaluation harness, `tools/laconic-evals`, has Rust tests, run with line coverage by `cargo llvm-cov` in the same workflow, which also runs the MCP server test in `tests/` with `python -m unittest discover -s tests -v`. `laconic-check` has its Rust test modules and `tools/laconic-check/tests/`, run by `cargo test` in the `laconic-check` workflow.
 
 Changes to `lint` or `preserve` should also survive the fuzz targets in `tools/laconic-check/fuzz/`, which CI runs for 5 minutes each every Monday. They need a nightly toolchain and `cargo install cargo-fuzz`; from `tools/laconic-check`, run one with `cargo +nightly fuzz run lint` (or `preserve`). A crash leaves its input in `fuzz/artifacts/`; turn it into a test before fixing it.
 
@@ -84,11 +84,12 @@ Run relevant checks and include the commands and results in the PR. For hook, pl
 cargo test --manifest-path tools/laconic-tools/Cargo.toml
 ```
 
-For Python and evaluation-harness changes:
+For evaluation-harness changes, and the MCP server's Python test:
 
 ```sh
+cargo test --manifest-path tools/laconic-evals/Cargo.toml
+cargo run --quiet --locked --manifest-path tools/laconic-evals/Cargo.toml -- validate
 python3 -m unittest discover -s tests -v
-python3 scripts/run_evals.py validate
 ```
 
 For behaviour changes, add or update representative eval cases when needed, run paired baseline/candidate evaluations under the same conditions and apply the release gate. For hook or plugin changes, verify loading in an isolated configuration directory. If a check was not run, say so and explain why; never invent results or treat inspection as execution.

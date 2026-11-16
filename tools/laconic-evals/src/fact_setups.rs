@@ -6,7 +6,7 @@
 //! Run: `laconic-evals fact-setups evals/results/<new folder>`
 //! Then: `laconic-evals fact-setups --preflight evals/results/<that folder>`
 
-use crate::cases::{parse, read_text, root};
+use crate::cases::{append, parse, read_text, root, write};
 use crate::fact_survival::to_float;
 use crate::proc::{self, Failure, Input, Output};
 use crate::py;
@@ -82,10 +82,6 @@ fn strings(parts: &[&str]) -> Vec<String> {
     parts.iter().map(|&part| part.to_owned()).collect()
 }
 
-fn write(path: &Path, text: &str) -> Result<(), String> {
-    fs::write(path, text).map_err(|e| format!("{}: {e}", path.display()))
-}
-
 /// A rival's checkout at its pinned commit, cloned from `base` (https://github.com) unless
 /// already present.
 pub fn fetch(
@@ -129,8 +125,7 @@ fn copy_tree(from: &Path, to: &Path) -> Result<(), String> {
     let fail = |path: &Path, e: std::io::Error| format!("{}: {e}", path.display());
     fs::create_dir_all(to).map_err(|e| fail(to, e))?;
     let mut entries: Vec<_> = fs::read_dir(from)
-        .map_err(|e| fail(from, e))?
-        .collect::<Result<_, _>>()
+        .and_then(Iterator::collect)
         .map_err(|e| fail(from, e))?;
     entries.sort_by_key(fs::DirEntry::file_name);
     for entry in entries
@@ -357,13 +352,7 @@ pub fn preflight(here: &Path, exec: Exec, stdout: &mut dyn Write) -> Result<i32,
         None,
         true,
     );
-    let overhead = here.join("overhead.jsonl");
-    fs::OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(&overhead)
-        .and_then(|mut sink| sink.write_all(format!("{line}\n").as_bytes()))
-        .map_err(|e| format!("{}: {e}", overhead.display()))?;
+    append(&here.join("overhead.jsonl"), &format!("{line}\n"))?;
     Ok(i32::from(failures > 0))
 }
 
@@ -379,57 +368,25 @@ pub fn setup(here: &Path, base: &str, check: CheckCall) -> Result<String, String
         rival.insert(name, fetch(&src, name, repo, commit, base, check)?);
     }
     let skills_dir = root().join("skills");
-    let skills = [
+    let caveman = rival["caveman"].join("plugins").join("caveman");
+    let plugins = [
         (
             "laconic-prose",
-            plugin(
-                &setups,
-                "laconic-prose",
-                "laconic-prose",
-                &skills_dir.join("laconic-prose"),
-            )?,
             "laconic-prose",
+            skills_dir.join("laconic-prose"),
         ),
-        (
-            "laconic-session",
-            plugin(
-                &setups,
-                "laconic-session",
-                "laconic",
-                &skills_dir.join("laconic"),
-            )?,
-            "laconic",
-        ),
-        (
-            "humanizer",
-            plugin(&setups, "humanizer", "humanizer", &rival["humanizer"])?,
-            "humanizer",
-        ),
-        (
-            "avoid",
-            rival["avoid"].join("plugins").join("avoid-ai-writing"),
-            "avoid-ai-writing",
-        ),
-        (
-            "stop-slop",
-            plugin(&setups, "stop-slop", "stop-slop", &rival["stop-slop"])?,
-            "stop-slop",
-        ),
-        (
-            "caveman",
-            plugin(
-                &setups,
-                "caveman",
-                "caveman",
-                &rival["caveman"]
-                    .join("plugins")
-                    .join("caveman")
-                    .join("skills")
-                    .join("caveman"),
-            )?,
-            "caveman",
-        ),
+        ("laconic-session", "laconic", skills_dir.join("laconic")),
+        ("humanizer", "humanizer", rival["humanizer"].clone()),
+        ("stop-slop", "stop-slop", rival["stop-slop"].clone()),
+        ("caveman", "caveman", caveman.join("skills").join("caveman")),
     ];
+    let mut skills = Vec::new();
+    for (name, skill, path) in plugins {
+        skills.push((name, plugin(&setups, name, skill, &path)?, skill));
+    }
+    // avoid-ai-writing ships as a plugin, so it runs from its clone.
+    let avoid = rival["avoid"].join("plugins").join("avoid-ai-writing");
+    skills.insert(3, ("avoid", avoid, "avoid-ai-writing"));
     let config = runners(&setups, &skills)?;
     write(
         &here.join("runners.json"),

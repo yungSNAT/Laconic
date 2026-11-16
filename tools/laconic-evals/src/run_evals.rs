@@ -7,7 +7,7 @@
 use crate::cases::{check_response, load_cases, read_jsonl, read_text, validate_cases};
 use crate::fact_survival::to_float;
 use crate::proc::{self, Failure, Input, Output};
-use crate::py;
+use crate::py::{self, type_name};
 use serde_json::{Map, Value, json};
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fs::{self, OpenOptions};
@@ -53,19 +53,6 @@ impl Fault {
         match self {
             Fault::Value(message) | Fault::Other(message) => message,
         }
-    }
-}
-
-/// The type name Python's error messages give a JSON value.
-pub fn type_name(value: &Value) -> &'static str {
-    match value {
-        Value::Null => "NoneType",
-        Value::Bool(_) => "bool",
-        Value::Number(n) if n.is_f64() => "float",
-        Value::Number(_) => "int",
-        Value::String(_) => "str",
-        Value::Array(_) => "list",
-        Value::Object(_) => "dict",
     }
 }
 

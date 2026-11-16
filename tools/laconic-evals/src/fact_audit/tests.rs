@@ -407,7 +407,7 @@ fn an_interrupted_download_is_fetched_again() {
 }
 
 #[test]
-fn http_get_reads_a_whole_body_and_reports_a_failed_status() {
+fn http_get_reads_a_whole_body_and_reports_a_failed_status_or_a_cut_body() {
     use std::io::{BufRead, BufReader, Write};
     use std::net::TcpListener;
     let listener = TcpListener::bind("127.0.0.1:0").unwrap();
@@ -415,7 +415,12 @@ fn http_get_reads_a_whole_body_and_reports_a_failed_status() {
     let body = "x".repeat(11 * 1024 * 1024);
     let served = body.clone();
     let server = std::thread::spawn(move || {
-        for (status, content) in [("200 OK", served.as_str()), ("404 Not Found", "")] {
+        let replies = [
+            ("200 OK", served.len(), served.as_str()),
+            ("404 Not Found", 0, ""),
+        ];
+        // The last reply closes the connection after 5 of the 9 bytes it promised.
+        for (status, length, content) in replies.into_iter().chain([("200 OK", 9, "short")]) {
             let (stream, _) = listener.accept().unwrap();
             let mut reader = BufReader::new(stream.try_clone().unwrap());
             let mut line = String::new();
@@ -425,8 +430,7 @@ fn http_get_reads_a_whole_body_and_reports_a_failed_status() {
             let mut stream = stream;
             write!(
                 stream,
-                "HTTP/1.1 {status}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{content}",
-                content.len()
+                "HTTP/1.1 {status}\r\nContent-Length: {length}\r\nConnection: close\r\n\r\n{content}"
             )
             .unwrap();
         }
@@ -437,6 +441,7 @@ fn http_get_reads_a_whole_body_and_reports_a_failed_status() {
         body.len(),
         "beyond ureq's 10 MB default"
     );
+    assert!(http_get(&url).unwrap_err().starts_with(&url));
     assert!(http_get(&url).unwrap_err().starts_with(&url));
     server.join().unwrap();
 }

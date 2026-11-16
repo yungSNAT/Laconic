@@ -1130,3 +1130,45 @@ fn cases_match_their_sources() {
         py::universal_newlines(&committed)
     );
 }
+
+#[test]
+fn every_failed_row_is_costed_and_one_failure_is_reported() {
+    let dir = tempfile::tempdir().unwrap();
+    let call = |_: &str| -> Result<(Value, f64), String> { Err("judge exited 1".into()) };
+    let error = judge_rows(
+        &rows(),
+        &ledgers(),
+        &sources_of(&[("c", "Source.")]),
+        &dir.path().join("scores.jsonl"),
+        &call,
+        2,
+        12.0,
+    )
+    .unwrap_err();
+    assert!(error.ends_with(": judge exited 1"), "{error}");
+    let overhead = read_jsonl(&dir.path().join("overhead.jsonl")).unwrap();
+    assert_eq!(overhead.len(), 2);
+    assert!(overhead.iter().all(|row| row["stage"] == "failed-judge"));
+}
+
+#[cfg(unix)]
+#[test]
+fn a_full_disk_is_an_error_naming_the_file() {
+    let error = append(Path::new("/dev/full"), "row\n").unwrap_err();
+    assert!(error.starts_with("/dev/full: "), "{error}");
+}
+
+#[test]
+fn a_response_without_a_trial_is_an_error() {
+    let kept = marks(&[("fact", "kept")]);
+    let error = summarise(
+        &[score("a", "c", 1, kept, json!([]))],
+        &[json!({"runner": "a", "case_id": "c", "response": "x"})],
+        &sources_of(&[("c", "x")]),
+        "a",
+        &no_added,
+        1,
+        None,
+    );
+    assert_eq!(error, Err("a row has no 'trial'".into()));
+}

@@ -12,7 +12,7 @@ use crate::cases::{parse, read_text};
 use crate::fact_audit::Exec;
 use crate::humanise::{source_text, words};
 use crate::proc::{self, Input};
-use crate::py::{self, Num, field, text};
+use crate::py::{self, Num, field, text, type_name};
 use fancy_regex::Regex;
 use serde_json::{Map, Value, json};
 use std::collections::{BTreeMap, BTreeSet, HashSet};
@@ -191,19 +191,6 @@ pub fn normalise(text: &str) -> String {
     icu_casemap::CaseMapper::new()
         .fold_string(&joined)
         .into_owned()
-}
-
-/// Python's type name for a JSON value, for error messages.
-fn type_name(value: &Value) -> &'static str {
-    match value {
-        Value::Null => "NoneType",
-        Value::Bool(_) => "bool",
-        Value::Number(n) if n.is_f64() => "float",
-        Value::Number(_) => "int",
-        Value::String(_) => "str",
-        Value::Array(_) => "list",
-        Value::Object(_) => "dict",
-    }
 }
 
 /// The reply's ids mapped to their rows, as `{row.get("id"): row for row in parsed["items"]}`.

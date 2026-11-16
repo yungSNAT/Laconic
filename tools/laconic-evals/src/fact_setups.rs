@@ -129,8 +129,7 @@ fn copy_tree(from: &Path, to: &Path) -> Result<(), String> {
     let fail = |path: &Path, e: std::io::Error| format!("{}: {e}", path.display());
     fs::create_dir_all(to).map_err(|e| fail(to, e))?;
     let mut entries: Vec<_> = fs::read_dir(from)
-        .map_err(|e| fail(from, e))?
-        .collect::<Result<_, _>>()
+        .and_then(Iterator::collect)
         .map_err(|e| fail(from, e))?;
     entries.sort_by_key(fs::DirEntry::file_name);
     for entry in entries

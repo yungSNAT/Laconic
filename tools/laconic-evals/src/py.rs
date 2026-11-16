@@ -127,6 +127,19 @@ fn escape_into(out: &mut String, text: &str, ascii: bool) {
     out.push('"');
 }
 
+/// The type name Python's error messages give a JSON value.
+pub fn type_name(value: &Value) -> &'static str {
+    match value {
+        Value::Null => "NoneType",
+        Value::Bool(_) => "bool",
+        Value::Number(n) if n.is_f64() => "float",
+        Value::Number(_) => "int",
+        Value::String(_) => "str",
+        Value::Array(_) => "list",
+        Value::Object(_) => "dict",
+    }
+}
+
 /// `json.dumps(value, ensure_ascii=ascii, indent=indent)`.
 pub fn dumps(value: &Value, indent: Option<usize>, ascii: bool) -> String {
     let mut out = String::new();
@@ -299,8 +312,7 @@ pub fn compare(a: &Value, b: &Value) -> Result<Ordering, String> {
                 if let (Some(p), Some(q)) = (a.as_i64(), b.as_i64()) {
                     Ok(p.cmp(&q))
                 } else {
-                    x.partial_cmp(&y)
-                        .ok_or_else(|| "cannot order NaN".to_owned())
+                    Ok(x.partial_cmp(&y).expect("a JSON number is never NaN"))
                 }
             }
             _ => Err(format!(
@@ -442,10 +454,6 @@ fn divide(p: &BigInt, q: &BigUint) -> f64 {
     )]
     let mut value = kept as f64;
     let mut exponent = -shift + drop;
-    while exponent > 1000 {
-        value *= 2f64.powi(1000);
-        exponent -= 1000;
-    }
     while exponent < -1000 {
         value *= 2f64.powi(-1000);
         exponent += 1000;
@@ -479,9 +487,8 @@ pub fn mean(values: impl IntoIterator<Item = Num>) -> Option<Num> {
         let count = BigInt::from(count);
         if &whole % &count == BigInt::from(0) {
             let quotient = whole / count;
-            if let Ok(i) = i64::try_from(&quotient) {
-                return Some(Num::Int(i));
-            }
+            let mean = i64::try_from(&quotient).expect("a mean lies between its values");
+            return Some(Num::Int(mean));
         }
     }
     Some(Num::Float(divide(&total, &denominator)))
@@ -528,21 +535,16 @@ impl Random {
                 .wrapping_mul(previous ^ (previous >> 30))
                 .wrapping_add(u32::try_from(i).expect("below 624"));
         }
-        let key = [seed];
-        let (mut i, mut j) = (1usize, 0usize);
+        // The key is the one word `seed`, so its index j is always 0 and adds nothing.
+        let mut i = 1usize;
         for _ in 0..624 {
             let previous = state[i - 1];
             state[i] = (state[i] ^ (previous ^ (previous >> 30)).wrapping_mul(1_664_525))
-                .wrapping_add(key[j])
-                .wrapping_add(u32::try_from(j).expect("below 1"));
+                .wrapping_add(seed);
             i += 1;
-            j += 1;
             if i >= 624 {
                 state[0] = state[623];
                 i = 1;
-            }
-            if j >= key.len() {
-                j = 0;
             }
         }
         for _ in 0..623 {

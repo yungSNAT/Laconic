@@ -314,6 +314,11 @@ fn preflight_passes_when_every_setup_calls_its_skill() {
         String::from_utf8(printed).unwrap(),
         "caveman: wanted caveman, called ['caveman']\n\n\n"
     );
+    let mut closed: &mut [u8] = &mut [];
+    assert_eq!(
+        preflight(dir.path(), &fake, &mut closed),
+        Err("failed to write whole buffer".into())
+    );
 }
 
 #[test]

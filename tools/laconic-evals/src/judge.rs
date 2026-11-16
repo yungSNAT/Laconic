@@ -6,10 +6,10 @@
 use crate::cases::{load_cases, read_jsonl, read_text};
 use crate::fact_survival::to_float;
 use crate::proc::Input;
-use crate::py;
+use crate::py::{self, type_name};
 use crate::run_evals::{
     Exec, Fault, Runner, Sleep, backoff, load_runner, neutral_cwd, parse_response,
-    run_with_timeout, sort_by_pair, type_name,
+    run_with_timeout, sort_by_pair,
 };
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};

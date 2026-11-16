@@ -271,6 +271,12 @@ fn run_sums_tokens_and_counts_denials_as_python_did() {
         r#"{"usage": {"input_tokens": 9007199254740993, "cache_creation_input_tokens": 9007199254740997, "cache_read_input_tokens": 1.5}}"#,
     ));
     assert_eq!(mixed["input_tokens"], json!(18_014_398_509_481_992.0));
+    // After the first float, Python keeps adding with its compensated float sum: 1e16 + 1 + 1
+    // is 10000000000000002.0, where adding in turn would round each 1 away.
+    let after = session(&reply(
+        r#"{"usage": {"input_tokens": 1e16, "cache_creation_input_tokens": 1, "cache_read_input_tokens": 1}}"#,
+    ));
+    assert_eq!(after["input_tokens"], json!(10_000_000_000_000_002.0));
     let text = session(&reply(r#"{"usage": null, "permission_denials": "ab"}"#));
     assert_eq!(text["denials"], 2);
     assert_eq!(text["input_tokens"], 0);

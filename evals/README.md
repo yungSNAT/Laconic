@@ -160,13 +160,15 @@ Two rival humanisers ship a deterministic check that a rewrite kept the source's
 
 Each fails a rewrite with exit status 1. Both ran through the functions behind those commands (`validate` and `fidelity`), on the pairs `laconic-evals fact-audit` downloads.
 
-| Documents the paper marks as | Documents | `preserve` fails | `preserve --loose` fails | `validate.js` fails | Zero Slop fails |
-| --- | --- | --- | --- | --- | --- |
-| Any unit altered | 105 | 105 | 105 | 23 | 105 |
-| Numbers altered | 47 | 47 | 47 | 9 | 47 |
-| Quotations of 3 or more words altered | 58 | 58 | 58 | 15 | 58 |
-| Names altered | 28 | 28 | 28 | 5 | 28 |
-| Every unit kept | 258 | 235 | 194 | 25 | 243 |
+[patina](https://github.com/devswha/patina) 9.1.0 (npm `patina-cli`) calls its `--verify` a meaning check, but `--verify` rewrites the input through a model and scores the result with one, so it cannot compare a given pair. Its deterministic part, `assessRewriteMeaningSafety` in `src/verify.js`, which the CLI runs on every rewrite it makes and which fails `--verify` (exit status 4), ran on the same pairs on 17 November 2026 (Node 26.13.1): it fails a rewrite that drops a source number or changes a numeric claim, such as a sign or a number word. Of the 68 altered documents it fails, 35 fail on a dropped number; of the 112 kept documents it fails, 105 fail on a changed numeric claim and 7 on a dropped number. It does not check quotations or names, so each document it fails in those rows had a number change too.
+
+| Documents the paper marks as | Documents | `preserve` fails | `preserve --loose` fails | `validate.js` fails | Zero Slop fails | patina fails |
+| --- | --- | --- | --- | --- | --- | --- |
+| Any unit altered | 105 | 105 | 105 | 23 | 105 | 68 |
+| Numbers altered | 47 | 47 | 47 | 9 | 47 | 43 |
+| Quotations of 3 or more words altered | 58 | 58 | 58 | 15 | 58 | 33 |
+| Names altered | 28 | 28 | 28 | 5 | 28 | 17 |
+| Every unit kept | 258 | 235 | 194 | 25 | 243 | 112 |
 
 A failure need not name the altered unit. Of the 47 documents with an altered number, `preserve` reports a dropped number or quantity in 43 and Zero Slop a dropped figure in 30; `validate.js` warns of a missing number in 20 but fails only on a changed heading structure. Of the 58 with an altered quotation, `preserve` and Zero Slop report a dropped quotation in all 58; `validate.js` has no check for a quotation inside a paragraph. Of the 28 with an altered name, Zero Slop reports a dropped name in 27 and `preserve` lists one to check in 20, though it never fails on a name.
 

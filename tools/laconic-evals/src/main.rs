@@ -301,6 +301,13 @@ impl From<&str> for Stop {
     }
 }
 
+/// A failed write to standard output.
+impl From<std::io::Error> for Stop {
+    fn from(error: std::io::Error) -> Self {
+        Stop::Failed(error.to_string())
+    }
+}
+
 /// A file in the repository's evals folder.
 fn evals(name: &str) -> PathBuf {
     cases::root().join("evals").join(name)
@@ -308,15 +315,6 @@ fn evals(name: &str) -> PathBuf {
 
 fn or_evals(path: Option<PathBuf>, name: &str) -> PathBuf {
     path.unwrap_or_else(|| evals(name))
-}
-
-fn append(path: &Path, line: &str) -> Result<(), String> {
-    std::fs::OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(path)
-        .and_then(|mut file| file.write_all(line.as_bytes()))
-        .map_err(|e| format!("{}: {e}", path.display()))
 }
 
 /// One judge call with a timeout.
@@ -422,8 +420,7 @@ fn survival(command: Survival, out: &mut dyn Write, tools: &Tools) -> Result<u8,
                 jobs,
                 budget_usd,
             )?;
-            writeln!(out, "judge cost: ${}", fact_survival::money(spent))
-                .map_err(|e| e.to_string())?;
+            writeln!(out, "judge cost: ${}", fact_survival::money(spent))?;
         }
         Survival::Calibrate {
             fixtures,
@@ -442,11 +439,11 @@ fn survival(command: Survival, out: &mut dyn Write, tools: &Tools) -> Result<u8,
                 &sources,
                 &judge(Duration::from_secs(300)),
             )?;
-            writeln!(out, "{}", py::dumps_pretty(&result)).map_err(|e| e.to_string())?;
+            writeln!(out, "{}", py::dumps_pretty(&result))?;
             if let Some(overhead) = overhead {
                 let line =
                     serde_json::json!({"stage": "calibrate", "cost_usd": result["cost_usd"]});
-                append(&overhead, &format!("{}\n", py::dumps(&line, None, true)))?;
+                cases::append(&overhead, &format!("{}\n", py::dumps(&line, None, true)))?;
             }
         }
         Survival::Spend { folder, cap } => {
@@ -456,8 +453,7 @@ fn survival(command: Survival, out: &mut dyn Write, tools: &Tools) -> Result<u8,
                 "reported cost: ${} of ${}",
                 fact_survival::money(total),
                 fact_survival::money(cap)
-            )
-            .map_err(|e| e.to_string())?;
+            )?;
             return Ok(u8::from(total >= cap));
         }
         Survival::Report {
@@ -480,7 +476,7 @@ fn survival(command: Survival, out: &mut dyn Write, tools: &Tools) -> Result<u8,
                 trials,
                 Some(&setups),
             )?;
-            writeln!(out, "{}", py::dumps_pretty(&summary)).map_err(|e| e.to_string())?;
+            writeln!(out, "{}", py::dumps_pretty(&summary))?;
         }
     }
     Ok(0)
@@ -694,8 +690,7 @@ fn run(cli: Cli, out: &mut dyn Write, tools: &Tools) -> Result<u8, Stop> {
             String::new()
         }
     };
-    out.write_all(printed.as_bytes())
-        .map_err(|e| e.to_string())?;
+    out.write_all(printed.as_bytes())?;
     Ok(0)
 }
 

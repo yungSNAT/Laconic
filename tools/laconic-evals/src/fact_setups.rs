@@ -6,7 +6,7 @@
 //! Run: `laconic-evals fact-setups evals/results/<new folder>`
 //! Then: `laconic-evals fact-setups --preflight evals/results/<that folder>`
 
-use crate::cases::{parse, read_text, root};
+use crate::cases::{append, parse, read_text, root};
 use crate::fact_survival::to_float;
 use crate::proc::{self, Failure, Input, Output};
 use crate::py;
@@ -356,13 +356,7 @@ pub fn preflight(here: &Path, exec: Exec, stdout: &mut dyn Write) -> Result<i32,
         None,
         true,
     );
-    let overhead = here.join("overhead.jsonl");
-    fs::OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(&overhead)
-        .and_then(|mut sink| sink.write_all(format!("{line}\n").as_bytes()))
-        .map_err(|e| format!("{}: {e}", overhead.display()))?;
+    append(&here.join("overhead.jsonl"), &format!("{line}\n"))?;
     Ok(i32::from(failures > 0))
 }
 

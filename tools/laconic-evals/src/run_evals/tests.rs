@@ -475,6 +475,15 @@ fn check_summaries_fail_where_python_did() {
         summarize_checks(&cases, &[row(json!("a b"))]),
         "target_words must be an integer",
     );
+    // Python divides by a bool as by 0 or 1.
+    let by_true = summarize_checks(
+        &[json!({"id": "draft", "target_words": true})],
+        &[row(json!("a b"))],
+    );
+    assert_eq!(
+        by_true.unwrap()["candidate"]["target_length"][0]["share"],
+        json!(2.0)
+    );
     fails(summarize_checks(&[json!({"checks": {}})], &[]), "'id'");
     fails(summarize_checks(&[json!({"target_words": 1})], &[]), "'id'");
     let checked = [json!({"id": "draft", "checks": {}})];
@@ -545,6 +554,29 @@ fn parallel_jobs_record_every_case_and_stop_at_the_budget() {
     // Calls already running finish after the budget runs out: 2 or 3 of the 4 run, depending
     // on whether the first pair completes together.
     assert!([2, 3].contains(&rows(&args.output).len()));
+}
+
+#[test]
+fn a_closed_output_stops_the_run_and_drops_the_calls_still_running() {
+    let dir = tempfile::tempdir().unwrap();
+    let runs = Runs::new(|_, _| reply(0.25));
+    let world = world!(runs, &no_pause);
+    let mut args = catalogue_args(
+        dir.path(),
+        &["direct-answer", "debugging-cause"],
+        "claude-json",
+        &["stub"],
+    );
+    args.budget_usd = 10.0;
+    args.jobs = 2;
+    let mut closed: &mut [u8] = &mut [];
+    fails(
+        run_evaluations(&args, &world, &mut closed),
+        "failed to write whole buffer",
+    );
+    assert_eq!(runs.calls().len(), 2);
+    // The first response is saved before its line fails to print; the second is not.
+    assert_eq!(rows(&args.output).len(), 1);
 }
 
 #[test]
@@ -1341,6 +1373,7 @@ fn neutral_directories_are_fresh_and_outside_the_repository() {
     let second = neutral_cwd("eval-neutral-cwd-").unwrap();
     assert_ne!(second.path(), first.path());
     assert_eq!(fs::read_dir(second.path()).unwrap().count(), 0);
+    assert!(neutral_cwd("no-such-folder/eval-").is_err());
 }
 
 #[test]

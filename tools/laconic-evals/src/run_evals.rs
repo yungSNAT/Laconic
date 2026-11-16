@@ -4,13 +4,13 @@
 //! Validates, runs and scores paired response-quality evaluations: `validate`, `plan`, `run`,
 //! `checks`, `score` and `measure`.
 
-use crate::cases::{check_response, load_cases, read_jsonl, read_text, validate_cases};
+use crate::cases::{append, check_response, load_cases, read_jsonl, read_text, validate_cases};
 use crate::fact_survival::to_float;
 use crate::proc::{self, Failure, Input, Output};
 use crate::py::{self, type_name};
 use serde_json::{Map, Value, json};
 use std::collections::{BTreeMap, HashMap, HashSet};
-use std::fs::{self, OpenOptions};
+use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::mpsc;
@@ -1160,11 +1160,7 @@ pub fn run_evaluations(args: &RunArgs, world: &World, out: &mut dyn Write) -> Re
     if let Some(parent) = args.output.parent().filter(|p| !p.as_os_str().is_empty()) {
         fs::create_dir_all(parent).map_err(|e| format!("{}: {e}", parent.display()))?;
     }
-    let mut destination = OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(&args.output)
-        .map_err(|e| format!("{}: {e}", args.output.display()))?;
+    append(&args.output, "")?;
     // shortcut: the budget is a soft threshold. No new call is submitted once recorded cost
     // reaches it, but up to N - 1 calls may still be running; it is not a hard cap. Reserve
     // per-call cost before submitting if a run overshoots materially.
@@ -1214,10 +1210,7 @@ pub fn run_evaluations(args: &RunArgs, world: &World, out: &mut dyn Write) -> Re
                 };
                 let written = to_float(Some(&row["cost_usd"])).and_then(|cost| {
                     reported_cost += cost;
-                    destination
-                        .write_all(format!("{}\n", py::dumps_row(&row)).as_bytes())
-                        .and_then(|()| destination.flush())
-                        .map_err(|e| format!("{}: {e}", args.output.display()))?;
+                    append(&args.output, &format!("{}\n", py::dumps_row(&row)))?;
                     write(
                         out,
                         format!(

@@ -3,7 +3,7 @@
 
 //! Blind-judges paired evaluation responses and writes scorable rows: `judge`.
 
-use crate::cases::{load_cases, read_jsonl, read_text};
+use crate::cases::{append, load_cases, read_jsonl, read_text};
 use crate::fact_survival::to_float;
 use crate::proc::Input;
 use crate::py::{self, type_name};
@@ -14,7 +14,7 @@ use crate::run_evals::{
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
-use std::fs::{self, OpenOptions};
+use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
@@ -643,11 +643,7 @@ pub fn command(
     if let Some(parent) = output.parent().filter(|p| !p.as_os_str().is_empty()) {
         fs::create_dir_all(parent).map_err(|e| format!("{}: {e}", parent.display()))?;
     }
-    let mut destination = OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(output)
-        .map_err(|e| format!("{}: {e}", output.display()))?;
+    append(output, "")?;
     sort_by_pair(&mut complete, |g| (&g.case_id, &g.trial))?;
     let mut total_cost = 0.0;
     let mut skipped = Vec::new();
@@ -683,10 +679,7 @@ pub fn command(
             .iter()
             .map(|row| format!("{}\n", py::dumps_row(row)))
             .collect();
-        destination
-            .write_all(lines.as_bytes())
-            .and_then(|()| destination.flush())
-            .map_err(|e| format!("{}: {e}", output.display()))?;
+        append(output, &lines)?;
         print(out, format!("judged {place}"))?;
     }
     if total_cost != 0.0 {

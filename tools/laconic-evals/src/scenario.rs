@@ -3,7 +3,7 @@
 
 //! Captures a resumed Claude conversation for the judge and score commands: `scenario`.
 
-use crate::cases::{load_cases, read_text, validate_cases};
+use crate::cases::{append, load_cases, read_text, validate_cases};
 use crate::proc::{Failure, Input};
 use crate::py;
 use crate::run_evals::{Exec, condition_prompt, strip_frontmatter};
@@ -195,7 +195,8 @@ pub fn run_scenario(
     if let Some(parent) = args.output.parent().filter(|p| !p.as_os_str().is_empty()) {
         fs::create_dir_all(parent).map_err(|e| format!("{}: {e}", parent.display()))?;
     }
-    let mut destination = OpenOptions::new()
+    // An existing output is refused before any call.
+    OpenOptions::new()
         .write(true)
         .create_new(true)
         .open(&args.output)
@@ -254,9 +255,7 @@ pub fn run_scenario(
         "response": py::dumps(&Value::from(transcript), None, false),
         "cost_usd": py::float(spent),
     });
-    destination
-        .write_all(format!("{}\n", py::dumps_row(&row)).as_bytes())
-        .map_err(|e| format!("{}: {e}", args.output.display()))?;
+    append(&args.output, &format!("{}\n", py::dumps_row(&row)))?;
     writeln!(
         out,
         "Conversation saved to {}; reported cost: ${spent:.6}. Not graded.",

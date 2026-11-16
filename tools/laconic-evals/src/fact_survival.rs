@@ -8,7 +8,7 @@
 //! must quote the rewrite for every item it calls kept. A quote that is not in the rewrite
 //! counts as dropped, so a judge cannot invent support.
 
-use crate::cases::{parse, read_text};
+use crate::cases::{append, parse, read_text};
 use crate::fact_audit::Exec;
 use crate::humanise::{source_text, words};
 use crate::proc::{self, Input};
@@ -16,8 +16,7 @@ use crate::py::{self, Num, field, text, type_name};
 use fancy_regex::Regex;
 use serde_json::{Map, Value, json};
 use std::collections::{BTreeMap, BTreeSet, HashSet};
-use std::fs::{self, OpenOptions};
-use std::io::Write;
+use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::{LazyLock, mpsc};
 use std::thread;
@@ -403,16 +402,6 @@ fn judge_one(
             Err(ReplyError::Retry(_)) => {}
         }
     }
-}
-
-fn append(path: &Path, line: &str) -> Result<(), String> {
-    let mut file = OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(path)
-        .map_err(|e| format!("{}: {e}", path.display()))?;
-    file.write_all(line.as_bytes())
-        .map_err(|e| format!("{}: {e}", path.display()))
 }
 
 /// Judge rows not yet in `output`; resumable. Returns the cost of this run.

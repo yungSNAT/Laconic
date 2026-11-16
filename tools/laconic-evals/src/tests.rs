@@ -80,6 +80,13 @@ fn call(args: &[&str], tools: &Tools) -> (Result<u8, Stop>, String) {
     (status, String::from_utf8(out).unwrap())
 }
 
+/// Whether the command fails as it should when its standard output is closed.
+fn fails_on_a_closed_output(args: &[&str], tools: &Tools) -> bool {
+    let cli = Cli::try_parse_from(["laconic-evals"].iter().chain(args)).unwrap();
+    let mut closed: &mut [u8] = &mut [];
+    matches!(run(cli, &mut closed, tools), Err(Stop::Failed(message)) if message == "failed to write whole buffer")
+}
+
 fn arg(path: &Path) -> String {
     path.display().to_string()
 }
@@ -253,6 +260,7 @@ fn judge_resumes_and_prints_its_cost() {
     ];
     assert_eq!(call(&args, &tools), (Ok(0), "judge cost: $0.12\n".into()));
     assert_eq!(*timeouts.lock().unwrap(), [Duration::from_millis(7500)]);
+    assert!(fails_on_a_closed_output(&args, &tools));
     let (status, _) = call(
         &[
             "fact-survival",
@@ -350,6 +358,10 @@ fn spend_exits_1_once_the_cap_is_reached() {
         call(&["fact-survival", "spend", &folder, "--cap", "2.5"], &NONE),
         (Ok(1), "reported cost: $2.50 of $2.50\n".into())
     );
+    assert!(fails_on_a_closed_output(
+        &["fact-survival", "spend", &folder, "--cap", "3"],
+        &NONE
+    ));
     fs::write(dir.path().join("scores.jsonl"), "[]\n").unwrap();
     assert!(
         call(&["fact-survival", "spend", &folder, "--cap", "3"], &NONE)
@@ -488,6 +500,46 @@ fn agent_bench_resumes_finished_runs() {
 }
 
 #[test]
+fn agent_bench_runs_and_records_an_unfinished_session() {
+    let dir = tempfile::tempdir().unwrap();
+    let out = dir.path().join("out.jsonl");
+    let (last, _) = agent_bench::TASKS.last().unwrap();
+    let rows: Vec<Value> = agent_bench::TASKS
+        .iter()
+        .flat_map(|(task, _)| {
+            ["A", "B"].map(|setup| json!({"task": task, "setup": setup, "trial": 1}))
+        })
+        .filter(|row| !(row["task"] == last.as_str() && row["setup"] == "B"))
+        .collect();
+    write_rows(&out, &rows);
+    let commands = Mutex::new(Vec::new());
+    let run_in = |command: &[String], _: &Input, _: &Path, _: Duration| {
+        commands.lock().unwrap().push(command[0].clone());
+        if command[0].ends_with("claude") {
+            done(0, r#"{"num_turns": 3}"#, "")
+        } else {
+            done(1, "", "")
+        }
+    };
+    let tools = Tools {
+        run_in: &run_in,
+        ..NONE
+    };
+    let (status, printed) = call(&["agent-bench", "a.md", "b.md", "1", &arg(&out)], &tools);
+    assert_eq!(status, Ok(0));
+    assert_eq!(
+        *commands.lock().unwrap(),
+        ["/bin/python3", "/bin/claude", "/bin/python3"]
+    );
+    let row: Value = serde_json::from_str(&printed).unwrap();
+    assert_eq!(
+        [&row["task"], &row["setup"], &row["turns"], &row["passed"]],
+        [&json!(last), &json!("B"), &json!(3), &json!(false)]
+    );
+    assert_eq!(fact_survival::read_jsonl(&out).unwrap().last(), Some(&row));
+}
+
+#[test]
 fn the_stand_ins_refuse_every_call() {
     let refused =
         |call: &dyn Fn()| std::panic::catch_unwind(std::panic::AssertUnwindSafe(call)).is_err();
@@ -554,6 +606,7 @@ fn validate_and_plan_read_the_shipped_catalogue_by_default() {
         &NONE,
     );
     assert_eq!(status, Ok(0));
+    assert!(fails_on_a_closed_output(&["plan"], &NONE));
     let ids = cases::load_cases(&holdout).unwrap().len();
     let rows: Vec<Value> = printed
         .lines()

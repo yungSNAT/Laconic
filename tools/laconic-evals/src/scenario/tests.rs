@@ -478,6 +478,26 @@ fn remaining_budget_is_rounded_down_and_stops_further_calls() {
 }
 
 #[test]
+fn a_closed_output_fails_after_the_conversation_is_saved() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut args = args(dir.path());
+    args.output = dir.path().join("new/response.jsonl");
+    let runs = Runs::new(|_, _| ok(0.1));
+    let mut closed: &mut [u8] = &mut [];
+    fails(
+        run_scenario(
+            &args,
+            &|c, i, d, t| runs.exec(c, i, d, t),
+            &session,
+            CALL_TIMEOUT,
+            &mut closed,
+        ),
+        "failed to write whole buffer",
+    );
+    assert_eq!(read_jsonl(&args.output).unwrap().len(), 1);
+}
+
+#[test]
 fn prompts_reach_the_child_as_data_with_their_bytes_intact() {
     // A parser exit must never substitute for a completed evaluation turn: every prompt goes on
     // standard input, never into the command line.

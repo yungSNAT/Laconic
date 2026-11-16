@@ -1151,13 +1151,6 @@ fn every_failed_row_is_costed_and_one_failure_is_reported() {
     assert!(overhead.iter().all(|row| row["stage"] == "failed-judge"));
 }
 
-#[cfg(unix)]
-#[test]
-fn a_full_disk_is_an_error_naming_the_file() {
-    let error = append(Path::new("/dev/full"), "row\n").unwrap_err();
-    assert!(error.starts_with("/dev/full: "), "{error}");
-}
-
 #[test]
 fn a_response_without_a_trial_is_an_error() {
     let kept = marks(&[("fact", "kept")]);

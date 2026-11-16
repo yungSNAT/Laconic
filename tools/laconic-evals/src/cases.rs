@@ -8,7 +8,8 @@ use crate::py;
 use fancy_regex::{Regex, RegexBuilder};
 use serde_json::Value;
 use std::collections::HashSet;
-use std::fs;
+use std::fs::{self, OpenOptions};
+use std::io::Write;
 use std::path::{Path, PathBuf};
 
 /// The repository root: two levels above this crate.
@@ -25,6 +26,16 @@ pub fn root() -> PathBuf {
 pub fn read_text(path: &Path) -> Result<String, String> {
     fs::read_to_string(path)
         .map(|text| py::universal_newlines(&text))
+        .map_err(|e| format!("{}: {e}", path.display()))
+}
+
+/// Appends `text` to `path`, creating the file; an error names the file.
+pub fn append(path: &Path, text: &str) -> Result<(), String> {
+    OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(path)
+        .and_then(|mut file| file.write_all(text.as_bytes()))
         .map_err(|e| format!("{}: {e}", path.display()))
 }
 
@@ -241,6 +252,27 @@ mod tests {
         let (_dir, path) = temp_file("{\"id\": \"ok\"}\r\nnot-json\n");
         assert!(read_jsonl(&path).unwrap_err().contains("line 2: "));
         assert!(read_jsonl(&path.with_extension("missing")).is_err());
+    }
+
+    #[test]
+    fn append_adds_to_the_file_and_names_it_on_failure() {
+        let (dir, path) = temp_file("a\n");
+        append(&path, "b\n").unwrap();
+        append(&dir.path().join("new.jsonl"), "c\n").unwrap();
+        assert_eq!(fs::read_to_string(&path).unwrap(), "a\nb\n");
+        assert_eq!(
+            fs::read_to_string(dir.path().join("new.jsonl")).unwrap(),
+            "c\n"
+        );
+        let error = append(dir.path(), "row\n").unwrap_err();
+        assert!(error.starts_with(&format!("{}: ", dir.path().display())));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_full_disk_is_an_error_naming_the_file() {
+        let error = append(Path::new("/dev/full"), "row\n").unwrap_err();
+        assert!(error.starts_with("/dev/full: "), "{error}");
     }
 
     #[test]

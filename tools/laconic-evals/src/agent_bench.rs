@@ -83,7 +83,7 @@ pub fn python(which: &dyn Fn(&str) -> Option<PathBuf>) -> Result<PathBuf, String
 /// edit that keeps a file's size and modification second would otherwise reuse the bytecode of
 /// the code it replaced, from an earlier run or the agent's own.
 pub fn tests_pass(python: &Path, root: &Path, run: Run) -> Result<bool, String> {
-    let cache = tempfile::tempdir().map_err(|e| e.to_string())?;
+    let cache = crate::run_evals::neutral_cwd(".tmp")?;
     let command: Vec<String> = [
         python.display().to_string(),
         "-X".to_owned(),

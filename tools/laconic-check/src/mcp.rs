@@ -35,14 +35,14 @@ pub enum Json {
 
 impl Json {
     /// A member of an object; of repeated keys, the last, as JavaScript reads them.
-    fn get(&self, key: &str) -> Option<&Json> {
+    pub(crate) fn get(&self, key: &str) -> Option<&Json> {
         match self {
             Json::Object(members) => members.iter().rev().find(|(k, _)| k == key).map(|(_, v)| v),
             _ => None,
         }
     }
 
-    fn as_str(&self) -> Option<&str> {
+    pub(crate) fn as_str(&self) -> Option<&str> {
         match self {
             Json::String(s) => Some(s),
             _ => None,
@@ -438,7 +438,7 @@ fn call_tool(params: Option<&Json>) -> Result<String, String> {
     }
 }
 
-fn reply(id: Json, outcome: Result<Json, (i32, String)>) -> String {
+pub(crate) fn reply(id: Json, outcome: Result<Json, (i32, String)>) -> String {
     let body = match outcome {
         Ok(result) => ("result", result),
         Err((code, message)) => (

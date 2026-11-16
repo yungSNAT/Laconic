@@ -48,6 +48,8 @@ The manifests other than Claude Code's still declare plugin 0.5.0, so a build fr
 
 ### laconic-check: added
 
+- `preserve` lists a possible reversal to check on a `check reversal:` line, which never fails: a sentence of the edit that states without a negation the word a sentence of the original negated, when the 2 share at least half of the original's content words. The original's negations are 'not', 'never', 'cannot', 'no', 'none' and words ending in 'n't', and 'no more seats' negates 'seats'. 'not just' and 'not only' add rather than negate, and an edit sentence with its own negation or 'rather than' is not a reversal.
+- `preserve` reports a dropped or added day name, such as 'Thursday', and reads a plural such as 'Sundays' as its day.
 - `laconic-check lsp`, a language server over standard input and output: it publishes `lint`'s findings for each open Markdown document as diagnostics, warnings or hints for advisory rules, each linked to its rule, with the settings of the `.laconic-check` file in the innermost workspace folder that holds the document. A project file it cannot read or parse is one error diagnostic. Positions are in UTF-8 when the client offers it and UTF-16 otherwise.
 - An `accept` line in `.laconic-check` lists words of letters only that `us-spelling` does not flag, each matched as a whole word in the same case.
 - `lint --sarif` prints a SARIF 2.1.0 log for GitHub code scanning: every rule with its description and link, and each finding at level `warning`, or `note` if advisory, located by the file's absolute `file` URI and a one-character region in UTF-16 code units. The exit status is unchanged; `--sarif` cannot be combined with `--json`.
@@ -62,6 +64,7 @@ The manifests other than Claude Code's still declare plugin 0.5.0, so a build fr
 
 ### laconic-check: fixed
 
+- `preserve` no longer reports '00' as dropped when an edit writes a time on the hour without its minutes, such as '5:00 p.m.' as '5pm'. A colon number is a time only after a word such as 'at' or 'until', before 'am' or 'pm', or after 'to' or 'and' that follows a time, so a ratio such as '5:30' stays 2 numbers.
 - `lint` reads back only the few words that could spell a parenthesised acronym, not the whole paragraph before it, so many definitions in one paragraph take linear time: 4,000 in a debug build took 8.1 seconds and now take about as long as 8 times 500.
 - `lint` no longer reads an apostrophe that elides the start of a year or word ('90s, '22, 'em, 'til, 'tis, 'twas) as an opening quotation mark, which hid the prose up to the next closing apostrophe: in `In the '90s, organized teams' work`, 'organized' is now flagged.
 - The MCP `lint` tool's description names every rule, listed from the rule table, and `preserve`'s names quotations, which it has always checked.

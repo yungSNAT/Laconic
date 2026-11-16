@@ -149,6 +149,29 @@ The default stays as it is, on a hand reading of the 41 documents that `--loose`
 
 The paper's judgements are the reference here, so the table measures agreement with them, not the accuracy of either checker. `preserve` never fails on a name, and it also fails on words such as 'not', 'must' and 'before', which the paper does not judge. The texts are CC BY 4.0 (AI Humanizer Benchmark); `humanizer-fact-audit` is by Ziyuan Wang, Genliang Zhu and Xiaobo Chen, its code MIT and its data CC BY 4.0. Nothing from either is stored in this repository.
 
+Two documents the paper marks kept, cleverhumanizer's s24 and s28, keep scare-quoted terms ('flexible leave', 'safe zone') but drop their quotation marks, and `preserve` reports each as a dropped quotation. It keeps counting the marks: without them, a reader takes words the source set apart as the writer's own. Ignoring the marks would let neither document pass, as each also fails on a dropped meaning word with or without `--loose` ('subject to' in s24; 'every', 'might' and 'before' in s28).
+
+### Against other fact checkers
+
+Two rival humanisers ship a deterministic check that a rewrite kept the source's facts. On 16 November 2026, each ran on the same 363 pairs as `laconic-check` built from commit `9a9323a`, all on Linux (x86_64):
+
+- [avoid-ai-writing](https://github.com/conorbronsdon/avoid-ai-writing) 3.38.0, `node detector/validate.js before.md after.md --residual-policy warn` (Node 26.13.1). The policy fails a rewrite only on its preservation checks, not on growth of its own AI-writing patterns.
+- [Zero Slop](https://github.com/manavmishra/ZeroSlop) at commit `42e4c952de7216ae915270b8cb0658ec08857650` (release 2.12.40), `python3 scripts/slopscore.py --fidelity before.md after.md` (Python 3.14.10). It fails a rewrite that drops a figure, name, quotation or link, or adds one.
+
+Each fails a rewrite with exit status 1. Both ran through the functions behind those commands (`validate` and `fidelity`), on the pairs `laconic-evals fact-audit` downloads.
+
+| Documents the paper marks as | Documents | `preserve` fails | `preserve --loose` fails | `validate.js` fails | Zero Slop fails |
+| --- | --- | --- | --- | --- | --- |
+| Any unit altered | 105 | 105 | 105 | 23 | 105 |
+| Numbers altered | 47 | 47 | 47 | 9 | 47 |
+| Quotations of 3 or more words altered | 58 | 58 | 58 | 15 | 58 |
+| Names altered | 28 | 28 | 28 | 5 | 28 |
+| Every unit kept | 258 | 235 | 194 | 25 | 243 |
+
+A failure need not name the altered unit. Of the 47 documents with an altered number, `preserve` reports a dropped number or quantity in 43 and Zero Slop a dropped figure in 30; `validate.js` warns of a missing number in 20 but fails only on a changed heading structure. Of the 58 with an altered quotation, `preserve` and Zero Slop report a dropped quotation in all 58; `validate.js` has no check for a quotation inside a paragraph. Of the 28 with an altered name, Zero Slop reports a dropped name in 27 and `preserve` lists one to check in 20, though it never fails on a name.
+
+Of the 258 kept documents, `preserve` fails 223 only on meaning words such as 'often' and 'not', which the paper does not judge, and 12 on a number, quantity or quotation. Zero Slop fails 191 only on dropped names, 17 on a dropped figure or quotation, 4 on a changed structure (such as headings or code) and 31 only on additions. `validate.js` passes 233 of them, but also 82 of the 105 altered documents. The judgements are the paper's; Laconic's author chose the 2 rivals and ran all 3 checks.
+
 ## Public-set fact check
 
 Run on 14 November 2026, with the method committed before any rewrite. The sources are the 99 public texts of the 2026-09, 2026-10 and 2026-11 cycles of the [AI Humanizer Benchmark](https://huggingface.co/datasets/ai-humanizer-benchmark/ai-humanizer-benchmark) at revision `35cf47ea697819c30d2d7845d37389db318e0363`, 33 a cycle. Laconic's prose skill at commit `2ea470ad1b34ae342052bb6153b8e9ec6556ce9b` and [humanizer](https://github.com/blader/humanizer/tree/v4.0.0) 4.0.0 (`b48c832f0f809c1b5658edbb838c2521b72f2413`) each rewrote every text twice, 3 texts to a fresh context, with the same request. Laconic received its `SKILL.md` with its edit-and-audit, patterns and style-manual-rules references flattened into labelled sections; `humanizer` received its complete `SKILL.md`. One round used `claude-opus-5-5` at high effort through Claude Code 2.1.322, the other `gpt-6.1-sol` at high reasoning through Codex CLI 0.169.0; the Opus round was added after the Codex round, with the method unchanged. All 396 planned rewrites in each round were valid.

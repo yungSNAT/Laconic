@@ -122,6 +122,10 @@ pub fn reversals(original: &str, edited: &str) -> Vec<String> {
         })
         .filter(|(_, w)| !negates(w))
         .collect();
+    let edits: Vec<(&str, HashSet<&str>)> = edits
+        .iter()
+        .map(|(s, w)| (s.as_str(), content(w)))
+        .collect();
     let mut out = Vec::new();
     for sentence in sentences(original) {
         let words = words(&sentence);
@@ -130,9 +134,8 @@ pub fn reversals(original: &str, edited: &str) -> Vec<String> {
         if targets.is_empty() || shared.is_empty() {
             continue;
         }
-        for (edit, edit_words) in &edits {
-            let has = content(edit_words);
-            if shared.intersection(&has).count() * 2 < shared.len() {
+        for (edit, has) in &edits {
+            if shared.intersection(has).count() * 2 < shared.len() {
                 continue;
             }
             for target in targets.iter().filter(|t| has.contains(*t)) {
@@ -142,7 +145,8 @@ pub fn reversals(original: &str, edited: &str) -> Vec<String> {
                 } else {
                     ""
                 };
-                let item = format!("'{target}' is no longer negated in \"{quoted}{more}\"");
+                // Debug quoting escapes any quotation mark or control character inside.
+                let item = format!("'{target}' is no longer negated in {:?}", quoted + more);
                 if !out.contains(&item) {
                     out.push(item);
                 }
@@ -208,5 +212,13 @@ mod tests {
         let found = reversals("The pump is not loud.", &long);
         assert_eq!(found.len(), 1);
         assert!(found[0].ends_with("...\""), "{}", found[0]);
+    }
+
+    #[test]
+    fn escapes_quotation_marks_in_the_sentence_it_quotes() {
+        assert_eq!(
+            reversals("Do not mark the cache stale.", "Mark the cache \"stale\"."),
+            [r#"'mark' is no longer negated in "Mark the cache \"stale\".""#]
+        );
     }
 }

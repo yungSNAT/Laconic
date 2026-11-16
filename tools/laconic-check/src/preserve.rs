@@ -742,11 +742,11 @@ fn months(text: &str) -> Vec<String> {
         .collect()
 }
 
-/// Day names in prose, a plural read as its day.
+/// Day names in prose, as whole words between any non-letters ('Thursday's',
+/// 'Monday-Friday'), a plural read as its day.
 fn weekdays(text: &str) -> Vec<String> {
     prose(text)
-        .split_whitespace()
-        .map(|t| t.trim_matches(|c: char| !c.is_alphanumeric()))
+        .split(|c: char| !c.is_alphabetic())
         .filter_map(|t| {
             WEEKDAYS
                 .iter()
@@ -774,15 +774,25 @@ fn numbers(text: &str, pounds: &HashSet<String>) -> Vec<String> {
             {
                 j += 1;
             }
-            let token: String = chars[i..j]
+            let mut token: String = chars[i..j]
                 .iter()
                 .collect::<String>()
                 .trim_end_matches(['.', ','])
                 .to_string();
-            // ':00' after an hour adds nothing: '5:00 p.m.' and '5pm' name the same time.
-            if token == "00" && i >= 2 && chars[i - 1] == ':' && chars[i - 2].is_ascii_digit() {
-                i = j;
-                continue;
+            // A time is one number, its hour and minutes, and ':00' adds nothing to the hour:
+            // '5:00 p.m.' and '5pm' name the same time, but '5:30' is not 5.
+            let minutes = chars
+                .get(j + 1..j + 3)
+                .filter(|m| m.iter().all(char::is_ascii_digit));
+            if let Some(minutes) = minutes
+                && chars[j] == ':'
+                && token.chars().all(|c| c.is_ascii_digit())
+                && !chars.get(j + 3).is_some_and(char::is_ascii_digit)
+            {
+                if minutes != ['0', '0'] {
+                    token = format!("{token}:{}", minutes.iter().collect::<String>());
+                }
+                j += 3;
             }
             let after: String = chars[j..chars.len().min(j + 12)].iter().collect();
             let percent = !token.ends_with('%') && starts_with_percent(&after);
@@ -1433,8 +1443,16 @@ mod tests {
             "The trackers close on Friday. Backups run on Sundays.",
         );
         assert_eq!(a["weekday"], vec!["Friday"]);
-        // Only the capitalised day names count.
+        // Only the capitalised day names count, as whole words.
         assert!(!missing("A sunday drive.", "A drive.").contains_key("weekday"));
+        assert!(!missing("Sundayland opens.", "It opens.").contains_key("weekday"));
+        assert_eq!(
+            missing(
+                "Thursday's draft covers Monday-Friday.",
+                "The draft covers it."
+            )["weekday"],
+            vec!["Thursday", "Monday", "Friday"]
+        );
     }
 
     #[test]
@@ -1467,9 +1485,18 @@ mod tests {
             "Stop after 5pm on Friday.",
         );
         assert!(!m.contains_key("number"), "{m:?}");
+        // A changed hour or minutes is a dropped time, whichever text has the minutes.
+        for (original, edited, dropped) in [
+            ("Meet at 5:30 pm.", "Meet at 5 pm.", "5:30"),
+            ("Meet at 5:00.", "Meet at 5:30.", "5"),
+            ("Meet at 5:00.", "Meet at 6:00.", "5"),
+        ] {
+            assert_eq!(missing(original, edited)["number"], vec![dropped]);
+        }
+        // Without 2 digits after the colon, it is not a time.
         assert_eq!(
-            missing("Meet at 5:30 pm.", "Meet at 5 pm.")["number"],
-            vec!["30"]
+            missing("A 16:9 screen.", "A screen.")["number"],
+            vec!["16", "9"]
         );
     }
 

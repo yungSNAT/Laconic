@@ -99,7 +99,7 @@ fn mcpb_manifest(version: &str) -> String {
         },
         "tools": [
             { "name": "lint", "description": "Flag Australian English and house-style candidates in Markdown prose." },
-            { "name": "preserve", "description": "Report numbers, code, URLs and negations that an edit dropped." }
+            { "name": "preserve", "description": "Report numbers, units, months, code, URLs, quotations and meaning words that an edit dropped." }
         ],
         // The macOS binary is for Apple silicon and the Linux one for x86_64.
         "compatibility": { "platforms": ["darwin", "win32", "linux"] }

@@ -13,7 +13,7 @@ use std::fmt::Write as _;
 mod num;
 mod random;
 
-pub use num::{Num, mean, mean_f64, round_num, sum};
+pub use num::{Num, mean, mean_f64, round, round_num, sum};
 pub use random::Random;
 
 /// Python's `str.isspace`, which `str.split()` and `str.strip()` use.

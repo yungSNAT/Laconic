@@ -233,6 +233,12 @@ fn run_sums_tokens_and_counts_denials_as_python_did() {
         py::dumps(&floats, None, true),
         r#"{"turns": null, "cost": null, "input_tokens": 1.5, "output_tokens": null, "denials": 1}"#
     );
+    // Python adds the ints exactly, then the float to their total: 18014398509481992.0, where
+    // adding every count as a float gives 18014398509481988.0.
+    let mixed = session(&reply(
+        r#"{"usage": {"input_tokens": 9007199254740993, "cache_creation_input_tokens": 9007199254740997, "cache_read_input_tokens": 1.5}}"#,
+    ));
+    assert_eq!(mixed["input_tokens"], json!(18_014_398_509_481_992.0));
     let text = session(&reply(r#"{"usage": null, "permission_denials": "ab"}"#));
     assert_eq!(text["denials"], 2);
     assert_eq!(text["input_tokens"], 0);

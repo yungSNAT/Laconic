@@ -39,6 +39,13 @@ updates:
       interval: weekly
     cooldown:
       default-days: 7
+    ignore:
+      # laconic-evals pins icu_casemap to 2.3 for Unicode 17 case folding, as Python 3.15's
+      # casefold; 2.4 has Unicode 18. Patch releases still arrive.
+      - dependency-name: icu_casemap
+        update-types:
+          - version-update:semver-minor
+          - version-update:semver-major
   # Coverage for the Codecov upload, pinned by hash in requirements-coverage.txt.
   - package-ecosystem: pip
     directory: /ci

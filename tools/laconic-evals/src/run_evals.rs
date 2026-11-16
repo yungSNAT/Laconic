@@ -194,12 +194,8 @@ fn call(
     remaining: f64,
 ) -> Result<Value, String> {
     let task = py::text(case, "prompt")?;
-    let prompt = condition_prompt(
-        task,
-        &args.condition,
-        args.condition_skill.as_deref(),
-        !args.no_injection,
-    )?;
+    let skill = args.condition_skill.as_deref();
+    let prompt = condition_prompt(task, &args.condition, skill, !args.no_injection)?;
     let mut invocation = runner.command.clone();
     if let Some(flag) = &runner.budget_flag {
         invocation.extend([flag.clone(), format!("{remaining:.4}")]);
@@ -340,10 +336,8 @@ pub fn run_evaluations(args: &RunArgs, world: &World, out: &mut dyn Write) -> Re
                 args.condition.clone(),
                 args.runner.clone(),
             )) {
-                py::print(
-                    out,
-                    &format!("skip completed {} trial {trial}: {id}", args.condition),
-                )?;
+                let skip = format!("skip completed {} trial {trial}: {id}", args.condition);
+                py::print(out, &skip)?;
                 continue;
             }
             pending.push((case, trial));

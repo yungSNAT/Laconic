@@ -166,9 +166,22 @@ fn keeps_a_path_that_is_not_utf8_and_a_top_level_name_that_ends_in_a_newline() {
     let name = std::ffi::OsStr::from_bytes(b"caf\xe9.md");
     assert_eq!(markdown(b"?? caf\xe9.md\0"), Ok(vec![PathBuf::from(name)]));
     let dir = repository("newline\n");
+    fs::write(dir.join("a.md"), "Pick a color.\n").unwrap();
+    let reason = reason(&stop(&event(&dir, false)).unwrap().unwrap());
+    assert!(reason.contains("\na.md:1:8: us-spelling: "), "{reason}");
+    let _ = fs::remove_dir_all(&dir);
+}
+
+// macOS file systems refuse a file name that is not UTF-8.
+#[cfg(target_os = "linux")]
+#[test]
+fn lints_a_file_whose_name_is_not_utf8() {
+    use std::os::unix::ffi::OsStrExt;
+    let dir = repository("bytes");
+    let name = std::ffi::OsStr::from_bytes(b"caf\xe9.md");
     fs::write(dir.join(name), "Pick a color.\n").unwrap();
     let reason = reason(&stop(&event(&dir, false)).unwrap().unwrap());
-    assert!(reason.contains(": us-spelling: "), "{reason}");
+    assert!(reason.contains(".md:1:8: us-spelling: "), "{reason}");
     let _ = fs::remove_dir_all(&dir);
 }
 

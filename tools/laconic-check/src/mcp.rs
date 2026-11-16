@@ -557,6 +557,34 @@ mod tests {
         assert!(LINT.contains(lint::RULES_URL));
     }
 
+    fn description(tool: &str) -> String {
+        let Json::Array(tools) = tools() else {
+            panic!("tools is a list")
+        };
+        let found = tools
+            .iter()
+            .find(|t| t.get("name").and_then(Json::as_str) == Some(tool))
+            .unwrap();
+        found
+            .get("description")
+            .and_then(Json::as_str)
+            .unwrap()
+            .to_owned()
+    }
+
+    #[test]
+    fn the_lint_tool_names_every_rule() {
+        let described = description("lint");
+        for rule in lint::RULES {
+            assert!(described.contains(rule.name), "{} missing", rule.name);
+        }
+    }
+
+    #[test]
+    fn the_preserve_tool_names_quotations() {
+        assert!(description("preserve").contains("quotations"));
+    }
+
     fn result(line: &str) -> Json {
         let reply = parse(&handle_line(line).unwrap()).unwrap();
         assert!(reply.get("error").is_none(), "{reply:?}");

@@ -153,7 +153,7 @@ Two documents the paper marks kept, cleverhumanizer's s24 and s28, keep scare-qu
 
 ### The 2026-11 cycle
 
-The rules above were tuned on the 2026-10 cycle. To test them on rewrites they were not tuned on, `factalign.py`, the checker in `humanizer-fact-audit` at the commit above, judged the benchmark's 2026-11 cycle at revision `35cf47ea697819c30d2d7845d37389db318e0363`: 330 rewrites, 33 by each of 10 commercial humanisers. Run with spaCy 3.8.7 and `en_core_web_sm` 3.8.0, it first reproduced all 363 of the paper's 2026-10 judgements exactly, all 1,034 units. `preserve` ran as a release build on Windows (x86_64) on 17 November 2026, with 2 fixes this cycle prompted, so the cycle is not wholly held out: it reports a dropped day name, and '5:00 p.m.' matches '5 p.m.' while '5:30' does not match 5.
+The rules above were tuned on the 2026-10 cycle. To test them on rewrites they were not tuned on, `factalign.py`, the checker in `humanizer-fact-audit` at the commit above, judged the benchmark's 2026-11 cycle at revision `35cf47ea697819c30d2d7845d37389db318e0363`: 330 rewrites, 33 by each of 10 commercial humanisers. Run with spaCy 3.8.7 and `en_core_web_sm` 3.8.0, it first reproduced all 363 of the paper's 2026-10 judgements exactly, all 1,034 units. `preserve` ran as a release build on Windows (x86_64) on 17 November 2026, with 2 fixes this cycle prompted, so the cycle is not wholly held out: it reports a dropped day name, and '5:00 p.m.' matches '5 p.m.', but '5:30' does not match 5.
 
 | Documents `factalign.py` marks as | Documents | `preserve` | `preserve --loose` |
 | --- | --- | --- | --- |

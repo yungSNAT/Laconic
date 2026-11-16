@@ -60,6 +60,7 @@ The manifests other than Claude Code's still declare plugin 0.5.0, so a build fr
 
 ### laconic-check: fixed
 
+- `lint` reads back only the few words that could spell a parenthesised acronym, not the whole paragraph before it, so many definitions in one paragraph take linear time: 4,000 in a debug build took 8.1 seconds and now take about as long as 8 times 500.
 - `lint` no longer reads an apostrophe that elides the start of a year or word ('90s, '22, 'em, 'til, 'tis, 'twas) as an opening quotation mark, which hid the prose up to the next closing apostrophe: in `In the '90s, organized teams' work`, 'organized' is now flagged.
 - The MCP `lint` tool's description names every rule, listed from the rule table, and `preserve`'s names quotations, which it has always checked.
 - `preserve` reads a range written with a spaced dash ('30 – 60 grams') or a hyphen that waits for the upper bound's unit ('a 45- to 60-minute ride') in that unit, and compares a quotation set as its own sentence without its new capital or question mark, so 'can I afford to publish this book' to 'Can I afford to publish this book?' no longer reports a dropped quotation. Each was a false alarm on a rewrite the fact audit marks fully kept.

@@ -372,6 +372,35 @@ fn fetch_downloads_once_into_the_cache() {
 }
 
 #[test]
+fn fetch_names_the_file_it_cannot_write() {
+    let dir = tempfile::tempdir().unwrap();
+    let get = |_: &str| Ok(b"{}\n".to_vec());
+    let url = "https://example.com/f";
+    let shown = |path: &Path| path.display().to_string();
+    // The cache folder is a file.
+    fs::write(dir.path().join("file"), "").unwrap();
+    let error = fetch(url, &dir.path().join("file/x.jsonl"), &get).unwrap_err();
+    assert!(
+        error.starts_with(&shown(&dir.path().join("file"))),
+        "{error}"
+    );
+    // The partial download's name is taken by a folder.
+    fs::create_dir(dir.path().join("a.jsonl.partial")).unwrap();
+    let error = fetch(url, &dir.path().join("a.jsonl"), &get).unwrap_err();
+    assert!(
+        error.starts_with(&shown(&dir.path().join("a.jsonl.partial"))),
+        "{error}"
+    );
+    // The cached name is taken by a folder with something in it.
+    fs::create_dir_all(dir.path().join("b.jsonl/inside")).unwrap();
+    let error = fetch(url, &dir.path().join("b.jsonl"), &get).unwrap_err();
+    assert!(
+        error.starts_with(&shown(&dir.path().join("b.jsonl"))),
+        "{error}"
+    );
+}
+
+#[test]
 fn fetch_refuses_a_scheme_other_than_http() {
     let dir = tempfile::tempdir().unwrap();
     for url in ["file:///etc/hosts", "ftp://example.com/f", "example.com/f"] {

@@ -6,6 +6,7 @@ use crate::cases::{load_cases, root, validate_cases};
 use crate::proc::{Failure, Output};
 use crate::testing::{Recorder, done};
 use serde_json::json;
+use std::fs;
 
 fn reply(
     code: i32,

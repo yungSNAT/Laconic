@@ -152,6 +152,11 @@ pub fn dumps_pretty(value: &Value) -> String {
     dumps(value, Some(2), true)
 }
 
+/// `print(line)` to `out`.
+pub fn print(out: &mut dyn std::io::Write, line: &str) -> Result<(), String> {
+    writeln!(out, "{line}").map_err(|e| e.to_string())
+}
+
 /// `json.dumps(value, ensure_ascii=False)`, as the commands write JSON Lines rows.
 pub fn dumps_row(value: &Value) -> String {
     dumps(value, None, false)

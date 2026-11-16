@@ -254,7 +254,7 @@ pub fn command(
                 if done.contains(&key) {
                     continue;
                 }
-                let dir = tempfile::tempdir().map_err(|e| e.to_string())?;
+                let dir = crate::run_evals::neutral_cwd(".tmp")?;
                 build(task, dir.path())?;
                 if tests_pass(python, dir.path(), run)? {
                     return Err(format!("{task} should start failing"));

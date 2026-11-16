@@ -262,7 +262,7 @@ Set the color property of the heading to red.
 | --- | --- |
 | 0 | `lint` found no more failing findings than `--max-findings` allows, or ran with `--warn`; `preserve` found nothing dropped, and nothing added under `--strict`; `mcp` reached the end of its input; `lsp` received `exit` after `shutdown`; `hook` answered its event; `--version` or `--help` printed its text. |
 | 1 | `lint` found more failing findings than allowed; `preserve` found an item dropped, or one added under `--strict`; `lsp` received `exit` without `shutdown`, or its input ended; `hook` could not read its event, the project file or an uncommitted Markdown file, or Git failed other than by finding no repository. |
-| 2 | A usage, project file or read error in a command other than `hook`, or an input or output error in `mcp` or `lsp`. After a read error, `lint` still lints the other files (on `main`, not yet in a release). |
+| 2 | A usage error; a project file or read error in a command other than `hook`; or an input or output error in `mcp` or `lsp`. After a read error, `lint` still lints the other files (on `main`, not yet in a release). |
 
 To run it with [pre-commit](https://pre-commit.com), put `laconic-check` on the PATH and add its hooks; the commit message hook also needs `pre-commit install --hook-type commit-msg`, and laconic-check 0.4.0 or later, as 0.3.0 lacks `--commit-msg`:
 

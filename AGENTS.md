@@ -29,7 +29,7 @@ Agents can access the complete project by reading repository-relative files afte
 | Other runtimes | `qwen-extension.json`, `kimi.plugin.json`, `gemini-extension.json`, `GEMINI.md`, `plugin.json` | Qwen, Kimi, Gemini and additional plugin metadata. |
 | Writing references | `skills/laconic-prose/references/` | Writing, editing and audit modes, patterns, venues, Style Manual rules and regression cases. |
 | Documentation | `README.md`, `INSTALL.md`, `CHANGELOG.md`, `SECURITY.md` | User-facing overview, installation, changes and vulnerability reporting. |
-| Verification | `tools/laconic-tools/src/contracts/`, `tools/laconic-evals/`, `tests/`, `scripts/` | Repository contract tests (hooks, plugins, manifests, skills, install docs, CI guards), the evaluation harness and its tests, the MCP server test and compatibility checks. |
+| Verification | `tools/laconic-tools/src/contracts/`, `tools/laconic-evals/`, `tests/`, `scripts/` | Repository contract tests (hooks, plugins, manifests, skills, install docs, CI guards) with the OpenCode plugin driver they load, the evaluation harness and its tests, and compatibility checks. |
 | Contribution workflow | `CONTRIBUTING.md`, `.github/pull_request_template.md` | Authorship, issues, safety, review and PR requirements. |
 
 ## Runtime entry points
@@ -59,7 +59,7 @@ Run only checks relevant to the change, and report exact commands and results:
 
 ```bash
 cargo test --manifest-path tools/laconic-tools/Cargo.toml
-python3 -m unittest discover -s tests -v
+cargo test --manifest-path tools/laconic-check/Cargo.toml
 cargo test --manifest-path tools/laconic-evals/Cargo.toml
 cargo run --quiet --locked --manifest-path tools/laconic-evals/Cargo.toml -- validate
 bun scripts/check_context_compat.ts

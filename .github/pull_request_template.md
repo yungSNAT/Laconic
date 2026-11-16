@@ -43,7 +43,7 @@
 
 <!-- Common checks, when relevant:
 cargo test --manifest-path tools/laconic-tools/Cargo.toml
-python3 -m unittest discover -s tests -v
+cargo test --manifest-path tools/laconic-check/Cargo.toml
 cargo test --manifest-path tools/laconic-evals/Cargo.toml
 cargo run --quiet --locked --manifest-path tools/laconic-evals/Cargo.toml -- validate
 -->

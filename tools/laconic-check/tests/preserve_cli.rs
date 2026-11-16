@@ -110,6 +110,22 @@ fn a_dropped_name_is_advisory_even_with_strict() {
 }
 
 #[test]
+fn a_possible_reversal_is_advisory_even_with_strict() {
+    // The edit keeps 1 'not', so only the reversal check sees the change.
+    let pair = files(
+        "reversal",
+        "Do not delete the cache. Keep the logs.",
+        "Delete the cache. Do not keep the logs.",
+    );
+    let (status, out) = preserve(&["--strict"], &pair);
+    assert_eq!(status, 0, "{out}");
+    assert!(
+        out.contains("check reversal: 'delete' is no longer negated in \"Delete the cache.\"\n"),
+        "{out}"
+    );
+}
+
+#[test]
 fn an_added_name_is_listed_and_passes_strict() {
     let pair = files(
         "added-name",

@@ -40,13 +40,19 @@ impl ProjectRule {
     }
 }
 
-/// A letter, digit or hyphen: what a phrase may not touch at either end.
-fn word_char(c: char) -> bool {
-    c.is_alphanumeric() || c == '-'
-}
-
 fn apostrophe(c: char) -> bool {
     c == '\'' || c == '\u{2019}'
+}
+
+/// Whether `text[at]` is part of a word, which a phrase may not touch at either end: a
+/// letter, digit or hyphen, or an apostrophe between letters or digits, as in 'it's'.
+fn in_word(text: &[char], at: usize) -> bool {
+    let alphanumeric = |i: usize| text.get(i).is_some_and(|c| c.is_alphanumeric());
+    text.get(at).is_some_and(|&c| {
+        c.is_alphanumeric()
+            || c == '-'
+            || (apostrophe(c) && at > 0 && alphanumeric(at - 1) && alphanumeric(at + 1))
+    })
 }
 
 /// The end of `phrase` matched at `start` of `text`, if it matches there as whole words. A
@@ -78,7 +84,7 @@ fn match_at(text: &[char], start: usize, phrase: &str) -> Option<usize> {
         }
         at += 1;
     }
-    (!text.get(at).copied().is_some_and(word_char)).then_some(at)
+    (!in_word(text, at)).then_some(at)
 }
 
 /// Adds a finding for each phrase of `rules` in the masked paragraph `text`, at its 1-based
@@ -88,7 +94,7 @@ fn match_at(text: &[char], start: usize, phrase: &str) -> Option<usize> {
 // times the number of phrases; index the phrases by first letter if projects list thousands.
 pub(super) fn check(text: &[char], rules: &[Rc<ProjectRule>], findings: &mut Vec<Finding>) {
     for start in 0..text.len() {
-        if !text[start].is_alphanumeric() || (start > 0 && word_char(text[start - 1])) {
+        if !text[start].is_alphanumeric() || (start > 0 && in_word(text, start - 1)) {
             continue;
         }
         for rule in rules {

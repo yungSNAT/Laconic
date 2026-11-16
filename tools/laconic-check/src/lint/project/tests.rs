@@ -87,6 +87,14 @@ fn phrases_are_whole_words_and_hyphens_join_words() {
 }
 
 #[test]
+fn an_apostrophe_inside_a_word_joins_it_and_one_at_its_end_does_not() {
+    let rules = [rule("short", &[("it", None), ("s", None), ("users", None)])];
+    let text = "It's fine, it\u{2019}s fine, the users' logs, and it ends.";
+    let columns: Vec<usize> = found(text, &rules).iter().map(|f| f.1).collect();
+    assert_eq!(columns, [27, 44]);
+}
+
+#[test]
 fn a_banned_phrase_matches_across_a_line_wrap_and_either_apostrophe() {
     let rules = [rule(
         "filler",

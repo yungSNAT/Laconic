@@ -151,6 +151,20 @@ The paper's judgements are the reference here, so the table measures agreement w
 
 Two documents the paper marks kept, cleverhumanizer's s24 and s28, keep scare-quoted terms ('flexible leave', 'safe zone') but drop their quotation marks, and `preserve` reports each as a dropped quotation. It keeps counting the marks: without them, a reader takes words the source set apart as the writer's own. Ignoring the marks would let neither document pass, as each also fails on a dropped meaning word with or without `--loose` ('subject to' in s24; 'every', 'might' and 'before' in s28).
 
+### Held-out cycle
+
+The rules above were tuned on the 2026-10 cycle. To test them on rewrites they were not tuned on, `factalign.py`, the checker in `humanizer-fact-audit` at the commit above, judged the benchmark's 2026-11 cycle at revision `35cf47ea697819c30d2d7845d37389db318e0363`: 330 rewrites, 33 by each of 10 commercial humanisers. Run with spaCy 3.8.7 and `en_core_web_sm` 3.8.0, it first reproduced all 363 of the paper's 2026-10 judgements exactly, all 1,034 units. `preserve` ran as a release build on Windows (x86_64) on 17 November 2026, with 2 fixes this cycle prompted: it reports a dropped day name, and '5:00 p.m.' matches '5 p.m.'.
+
+| Documents `factalign.py` marks as | Documents | `preserve` | `preserve --loose` |
+| --- | --- | --- | --- |
+| Any unit altered | 82 | 79 fail | 76 fail |
+| Numbers and dates altered | 48 | 30 report a dropped number or quantity | 30 |
+| Quotations of 3 or more words altered | 28 | 28 report a dropped quotation | 28 |
+| Names altered | 35 | 23 list a name to check | 23 |
+| Every unit kept | 248 | 19 pass; 203 fail only on meaning words; 0 fail on a month, inline code or URL; 26 fail on a number, quantity or quotation | 51 pass; 171; 0; 26 |
+
+Of the 3 altered documents that pass, 2 lost only a name and 1 only the ordinal 'first'. Of the 18 number documents without a dropped number, 15 lost a list item's marker ('7.' or '2.') or the ordinal 'first', which `preserve` does not track; 2 lost 'Thursday', which `preserve` now reports as a dropped day name, a line the table counts under neither kind; and in 1 `factalign.py` counts the '00' of '5:00 p.m.' as a number, though the rewrite says '5 p.m.'. Without the 2 fixes, `preserve` failed 78 altered documents, reported that '00' as a dropped number and failed 3 more kept documents on a number. Of the 26 kept documents that fail on a number, quantity or quotation, 21 fail on a quotation: 14 lost a quotation of 1 or 2 words, which the paper does not judge, and 7 kept a longer quotation's words but not its quotation marks as written.
+
 ### Against other fact checkers
 
 Two rival humanisers ship a deterministic check that a rewrite kept the source's facts. On 16 November 2026, each ran on the same 363 pairs as `laconic-check` built from commit `9a9323a`, all on Linux (x86_64):

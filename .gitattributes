@@ -1,2 +1,5 @@
 # Shell scripts must keep LF endings so sh can run them from Windows checkouts.
 *.sh text eol=lf
+
+# The fact-survival summary fixture is compared byte for byte with what the tool prints.
+tools/laconic-evals/src/**/*.json text eol=lf

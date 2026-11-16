@@ -48,3 +48,7 @@ Rules:
 3. Credit people in one line ('thanks @name for #398').
 4. Let length follow the release. A patch release can be 3 lines.
 5. Keep humour only where the repository's history already has it.
+
+## Anything posted
+
+Keep the writer's working context out of text others will read on GitHub: agent session IDs and links, local paths such as `/home/<user>/...` or `C:\Users\<user>\...`, private host names, internal ticket or ledger IDs and the names of private tools. The reader cannot open them, and they can reveal a private setup. Give the public artefact instead: the commit, PR, issue, workflow run or log line. In a quoted error, keep the part of a path the reader can use, such as `src/lib.rs:12`.

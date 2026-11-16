@@ -62,7 +62,7 @@ Restart the agent, then type `/laconic`. It stays on for the session until you s
 - **You need another variety of English:** Laconic writes Australian English only. [LanguageTool](https://github.com/languagetool-org/languagetool) checks grammar and style in Australian, British, Canadian, New Zealand, South African and US English, after the text is written.
 - **You accept a rewrite that adds detail:** [humanizer](https://github.com/blader/humanizer) 4.0.0 (10 November 2026) tells the model, where a text is generic, to 'add a specific detail you know to be true'. Laconic adds no facts, and `laconic-check preserve --strict` fails an edit that adds a figure, URL, quotation or other item it protects.
 - **You want only the writing guidance:** [No AI Slop](https://github.com/petergyang/no-ai-slop), which Laconic's writing guidance builds on, has it without the response rules or Australian English.
-- **You want your own house style checked in CI:** [Vale](https://github.com/vale-cli/vale) lints prose against rules you configure; `laconic-check` checks only Laconic's.
+- **You want your own house style checked in CI:** [Vale](https://github.com/vale-cli/vale) lints prose against rules you configure, with regular expressions, rule types and packages; `laconic-check` adds a project's own word substitutions and banned phrases to Laconic's rules, and nothing more.
 - **You need an open source licence:** Laconic is under FSL-1.1-ALv2 (see [Licence](#licence)). [humanizer](https://github.com/blader/humanizer), [avoid-ai-writing](https://github.com/conorbronsdon/avoid-ai-writing), No AI Slop and Vale are MIT; LanguageTool is LGPL-2.1; caveman is Apache-2.0.
 
 ## What changes
@@ -250,6 +250,16 @@ accept = color, center
 disable = serial-comma
 ```
 
+After the settings, a `[rules]` section holds the project's own rules, one phrase a line: `id: phrase = replacement` suggests the replacement and `id: phrase =` bans the phrase (on `main`, not yet in a release). Each finding names its rule `project/<id>`, which `disable`, `only`, `--disable`, `--only` and suppression comments accept; several lines may share an id. A phrase is one or more words of letters and digits, with hyphens or apostrophes inside a word. It matches whole words in prose, never in code, URLs or quotations, and across a line break. Written in lower case it matches in any case; with a capital it matches only as written. Text written exactly as its replacement is not flagged, so `github = GitHub` leaves 'GitHub' alone. Project findings fail `lint` like Laconic's own. They have no rule reference link: `url` is `null` in `--json`, and the SARIF log lists their rules after Laconic's, without one. A malformed line or an unknown section stops `lint` with the line's number:
+
+```text
+[rules]
+plain-words: utilise = use
+plain-words: leverage = use
+filler: going forward =
+names: Javascript = JavaScript
+```
+
 To silence one finding, put a comment naming its rule on its own line before it. It covers the next non-blank line only, and `lint` reports each named rule that silences nothing as `unused-suppression`, even when the comment silences another:
 
 ```markdown
@@ -308,7 +318,7 @@ On 13 November 2026, `preserve` ran on the 363 rewrites by 11 commercial humanis
 
 On the same documents, avoid-ai-writing's `validate.js` fails 23 of the 105 altered and Zero Slop's fidelity check all 105; they pass 233 and 15 of the 258 kept, against 23 for `preserve` and 64 with `--loose` ([evals/README.md](evals/README.md#against-other-fact-checkers), 16 November 2026).
 
-`laconic-check mcp` serves `lint` and `preserve` as MCP tools over standard input and output, with nothing else to install. The `preserve` tool takes `loose: true` for what `--loose` does (on `main`, not yet in a release):
+`laconic-check mcp` serves `lint` and `preserve` as MCP tools over standard input and output, with nothing else to install. The `preserve` tool takes `loose: true` for what `--loose` does, and the `lint` tool applies the `.laconic-check` file in the directory the server runs in, as `lint` does, reread on each call; a malformed one makes the call an error naming its line (both on `main`, not yet in a release):
 
 ```bash
 claude mcp add --scope user laconic-check -- laconic-check mcp

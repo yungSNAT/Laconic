@@ -36,20 +36,6 @@ const FIXES: [(&str, &str, &str, &str); 5] = [
     ),
 ];
 
-/// Runs the fixtures' tests without writing bytecode, so same-size edits within a second
-/// cannot reuse a stale cache.
-#[cfg(unix)]
-fn fresh(
-    command: &[String],
-    input: &Input,
-    cwd: &Path,
-    timeout: Duration,
-) -> Result<Output, Failure> {
-    let mut wrapped = vec!["env".to_owned(), "PYTHONDONTWRITEBYTECODE=1".to_owned()];
-    wrapped.extend_from_slice(command);
-    run_in(&wrapped, input, cwd, timeout)
-}
-
 #[cfg(unix)]
 #[test]
 fn every_task_starts_failing_and_its_fix_passes() {
@@ -59,12 +45,17 @@ fn every_task_starts_failing_and_its_fix_passes() {
     for (task, rel, old, new) in FIXES {
         let dir = tempfile::tempdir().unwrap();
         build(task, dir.path()).unwrap();
-        assert!(!tests_pass(&python, dir.path(), &fresh).unwrap(), "{task}");
+        assert!(!tests_pass(&python, dir.path(), &run_in).unwrap(), "{task}");
         let path = dir.path().join(rel);
         let text = fs::read_to_string(&path).unwrap();
         assert_eq!(text.matches(old).count(), 1, "{task}");
+        let modified = fs::metadata(&path).unwrap().modified().unwrap();
         fs::write(&path, text.replace(old, new)).unwrap();
-        assert!(tests_pass(&python, dir.path(), &fresh).unwrap(), "{task}");
+        // The fix keeps the file's time, as an edit within the same second does; au-dates'
+        // also keeps its size, so bytecode cached by the first run would still look current.
+        let file = fs::File::options().write(true).open(&path).unwrap();
+        file.set_modified(modified).unwrap();
+        assert!(tests_pass(&python, dir.path(), &run_in).unwrap(), "{task}");
     }
 }
 

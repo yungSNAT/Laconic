@@ -115,7 +115,12 @@ fn escape_into(out: &mut String, text: &str, ascii: bool) {
             '\t' => out.push_str("\\t"),
             '\u{8}' => out.push_str("\\b"),
             '\u{c}' => out.push_str("\\f"),
-            c if c < ' ' || (ascii && !(' '..='~').contains(&c)) => {
+            // Python's json writes U+0085, U+2028 and U+2029 raw; escaping them keeps a row on
+            // one line for `split_lines`, which ends lines there.
+            c if c < ' '
+                || matches!(c, '\u{85}' | '\u{2028}' | '\u{2029}')
+                || (ascii && !(' '..='~').contains(&c)) =>
+            {
                 let mut units = [0; 2];
                 for unit in c.encode_utf16(&mut units) {
                     let _ = write!(out, "\\u{unit:04x}");
@@ -799,6 +804,17 @@ mod tests {
         let letters = ['a', 'b', 'c', 'd', 'e'];
         let picks: String = (0..5).map(|_| *random.choice(&letters)).collect();
         assert_eq!(picks, "ddace");
+    }
+
+    #[test]
+    fn a_row_reads_back_as_one_line() {
+        // `split_lines` ends lines at these too, so a raw one would split a row on resume.
+        let value = json!({"response": "a\u{85}b\u{2028}c\u{2029}d"});
+        let row = dumps_row(&value);
+        let expected = r#"{"response": "a_0085b_2028c_2029d"}"#.replace('_', "\\u");
+        assert_eq!(row, expected);
+        assert_eq!(split_lines(&row), [row.as_str()]);
+        assert_eq!(serde_json::from_str::<Value>(&row).unwrap(), value);
     }
 
     #[test]

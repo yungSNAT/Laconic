@@ -164,6 +164,27 @@ Run on 14 November 2026, with the method committed before any rewrite. The sourc
 
 Laconic minus `humanizer`: +5.97 percentage points under Opus 5.5 (95% interval 0.00 to +12.32) and 0.00 under `gpt-6.1-sol` (−2.21 to +2.14). The checker can flag a harmless paraphrase and misses changed conditions, negations, commitments and invented claims, so these are unit-loss rates, not full factual fidelity. The rounds used different models and runners and are not pooled. The run scripts, rewrites and scores are kept by Laconic's author and are not stored here; the texts are CC BY 4.0 and the checker's code is MIT.
 
+## Lint on outside corpora
+
+Run on 17 November 2026 with `laconic-check lint` built from `main` at `9a9323a`. The AI-tell rules here are `em-dash`, `clause-dashes`, `closer`, `stock-phrase`, `stacked-hedge`, `bold-label`, `staged-contrast`, `reveal-question` and `residue`; the rest check house style. Neither corpus is stored here.
+
+[SlopBench](https://github.com/pablocaeg/sloptotal/tree/7552b062f84b4e638235a08c57eff6a7fef9144b/tests/eval/slopbench) (sloptotal at `7552b062f84b4e638235a08c57eff6a7fef9144b`, a licence per row) pairs 1,626 human texts written before November 2022, such as encyclopedia articles, news, essays and Reddit posts, with 1,626 texts from 14 models on the same topics at the same lengths:
+
+| Texts | Words | Texts an AI-tell rule flags | Excluding the 2 dash rules | `staged-contrast` | AI-tell findings per 1,000 words |
+| --- | --- | --- | --- | --- | --- |
+| Human, 1,626 | 478,824 | 199 (12.2%) | 40 | 14 | 0.87 |
+| AI, 1,626 | 477,149 | 514 (31.6%) | 160 | 121 | 2.48 |
+
+The rules flag AI text 2.6 times as often as human text, but miss 68% of it, so a clean `lint` result says little about who wrote a text. They are prompts to revise, not a detector. Each human genre's count comes from one loop; this one prints 27 for its 90 news articles:
+
+```bash
+jq -c '.text' tests/eval/slopbench/corpus/human-news-ccnews.jsonl | while IFS= read -r t; do
+  jq -r . <<<"$t" | laconic-check lint --json - | jq -r '[.findings[].rule] | unique | join(" ")'
+done | grep -c -w -E 'em-dash|clause-dashes|closer|stock-phrase|stacked-hedge|bold-label|staged-contrast|reveal-question|residue'
+```
+
+[agent-style](https://github.com/yzhao062/agent-style/tree/bec03e7ee2d4dfad3b55b879cdd003a59099aa84/docs/bench-0.3.0-drafts/claude) publishes 40 drafts by Claude Opus 4.7 (`claude-opus-4-7`) for 10 writing tasks, 20 without its rules and 20 with them, and its own scorer's counts. Its `RULE-B` (em or en dashes as casual punctuation) is the one rule both checkers share. Without the rules, 10 drafts hold 22 em dashes and 6 hold 13 en dashes; `lint` flags all 22 em dashes and no en dash, and agent-style counts 27 `RULE-B` violations. With the rules, the drafts hold no dash of either kind and both counts are 0. Its other rules (long sentences, contractions and title-case headings) have no counterpart in `lint`.
+
 ## Agent cost benchmark
 
 `laconic-evals agent-bench` measures whether a rule set changes how an agent works, not just how it writes. It builds 5 small Python repositories with one failing test each and asks Claude Code to fix them with tools limited to Read, Edit, Glob, Grep and `python -m unittest`. It records whether the tests pass afterwards, plus turns, tokens, cost and permission denials. It compares 2 rule files:

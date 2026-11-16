@@ -204,6 +204,19 @@ fn run_reports_unparseable_output_and_timeouts() {
     assert!(session(&reply(br#"{"usage": [1]}"#)).is_err());
     assert!(session(&reply(br#"{"usage": {"input_tokens": "x"}}"#)).is_err());
     assert!(session(&reply(br#"{"permission_denials": 3}"#)).is_err());
+    // Python's exact int sum: a total past 64 bits is refused, never wrapped or rounded.
+    assert_eq!(
+        session(&reply(
+            br#"{"usage": {"input_tokens": 5000000000000000000, "cache_read_input_tokens": 5000000000000000000}}"#
+        )),
+        Err("the input token total is out of range".into())
+    );
+    assert_eq!(
+        session(&reply(
+            br#"{"usage": {"input_tokens": 10000000000000000000}}"#
+        )),
+        Err("the token count 10000000000000000000 is out of range".into())
+    );
 }
 
 #[test]

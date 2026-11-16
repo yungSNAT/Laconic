@@ -22,6 +22,7 @@ The manifests other than Claude Code's still declare plugin 0.5.0, so a build fr
 
 ### Plugin: changed
 
+- The GitHub prose reference keeps session IDs, local paths, private host names and internal IDs out of posted text, and points the reader to the public artefact instead.
 - Make Laconic a full replacement for stop-slop and No AI Slop.
 - Forbid typical-range estimates in place of evidence.
 - Move the compact rule's mechanics into a before-sending checklist (#34).

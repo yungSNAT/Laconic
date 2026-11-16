@@ -9,7 +9,7 @@
 //! Records whether the tests pass afterwards, plus turns, tokens and cost. Everything runs in
 //! temporary folders. The fixtures stay Python: they are what the agent fixes.
 
-use crate::cases::parse;
+use crate::cases::{append, parse};
 use crate::proc::{self, Failure, Input, Output};
 use crate::py::{self, Num};
 use serde_json::{Map, Value};
@@ -79,11 +79,19 @@ pub fn python(which: &dyn Fn(&str) -> Option<PathBuf>) -> Result<PathBuf, String
         .ok_or_else(|| "agent-bench: no python3 or python on PATH".to_owned())
 }
 
+/// Whether the repository's tests pass. Each run compiles into its own empty bytecode cache: an
+/// edit that keeps a file's size and modification second would otherwise reuse the bytecode of
+/// the code it replaced, from an earlier run or the agent's own.
 pub fn tests_pass(python: &Path, root: &Path, run: Run) -> Result<bool, String> {
-    let command: Vec<String> = [python.display().to_string()]
-        .into_iter()
-        .chain(["-m", "unittest", "discover", "-s", "tests", "-t", "."].map(str::to_owned))
-        .collect();
+    let cache = crate::run_evals::neutral_cwd(".tmp")?;
+    let command: Vec<String> = [
+        python.display().to_string(),
+        "-X".to_owned(),
+        format!("pycache_prefix={}", cache.path().display()),
+    ]
+    .into_iter()
+    .chain(["-m", "unittest", "discover", "-s", "tests", "-t", "."].map(str::to_owned))
+    .collect();
     let done = run(&command, &Input::Inherit, root, Duration::from_secs(120))
         .map_err(|e| e.message(&command[0]))?;
     Ok(done.code == 0)
@@ -261,7 +269,7 @@ pub fn command(
                 if done.contains(&key) {
                     continue;
                 }
-                let dir = tempfile::tempdir().map_err(|e| e.to_string())?;
+                let dir = crate::run_evals::neutral_cwd(".tmp")?;
                 build(task, dir.path())?;
                 if tests_pass(python, dir.path(), run)? {
                     return Err(format!("{task} should start failing"));
@@ -275,12 +283,7 @@ pub fn command(
                 map.insert("passed".into(), Value::from(passed));
                 drop(dir);
                 let line = py::dumps(&result, None, true);
-                fs::OpenOptions::new()
-                    .create(true)
-                    .append(true)
-                    .open(out)
-                    .and_then(|mut file| file.write_all(format!("{line}\n").as_bytes()))
-                    .map_err(|e| format!("{}: {e}", out.display()))?;
+                append(out, &format!("{line}\n"))?;
                 writeln!(stdout, "{line}")
                     .and_then(|()| stdout.flush())
                     .map_err(|e| e.to_string())?;

@@ -1,7 +1,7 @@
 // Copyright 2026 Ryan Duguid
 // SPDX-License-Identifier: FSL-1.1-ALv2
 
-//! Protected items an edit must keep: numbers, quantities, dated months, inline code,
+//! Protected items an edit must keep: numbers, quantities, dated months, day names, inline code,
 //! URLs, quotations and the words that carry negation, modality, certainty, condition, order and
 //! scope. Reports what the original had and the edit lost, and what the edit added. A
 //! clean result does not prove the meaning survived; it only rules out these losses. An
@@ -168,6 +168,17 @@ const MONTHS: &[(&[&str], &str)] = &[
     (&["October", "Oct"], "October"),
     (&["November", "Nov"], "November"),
     (&["December", "Dec"], "December"),
+];
+
+/// Day names, capitalised as written, with their plurals: 'on Sundays' keeps Sunday.
+const WEEKDAYS: &[&str] = &[
+    "Monday",
+    "Tuesday",
+    "Wednesday",
+    "Thursday",
+    "Friday",
+    "Saturday",
+    "Sunday",
 ];
 
 /// Capitalised words that are not part of a name, so 'May I' and 'The Board' read right.
@@ -404,10 +415,11 @@ fn only_in(
         .collect();
     // Unsigned values, as a quantity carries no sign or currency.
     let values_to: HashSet<String> = numbers(to, &pounds).iter().map(|n| unsigned(n)).collect();
-    let extractors: [Extractor; 6] = [
+    let extractors: [Extractor; 7] = [
         ("number", &|t| numbers(t, &pounds)),
         ("quantity", &|t| quantities(t, &pounds)),
         ("month", &months),
+        ("weekday", &weekdays),
         ("code", &code_spans),
         ("url", &urls),
         ("quotation", &quotations),
@@ -722,6 +734,20 @@ fn months(text: &str) -> Vec<String> {
         .collect()
 }
 
+/// Day names in prose, a plural read as its day.
+fn weekdays(text: &str) -> Vec<String> {
+    prose(text)
+        .split_whitespace()
+        .map(|t| t.trim_matches(|c: char| !c.is_alphanumeric()))
+        .filter_map(|t| {
+            WEEKDAYS
+                .iter()
+                .find(|day| t == **day || t.strip_suffix('s') == Some(day))
+                .map(|day| day.to_string())
+        })
+        .collect()
+}
+
 /// Numbers with their sign and currency; `pounds` lists the values that 'pounds' after a
 /// number names as money.
 fn numbers(text: &str, pounds: &HashSet<String>) -> Vec<String> {
@@ -745,6 +771,11 @@ fn numbers(text: &str, pounds: &HashSet<String>) -> Vec<String> {
                 .collect::<String>()
                 .trim_end_matches(['.', ','])
                 .to_string();
+            // ':00' after an hour adds nothing: '5:00 p.m.' and '5pm' name the same time.
+            if token == "00" && i >= 2 && chars[i - 1] == ':' && chars[i - 2].is_ascii_digit() {
+                i = j;
+                continue;
+            }
             let after: String = chars[j..chars.len().min(j + 12)].iter().collect();
             let percent = !token.ends_with('%') && starts_with_percent(&after);
             let token = if percent { token + "%" } else { token };
@@ -1379,6 +1410,36 @@ mod tests {
         let m = missing("Revenue was $47.3 million.", "Revenue rose.");
         assert_eq!(m["number"], vec!["$47.3"]);
         assert!(!m.contains_key("quantity"), "{m:?}");
+    }
+
+    #[test]
+    fn reports_a_dropped_weekday_and_reads_plurals_as_the_day() {
+        let original = "The trackers close on Thursday. Backups run on Sundays.";
+        let m = missing(
+            original,
+            "The trackers close soon. Backups run every Sunday.",
+        );
+        assert_eq!(m["weekday"], vec!["Thursday"]);
+        let a = added(
+            original,
+            "The trackers close on Friday. Backups run on Sundays.",
+        );
+        assert_eq!(a["weekday"], vec!["Friday"]);
+        // Only the capitalised day names count.
+        assert!(!missing("A sunday drive.", "A drive.").contains_key("weekday"));
+    }
+
+    #[test]
+    fn a_time_on_the_hour_matches_the_hour_alone() {
+        let m = missing(
+            "Stop after 5:00 p.m. on Friday.",
+            "Stop after 5pm on Friday.",
+        );
+        assert!(!m.contains_key("number"), "{m:?}");
+        assert_eq!(
+            missing("Meet at 5:30 pm.", "Meet at 5 pm.")["number"],
+            vec!["30"]
+        );
     }
 
     #[test]

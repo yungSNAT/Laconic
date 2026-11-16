@@ -46,6 +46,7 @@ The manifests other than Claude Code's still declare plugin 0.5.0, so a build fr
 
 ### laconic-check: added
 
+- `preserve` reports a dropped or added day name, such as 'Thursday', and reads a plural such as 'Sundays' as its day.
 - `lint --sarif` prints a SARIF 2.1.0 log for GitHub code scanning: every rule with its description and link, and each finding at level `warning`, or `note` if advisory, located by the file's absolute `file` URI and a one-character region in UTF-16 code units. The exit status is unchanged; `--sarif` cannot be combined with `--json`.
 - The MCP `preserve` tool takes an optional boolean `loose`, which does what `preserve --loose` does; without it, or with `false`, a lost word such as 'often' is still reported as dropped. Any other value is an error.
 - `preserve --loose` lists a lost word of frequency, quantity, ability, prediction, cause or hedging, such as 'often', 'some', 'can', 'will', 'because' or 'likely', on a `check meaning word:` line that does not fail; without it, these losses fail as before. On the fact audit, 64 of the 258 rewrites the paper marks fully kept pass with `--loose` (23 without), and all 105 it marks altered still fail. `evals/fact_audit_agreement.py --loose` measures it.
@@ -57,6 +58,7 @@ The manifests other than Claude Code's still declare plugin 0.5.0, so a build fr
 
 ### laconic-check: fixed
 
+- `preserve` no longer reports '00' as dropped when an edit writes a time on the hour without its minutes, such as '5:00 p.m.' as '5pm'.
 - The MCP `lint` tool's description names every rule, listed from the rule table, and `preserve`'s names quotations, which it has always checked.
 - `preserve` reads a range written with a spaced dash ('30 – 60 grams') or a hyphen that waits for the upper bound's unit ('a 45- to 60-minute ride') in that unit, and compares a quotation set as its own sentence without its new capital or question mark, so 'can I afford to publish this book' to 'Can I afford to publish this book?' no longer reports a dropped quotation. Each was a false alarm on a rewrite the fact audit marks fully kept.
 - `preserve` looks each name up in a set of the edit's runs of 2 and 3 words instead of searching the whole edit for it, so 16 times the names no longer takes about 240 times as long in a debug build; 32,000 names took 1.3 seconds and now take 0.7 in a release build. A name now counts as kept only as whole words: 'Jane Smith' is kept in '(Jane Smith)', 'Jane Smith's' and 'Jane Smith-Jones', but no longer in 'Jane Smithson'. The fact audit's results are unchanged.

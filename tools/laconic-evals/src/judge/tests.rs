@@ -114,6 +114,10 @@ impl Fixture {
 }
 
 /// A claude-json reply carrying a verdict for `labels`, at a cost of 0.25.
+fn cases_key(id: &str) -> String {
+    py::key(&json!(id))
+}
+
 fn claude_verdict(labels: &[&str]) -> Result<Output, Failure> {
     let result: serde_json::Map<String, Value> = labels
         .iter()

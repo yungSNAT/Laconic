@@ -368,57 +368,25 @@ pub fn setup(here: &Path, base: &str, check: CheckCall) -> Result<String, String
         rival.insert(name, fetch(&src, name, repo, commit, base, check)?);
     }
     let skills_dir = root().join("skills");
-    let skills = [
+    let caveman = rival["caveman"].join("plugins").join("caveman");
+    let plugins = [
         (
             "laconic-prose",
-            plugin(
-                &setups,
-                "laconic-prose",
-                "laconic-prose",
-                &skills_dir.join("laconic-prose"),
-            )?,
             "laconic-prose",
+            skills_dir.join("laconic-prose"),
         ),
-        (
-            "laconic-session",
-            plugin(
-                &setups,
-                "laconic-session",
-                "laconic",
-                &skills_dir.join("laconic"),
-            )?,
-            "laconic",
-        ),
-        (
-            "humanizer",
-            plugin(&setups, "humanizer", "humanizer", &rival["humanizer"])?,
-            "humanizer",
-        ),
-        (
-            "avoid",
-            rival["avoid"].join("plugins").join("avoid-ai-writing"),
-            "avoid-ai-writing",
-        ),
-        (
-            "stop-slop",
-            plugin(&setups, "stop-slop", "stop-slop", &rival["stop-slop"])?,
-            "stop-slop",
-        ),
-        (
-            "caveman",
-            plugin(
-                &setups,
-                "caveman",
-                "caveman",
-                &rival["caveman"]
-                    .join("plugins")
-                    .join("caveman")
-                    .join("skills")
-                    .join("caveman"),
-            )?,
-            "caveman",
-        ),
+        ("laconic-session", "laconic", skills_dir.join("laconic")),
+        ("humanizer", "humanizer", rival["humanizer"].clone()),
+        ("stop-slop", "stop-slop", rival["stop-slop"].clone()),
+        ("caveman", "caveman", caveman.join("skills").join("caveman")),
     ];
+    let mut skills = Vec::new();
+    for (name, skill, path) in plugins {
+        skills.push((name, plugin(&setups, name, skill, &path)?, skill));
+    }
+    // avoid-ai-writing ships as a plugin, so it runs from its clone.
+    let avoid = rival["avoid"].join("plugins").join("avoid-ai-writing");
+    skills.insert(3, ("avoid", avoid, "avoid-ai-writing"));
     let config = runners(&setups, &skills)?;
     write(
         &here.join("runners.json"),

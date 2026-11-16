@@ -42,6 +42,26 @@ fn judge_resumes_and_prints_its_cost() {
     assert_eq!(call(&args, &tools), (Ok(0), "judge cost: $0.12\n".into()));
     assert_eq!(*timeouts.lock().unwrap(), [Duration::from_millis(7500)]);
     assert!(fails_on_a_closed_output(&args, &tools));
+    let down = |_: &str, _: Duration| Err("judge down".to_owned());
+    let broken = Tools {
+        judge: &down,
+        ..NONE
+    };
+    let fresh = arg(&dir.path().join("fresh.jsonl"));
+    let (status, _) = call(
+        &[
+            "fact-survival",
+            "judge",
+            &arg(&responses),
+            "--output",
+            &fresh,
+        ],
+        &broken,
+    );
+    assert!(
+        matches!(&status, Err(Stop::Failed(m)) if m.contains("judge down")),
+        "{status:?}"
+    );
     let (status, _) = call(
         &[
             "fact-survival",
@@ -110,6 +130,16 @@ fn calibrate_prints_its_result_and_can_record_its_cost() {
         &tools,
     );
     assert_eq!(status, Ok(0));
+    let down = |_: &str, _: Duration| Err("judge down".to_owned());
+    let broken = Tools {
+        judge: &down,
+        ..NONE
+    };
+    let (status, _) = call(
+        &["fact-survival", "calibrate", "--fixtures", &arg(&fixtures)],
+        &broken,
+    );
+    assert_eq!(status, Err(Stop::Failed("judge down".into())));
     let jammed = dir.path().join("jammed");
     fs::create_dir(&jammed).unwrap();
     let (status, _) = call(

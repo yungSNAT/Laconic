@@ -62,6 +62,7 @@ Restart the agent, then type `/laconic`. It stays on for the session until you s
 - **You need another variety of English:** Laconic writes Australian English only. [LanguageTool](https://github.com/languagetool-org/languagetool) checks grammar and style in Australian, British, Canadian, New Zealand, South African and US English, after the text is written.
 - **You accept a rewrite that adds detail:** [humanizer](https://github.com/blader/humanizer) 4.0.0 (10 November 2026) tells the model, where a text is generic, to 'add a specific detail you know to be true'. Laconic adds no facts, and `laconic-check preserve --strict` fails an edit that adds a figure, URL, quotation or other item it protects.
 - **You want only the writing guidance:** [No AI Slop](https://github.com/petergyang/no-ai-slop), which Laconic's writing guidance builds on, has it without the response rules or Australian English.
+- **You edit in Microsoft Word:** [PerfectIt](https://www.perfectit.com/) checks consistency in Word against a style sheet, including one for Australian Government Style. Laconic works in agents, chat assistants and CI, not in Word.
 - **You want your own house style checked in CI:** [Vale](https://github.com/vale-cli/vale) lints prose against rules you configure; `laconic-check` checks only Laconic's.
 - **You need an open source licence:** Laconic is under FSL-1.1-ALv2 (see [Licence](#licence)). [humanizer](https://github.com/blader/humanizer), [avoid-ai-writing](https://github.com/conorbronsdon/avoid-ai-writing), No AI Slop and Vale are MIT; LanguageTool is LGPL-2.1; caveman is Apache-2.0.
 
@@ -306,7 +307,7 @@ On 13 November 2026, `preserve` ran on the 363 rewrites by 11 commercial humanis
 | Names altered | 28 | 20 list a name to check | 20 | 20 |
 | Every unit kept | 258 | 17 pass; 224 fail only on meaning words; 0 fail on a month, inline code or URL; 17 fail on a number, quantity or quotation | 23 pass; 222; 0; 13 | 64 pass; 182; 0; 12 |
 
-On the same documents, avoid-ai-writing's `validate.js` fails 23 of the 105 altered and Zero Slop's fidelity check all 105; they pass 233 and 15 of the 258 kept, against 23 for `preserve` and 64 with `--loose` ([evals/README.md](evals/README.md#against-other-fact-checkers), 16 November 2026).
+On the same documents, avoid-ai-writing's `validate.js` fails 23 of the 105 altered and Zero Slop's fidelity check all 105; they pass 233 and 15 of the 258 kept, against 23 for `preserve` and 64 with `--loose` ([evals/README.md](evals/README.md#against-other-fact-checkers), 16 November 2026). By the paper's Table 1, each humaniser altered at least one unit in 7 to 13 of the 20 texts it rewrote that hold one (35% to 65%; Undetectable AI 11 of 20); [evals/README.md](evals/README.md#by-humaniser) gives the table with `preserve`'s results for each.
 
 `laconic-check mcp` serves `lint` and `preserve` as MCP tools over standard input and output, with nothing else to install. The `preserve` tool takes `loose: true` for what `--loose` does (on `main`, not yet in a release):
 

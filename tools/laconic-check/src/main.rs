@@ -176,7 +176,12 @@ fn run_lint(options: &Options) -> ExitCode {
                 continue;
             }
         };
-        let lines: Vec<&str> = text.lines().collect();
+        // SARIF and accepted words need the text of a finding's line.
+        let lines: Vec<&str> = if options.sarif || !options.settings.accept.is_empty() {
+            text.lines().collect()
+        } else {
+            Vec::new()
+        };
         let uri = if options.sarif {
             sarif::artifact_uri(file)
         } else {

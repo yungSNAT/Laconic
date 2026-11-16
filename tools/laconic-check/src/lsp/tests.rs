@@ -242,7 +242,15 @@ fn framing_skips_a_message_too_long_and_rejects_a_broken_header() {
     assert_eq!(mcp::to_string(at(&replies[1], "id")), "1");
 
     let long = format!("X-Long: {}\r\n\r\n", "a".repeat(MAX_HEADER));
+    // Short lines that add up to more than a header may hold.
+    let many = format!(
+        "{}Content-Length: 2\r\n\r\n{{}}",
+        "X: y\r\n".repeat(MAX_HEADER / 6)
+    );
+    let truncated = format!("Content-Length: {}\r\n\r\n{{}}", MAX_MESSAGE + 1);
     for (input, kind) in [
+        (many, io::ErrorKind::InvalidData),
+        (truncated, io::ErrorKind::UnexpectedEof),
         (
             "Content-Type: x\r\n\r\n{}".to_owned(),
             io::ErrorKind::InvalidData,
@@ -348,6 +356,9 @@ fn file_uris_become_local_paths_and_others_none() {
         ("file:///home/%ff", false),
         ("file:///x.md", true),
         ("file:///c%3A/a/../b", true),
+        ("file:///C:relative/x.md", true),
+        ("file:///1:/x.md", true),
+        ("file:///C:", true),
     ] {
         assert_eq!(path(uri, windows), None, "{uri}");
     }

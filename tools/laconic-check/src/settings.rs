@@ -52,7 +52,8 @@ impl Settings {
         if self.disable.contains(&name) || !(self.only.is_empty() || self.only.contains(&name)) {
             return false;
         }
-        // A `us-spelling` finding starts at its word, so the letters from there are that word.
+        // A `us-spelling` finding's column is the first letter of a whole run of letters
+        // (`lint`'s spelling check), so the letters from there are that word.
         let accepted = || {
             let word: String = line
                 .chars()

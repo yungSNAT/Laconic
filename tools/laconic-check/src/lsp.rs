@@ -7,7 +7,7 @@
 //! the JSON code in `mcp`, so the crate keeps no dependencies. It syncs whole documents and
 //! offers nothing beyond diagnostics.
 
-use std::collections::HashMap;
+use std::collections::HashSet;
 use std::fs;
 use std::io::{self, BufRead, Read, Write};
 use std::path::{Component, PathBuf};
@@ -19,7 +19,7 @@ use crate::settings::{PROJECT_FILE, Settings};
 
 /// The longest message body, in bytes; a longer one is skipped without being held.
 const MAX_MESSAGE: usize = 16 << 20;
-/// The longest header line, in bytes.
+/// The longest header, all its lines together, in bytes.
 const MAX_HEADER: usize = 1024;
 
 #[derive(Default)]
@@ -29,8 +29,9 @@ struct Server {
     utf8: bool,
     /// Workspace folders as paths, from `initialize`.
     folders: Vec<PathBuf>,
-    /// Open Markdown documents by URI.
-    documents: HashMap<String, String>,
+    /// The URIs of open Markdown documents. Their text is not kept, as full sync sends it whole
+    /// with each change.
+    open: HashSet<String>,
 }
 
 /// Answers messages from `input` until `exit` or the end of input. True when `exit` came after
@@ -42,7 +43,10 @@ pub fn serve(mut input: impl BufRead, mut output: impl Write) -> io::Result<bool
             return Ok(false);
         };
         let replies = if length > MAX_MESSAGE {
-            io::copy(&mut input.by_ref().take(length as u64), &mut io::sink())?;
+            let skipped = io::copy(&mut input.by_ref().take(length as u64), &mut io::sink())?;
+            if skipped < length as u64 {
+                return Err(io::Error::from(io::ErrorKind::UnexpectedEof));
+            }
             let message = format!("skipped a message of {length} bytes, over {MAX_MESSAGE}");
             vec![notify(
                 "window/logMessage",
@@ -68,12 +72,10 @@ fn header(input: &mut impl BufRead) -> io::Result<Option<usize>> {
     let invalid = |message: &str| io::Error::new(io::ErrorKind::InvalidData, message.to_owned());
     let mut length = None;
     let mut started = false;
+    let mut block = input.take(MAX_HEADER as u64);
     loop {
         let mut line = Vec::new();
-        input
-            .by_ref()
-            .take(MAX_HEADER as u64)
-            .read_until(b'\n', &mut line)?;
+        block.read_until(b'\n', &mut line)?;
         if line.is_empty() {
             return if started {
                 Err(io::Error::from(io::ErrorKind::UnexpectedEof))
@@ -82,7 +84,7 @@ fn header(input: &mut impl BufRead) -> io::Result<Option<usize>> {
             };
         }
         if line.last() != Some(&b'\n') {
-            return Err(invalid("a header line is too long or unfinished"));
+            return Err(invalid("a header is too long or unfinished"));
         }
         started = true;
         let line = String::from_utf8_lossy(&line);
@@ -198,7 +200,7 @@ impl Server {
             return Vec::new();
         };
         let uri = uri.to_owned();
-        match method {
+        let body = match method {
             "textDocument/didOpen" => {
                 let markdown = document
                     .and_then(|d| d.get("languageId"))
@@ -210,7 +212,8 @@ impl Server {
                 if !markdown {
                     return Vec::new();
                 }
-                self.documents.insert(uri.clone(), body.to_owned());
+                self.open.insert(uri.clone());
+                body
             }
             "textDocument/didChange" => {
                 // Full sync: the last change holds the whole text.
@@ -218,31 +221,29 @@ impl Server {
                     Some(Json::Array(changes)) => changes.last(),
                     _ => None,
                 };
-                let body = changed.and_then(|c| c.get("text")).and_then(Json::as_str);
-                match (self.documents.get_mut(&uri), body) {
-                    (Some(held), Some(body)) => body.clone_into(held),
+                match changed.and_then(|c| c.get("text")).and_then(Json::as_str) {
+                    Some(body) if self.open.contains(&uri) => body,
                     _ => return Vec::new(),
                 }
             }
             "textDocument/didClose" => {
-                if self.documents.remove(&uri).is_none() {
+                if !self.open.remove(&uri) {
                     return Vec::new();
                 }
                 return vec![publish(&uri, Vec::new())];
             }
             _ => return Vec::new(),
-        }
-        vec![publish(&uri, self.diagnostics(&uri))]
+        };
+        vec![publish(&uri, self.diagnostics(&uri, body))]
     }
 
-    /// `lint`'s findings in an open document, after the project file's settings; or one error
-    /// for a project file that cannot be read.
-    fn diagnostics(&self, uri: &str) -> Vec<Json> {
+    /// `lint`'s findings in the text of the document at `uri`, after the project file's
+    /// settings; or one error for a project file that cannot be read.
+    fn diagnostics(&self, uri: &str, body: &str) -> Vec<Json> {
         let settings = match self.settings(uri) {
             Ok(settings) => settings,
             Err(message) => return vec![diagnostic(0, 0, 0, 1, None, &message)],
         };
-        let body = &self.documents[uri];
         let lines: Vec<&str> = body.lines().collect();
         let width = if self.utf8 {
             char::len_utf8
@@ -371,12 +372,15 @@ fn file_path(uri: &str, windows: bool) -> Option<PathBuf> {
     }
     let mut path = String::from_utf8(bytes).ok()?;
     if windows {
-        let drive = path
-            .strip_prefix('/')
-            .filter(|p| p.as_bytes().get(1) == Some(&b':'))?;
-        let mut chars = drive.chars();
-        let letter = chars.next()?.to_ascii_uppercase();
-        path = format!("{letter}{}", chars.as_str());
+        // Only an absolute path from a drive's root: `C:x` is relative to C:'s current folder.
+        let drive = path.strip_prefix('/')?;
+        let [letter, b':', b'/', ..] = *drive.as_bytes() else {
+            return None;
+        };
+        if !letter.is_ascii_alphabetic() {
+            return None;
+        }
+        path = format!("{}{}", char::from(letter.to_ascii_uppercase()), &drive[1..]);
     }
     let path = PathBuf::from(path);
     (!path.components().any(|c| c == Component::ParentDir)).then_some(path)

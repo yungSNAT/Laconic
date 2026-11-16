@@ -241,7 +241,7 @@ To run `lint` as a gate in CI or a pre-commit hook, these options set what it re
 | `--commit-msg` | Reads each file as a Git commit message, without comment lines or anything below the scissors line. |
 | `--config <file>` | Reads settings from this file instead of `.laconic-check`. |
 
-A `.laconic-check` file in the directory `lint` runs from holds `key = value` lines for `disable`, `only` and `max-findings`, and `#` comment lines. An `accept` line lists words that `us-spelling` does not flag, each matched as a whole word in the same case, so `accept = color` keeps 'Color' at the start of a sentence flagged (on `main`, not yet in a release). Rules on the command line add to its lists, and `--max-findings` replaces its count:
+A `.laconic-check` file in the directory `lint` runs from holds `key = value` lines for `disable`, `only` and `max-findings`, and `#` comment lines. An `accept` line lists words of letters only that `us-spelling` does not flag, each matched as a whole word in the same case, so `accept = color` keeps 'Color' at the start of a sentence flagged (on `main`, not yet in a release). Rules on the command line add to its lists, and `--max-findings` replaces its count:
 
 ```text
 # The CSS property names color and center are expected here.

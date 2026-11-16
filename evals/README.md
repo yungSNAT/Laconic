@@ -151,6 +151,27 @@ The paper's judgements are the reference here, so the table measures agreement w
 
 Two documents the paper marks kept, cleverhumanizer's s24 and s28, keep scare-quoted terms ('flexible leave', 'safe zone') but drop their quotation marks, and `preserve` reports each as a dropped quotation. It keeps counting the marks: without them, a reader takes words the source set apart as the writer's own. Ignoring the marks would let neither document pass, as each also fails on a dropped meaning word with or without `--loose` ('subject to' in s24; 'every', 'might' and 'before' in s28).
 
+### By humaniser
+
+Each of the 11 humanisers rewrote 33 texts, 20 of which hold a unit the paper judges. Its Table 1 gives the documents in which each humaniser altered at least one unit, out of those 20. The counts below were taken again on 17 November 2026 from the paper's per-document judgements (`data/fact_units.jsonl` at `humanizer-fact-audit` commit `e665dda0506a64c834886c94d8f328d447119a07`, 2026-10 cycle), and they match Table 1. The `preserve` columns are those of the next section's table, run on 16 November 2026 with `laconic-check` built from commit `9a9323a` on Linux (x86_64). A document counts as kept here when the paper marks no unit of it altered, including the 13 texts with no unit, as in the tables above. `preserve` fails most kept documents too, mostly on meaning words, so a failure does not show that a fact changed.
+
+| Humaniser (benchmark name) | Documents with a unit altered | Share of the 20 | Units altered, of 94 | `preserve` fails, altered | `preserve` fails, kept |
+| --- | --- | --- | --- | --- | --- |
+| aihumanize | 13 | 65% | 28 | 13 of 13 | 19 of 20 |
+| writehuman | 13 | 65% | 36 | 13 of 13 | 20 of 20 |
+| stealthgpt | 11 | 55% | 33 | 11 of 11 | 21 of 22 |
+| undetectable-ai | 11 | 55% | 18 | 11 of 11 | 16 of 22 |
+| cleverhumanizer | 10 | 50% | 26 | 10 of 10 | 21 of 23 |
+| gptinf | 9 | 45% | 24 | 9 of 9 | 23 of 24 |
+| rehumanize | 9 | 45% | 18 | 9 of 9 | 20 of 24 |
+| smarthumanizer | 8 | 40% | 23 | 8 of 8 | 24 of 25 |
+| hix-bypass | 7 | 35% | 14 | 7 of 7 | 20 of 26 |
+| superhumanizer | 7 | 35% | 18 | 7 of 7 | 26 of 26 |
+| undetectedgpt | 7 | 35% | 21 | 7 of 7 | 25 of 26 |
+| All 11 | 105 of 220 | 48% | 259 of 1,034 | 105 of 105 | 235 of 258 |
+
+The table measures the humanisers' rewrites, not Laconic's; the [public-set fact check](#public-set-fact-check) below measures Laconic's rewrites with the paper's checker, on the public texts of 3 cycles.
+
 ### Against other fact checkers
 
 Two rival humanisers ship a deterministic check that a rewrite kept the source's facts. On 16 November 2026, each ran on the same 363 pairs as `laconic-check` built from commit `9a9323a`, all on Linux (x86_64):
@@ -160,9 +181,9 @@ Two rival humanisers ship a deterministic check that a rewrite kept the source's
 
 Each fails a rewrite with exit status 1. Both ran through the functions behind those commands (`validate` and `fidelity`), on the pairs `laconic-evals fact-audit` downloads.
 
-[patina](https://github.com/devswha/patina) 9.1.0 (npm `patina-cli`) calls its `--verify` a meaning check, but `--verify` rewrites the input through a model and scores the result with one, so it cannot compare a given pair. Its deterministic part, `assessRewriteMeaningSafety` in `src/verify.js`, which the CLI runs on every rewrite it makes and which fails `--verify` (exit status 4), ran on the same pairs on 17 November 2026 (Node 26.13.1): it fails a rewrite that drops a source number or changes a numeric claim, such as a sign or a number word. Of the 68 altered documents it fails, 35 fail on a dropped number; of the 112 kept documents it fails, 105 fail on a changed numeric claim and 7 on a dropped number. It does not check quotations or names, so each document it fails in those rows had a number change too.
+[patina](https://github.com/devswha/patina) 9.1.0 (npm `patina-cli`) calls its `--verify` a meaning check, but `--verify` rewrites the input through a model and scores the result with one, so it cannot compare a given pair, and its model-judged part was not run here. Only its mechanical number check was measured: `assessRewriteMeaningSafety` in `src/verify.js`, which the CLI runs on every rewrite it makes and which fails `--verify` (exit status 4), ran on the same pairs on 17 November 2026 (Node 26.13.1). It fails a rewrite that drops a source number or changes a numeric claim, such as a sign or a number word. Of the 68 altered documents it fails, 35 fail on a dropped number; of the 112 kept documents it fails, 105 fail on a changed numeric claim and 7 on a dropped number. It does not check quotations or names, so each document it fails in those rows had a number change too.
 
-| Documents the paper marks as | Documents | `preserve` fails | `preserve --loose` fails | `validate.js` fails | Zero Slop fails | patina fails |
+| Documents the paper marks as | Documents | `preserve` fails | `preserve --loose` fails | `validate.js` fails | Zero Slop fails | patina number check fails |
 | --- | --- | --- | --- | --- | --- | --- |
 | Any unit altered | 105 | 105 | 105 | 23 | 105 | 68 |
 | Numbers altered | 47 | 47 | 47 | 9 | 47 | 43 |

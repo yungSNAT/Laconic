@@ -394,3 +394,18 @@ fn added_counts_preserves_added_lines() {
         |_: &[String], _: &Input| -> Result<Output, Failure> { Err(Failure::Spawn("gone".into())) };
     assert!(added_count(&missing, "s", "r").is_err());
 }
+
+#[test]
+fn a_response_without_a_trial_is_an_error() {
+    let kept = marks(&[("fact", "kept")]);
+    let error = summarise(
+        &[score("a", "c", 1, kept, json!([]))],
+        &[json!({"runner": "a", "case_id": "c", "response": "x"})],
+        &sources_of(&[("c", "x")]),
+        "a",
+        &no_added,
+        1,
+        None,
+    );
+    assert_eq!(error, Err("a row has no 'trial'".into()));
+}

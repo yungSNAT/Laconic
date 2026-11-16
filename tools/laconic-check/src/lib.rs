@@ -5,8 +5,10 @@
 //! `laconic-check` binary is the supported interface.
 
 pub mod lint;
+pub mod lsp;
 pub mod mcp;
 pub mod preserve;
 pub mod sarif;
 #[cfg(test)]
 mod seeded_faults;
+pub mod settings;

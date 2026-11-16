@@ -15,18 +15,18 @@ Existing Pi smoke tests cover native enable/disable state separately.
 Validate offline:
 
 ```sh
-python3 scripts/run_scenario_eval.py validate evals/scenarios/persistence-topic-switch-stop
+laconic-evals scenario validate evals/scenarios/persistence-topic-switch-stop
 ```
 
 After approving provider spending, run each condition with the same explicit
 model, budget and trial number. For example (each invocation allows up to $1):
 
 ```sh
-python3 scripts/run_scenario_eval.py run \
+laconic-evals scenario run \
   --scenario evals/scenarios/persistence-topic-switch-stop \
   --condition baseline --model <model-id> --trial 1 --budget-usd 1 \
   --output /tmp/laconic-baseline.jsonl
-python3 scripts/run_scenario_eval.py run \
+laconic-evals scenario run \
   --scenario evals/scenarios/persistence-topic-switch-stop \
   --condition candidate --condition-skill skills/laconic/SKILL.md \
   --model <model-id> --trial 1 --budget-usd 1 \
@@ -34,7 +34,7 @@ python3 scripts/run_scenario_eval.py run \
 ```
 
 Output paths must be new. Each successful run saves one response row containing
-the complete conversation, compatible with `scripts/judge.py`. Failed captures
+the complete conversation, compatible with `laconic-evals judge`. Failed captures
 leave an empty output file; they cannot be mistaken for completed conversations.
 Exit status zero means capture completed, not that the skill passed.
 

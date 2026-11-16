@@ -22,6 +22,7 @@ The manifests other than Claude Code's still declare plugin 0.5.0, so a build fr
 
 ### Plugin: changed
 
+- The GitHub prose reference keeps session IDs, local paths, private host names and internal IDs out of posted text, and points the reader to the public artefact instead.
 - Make Laconic a full replacement for stop-slop and No AI Slop.
 - Forbid typical-range estimates in place of evidence.
 - Move the compact rule's mechanics into a before-sending checklist (#34).
@@ -49,18 +50,23 @@ The manifests other than Claude Code's still declare plugin 0.5.0, so a build fr
 
 - `preserve` lists a possible reversal to check on a `check reversal:` line, which never fails: a sentence of the edit that states without a negation the word a sentence of the original negated, when the 2 share at least half of the original's content words. 'not just' and 'not only' add rather than negate, and an edit sentence with its own negation or 'rather than' is not a reversal.
 - `preserve` reports a dropped or added day name, such as 'Thursday', and reads a plural such as 'Sundays' as its day.
+- `laconic-check lsp`, a language server over standard input and output: it publishes `lint`'s findings for each open Markdown document as diagnostics, warnings or hints for advisory rules, each linked to its rule, with the settings of the `.laconic-check` file in the innermost workspace folder that holds the document. A project file it cannot read or parse is one error diagnostic. Positions are in UTF-8 when the client offers it and UTF-16 otherwise.
+- An `accept` line in `.laconic-check` lists words of letters only that `us-spelling` does not flag, each matched as a whole word in the same case.
 - `lint --sarif` prints a SARIF 2.1.0 log for GitHub code scanning: every rule with its description and link, and each finding at level `warning`, or `note` if advisory, located by the file's absolute `file` URI and a one-character region in UTF-16 code units. The exit status is unchanged; `--sarif` cannot be combined with `--json`.
 - The MCP `preserve` tool takes an optional boolean `loose`, which does what `preserve --loose` does; without it, or with `false`, a lost word such as 'often' is still reported as dropped. Any other value is an error.
 - `preserve --loose` lists a lost word of frequency, quantity, ability, prediction, cause or hedging, such as 'often', 'some', 'can', 'will', 'because' or 'likely', on a `check meaning word:` line that does not fail; without it, these losses fail as before. On the fact audit, 64 of the 258 rewrites the paper marks fully kept pass with `--loose` (23 without), and all 105 it marks altered still fail. `evals/fact_audit_agreement.py --loose` measures it.
 
 ### laconic-check: changed
 
+- Builds need Rust 1.100 or later: `rust-toolchain.toml` pins 1.100.0 for every crate in the repository, and each crate declares `rust-version = "1.100"`.
 - Release builds use link-time optimisation and one codegen unit, so the Linux binary is about a fifth smaller and starts slightly faster (#119).
 - The Action's `args` input documents that it splits at spaces, tabs and new lines and keeps quotation marks as written, so an option's value cannot contain a space, and that a project file whose path has one can go in the working directory as `.laconic-check`.
 
 ### laconic-check: fixed
 
 - `preserve` no longer reports '00' as dropped when an edit writes a time on the hour without its minutes, such as '5:00 p.m.' as '5pm'. A colon number is a time only after a word such as 'at' or 'until' or before 'am' or 'pm', so a ratio such as '5:30' stays 2 numbers.
+- `lint` reads back only the few words that could spell a parenthesised acronym, not the whole paragraph before it, so many definitions in one paragraph take linear time: 4,000 in a debug build took 8.1 seconds and now take about as long as 8 times 500.
+- `lint` no longer reads an apostrophe that elides the start of a year or word ('90s, '22, 'em, 'til, 'tis, 'twas) as an opening quotation mark, which hid the prose up to the next closing apostrophe: in `In the '90s, organized teams' work`, 'organized' is now flagged.
 - The MCP `lint` tool's description names every rule, listed from the rule table, and `preserve`'s names quotations, which it has always checked.
 - `preserve` reads a range written with a spaced dash ('30 – 60 grams') or a hyphen that waits for the upper bound's unit ('a 45- to 60-minute ride') in that unit, and compares a quotation set as its own sentence without its new capital or question mark, so 'can I afford to publish this book' to 'Can I afford to publish this book?' no longer reports a dropped quotation. Each was a false alarm on a rewrite the fact audit marks fully kept.
 - `preserve` looks each name up in a set of the edit's runs of 2 and 3 words instead of searching the whole edit for it, so 16 times the names no longer takes about 240 times as long in a debug build; 32,000 names took 1.3 seconds and now take 0.7 in a release build. A name now counts as kept only as whole words: 'Jane Smith' is kept in '(Jane Smith)', 'Jane Smith's' and 'Jane Smith-Jones', but no longer in 'Jane Smithson'. The fact audit's results are unchanged.

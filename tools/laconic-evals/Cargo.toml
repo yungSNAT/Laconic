@@ -2,6 +2,7 @@
 name = "laconic-evals"
 version = "0.1.0"
 edition = "2024"
+rust-version = "1.100"
 license = "FSL-1.1-ALv2"
 description = "Laconic's evaluation harness: runs, judges and scores paired evaluations and measures fact keeping, ported from the Python scripts with the same commands and outputs."
 publish = false
@@ -11,8 +12,11 @@ clap = { version = "4", features = ["derive"] }
 fancy-regex = "0.20.2"
 # ~2.3: Unicode 17 case folding, as Python 3.15's casefold; 2.4 has Unicode 18.
 icu_casemap = "~2.3.0"
+jiff = "1.0.0"
 num-bigint = "0.5.1"
 serde_json = { version = "1", features = ["preserve_order"] }
+sha2 = "0.11.1"
 tempfile = "3.27.0"
 toml = "1.2.1"
 ureq = "3.5.2"
+uuid = { version = "1.29.2", features = ["v4"] }

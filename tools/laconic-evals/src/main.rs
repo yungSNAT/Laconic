@@ -6,143 +6,27 @@
 
 mod agent_bench;
 mod cases;
+mod cli;
 mod fact_audit;
 mod fact_setups;
 mod fact_survival;
 mod humanise;
+mod judge;
 mod proc;
 mod py;
+mod run_evals;
+mod scenario;
 #[cfg(test)]
 mod testing;
 
 use clap::error::ErrorKind;
 use clap::{CommandFactory, Parser, Subcommand};
+use cli::*;
 use std::collections::BTreeSet;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 use std::time::Duration;
-
-#[derive(Parser)]
-#[command(
-    name = "laconic-evals",
-    version,
-    about,
-    infer_long_args = true,
-    args_override_self = true
-)]
-struct Cli {
-    #[command(subcommand)]
-    command: Command,
-}
-
-#[derive(Debug, Subcommand)]
-enum Command {
-    /// Checks laconic-check preserve against the fact audit of the AI Humanizer Benchmark.
-    FactAudit {
-        /// The laconic-check binary.
-        #[arg(long, default_value = "laconic-check")]
-        laconic_check: String,
-        /// Where the downloads are kept [default: evals/results/fact-audit].
-        #[arg(long)]
-        cache: Option<PathBuf>,
-        /// Run preserve with --loose.
-        #[arg(long)]
-        loose: bool,
-    },
-    /// Measures whether rewrites keep each fact and qualifier in a source text.
-    FactSurvival {
-        #[command(subcommand)]
-        command: Survival,
-    },
-    /// Fetches rival skills at pinned commits and writes the fact-survival runner config.
-    FactSetups {
-        /// Make one call per skill setup, proving it loads its own skill.
-        #[arg(long)]
-        preflight: bool,
-        folder: PathBuf,
-    },
-    /// Scores humanising responses with deterministic checkers, without a judge.
-    HumaniseMetrics {
-        responses: PathBuf,
-        /// [default: evals/humanise-cases.jsonl]
-        #[arg(long)]
-        cases: Option<PathBuf>,
-        /// Path to avoid-ai-writing's bin/avoid-ai-writing.js.
-        #[arg(long)]
-        avoid: Option<PathBuf>,
-        /// Also run dslop through uvx with evals/humanise-dslop.toml.
-        #[arg(long)]
-        dslop: bool,
-    },
-    /// Agentic cost benchmark: <rules-a.md> <rules-b.md> <trials> <out.jsonl>.
-    AgentBench {
-        #[arg(num_args = 0.., allow_hyphen_values = true, trailing_var_arg = true)]
-        args: Vec<String>,
-    },
-}
-
-#[derive(Debug, Subcommand)]
-enum Survival {
-    /// Writes the fact cases: the humanise sources under one neutral instruction.
-    BuildCases {
-        /// [default: evals/humanise-cases.jsonl]
-        #[arg(long)]
-        sources: Option<PathBuf>,
-        #[arg(long)]
-        output: PathBuf,
-    },
-    /// Judges each response against its ledger; resumable.
-    Judge {
-        responses: PathBuf,
-        /// [default: evals/fact-ledgers.jsonl]
-        #[arg(long)]
-        ledgers: Option<PathBuf>,
-        #[arg(long)]
-        output: PathBuf,
-        #[arg(long, default_value_t = 4)]
-        jobs: i64,
-        /// [default: evals/fact-cases.jsonl]
-        #[arg(long)]
-        cases: Option<PathBuf>,
-        #[arg(long, default_value_t = 12.0)]
-        budget_usd: f64,
-        #[arg(long, default_value_t = 300.0)]
-        call_timeout: f64,
-    },
-    /// Measures the judge against hand-labelled rewrites.
-    Calibrate {
-        /// [default: evals/fact-calibration.jsonl]
-        #[arg(long)]
-        fixtures: Option<PathBuf>,
-        /// [default: evals/fact-ledgers.jsonl]
-        #[arg(long)]
-        ledgers: Option<PathBuf>,
-        /// [default: evals/fact-cases.jsonl]
-        #[arg(long)]
-        cases: Option<PathBuf>,
-        /// Append this run's cost to this file.
-        #[arg(long)]
-        overhead: Option<PathBuf>,
-    },
-    /// Exit 1 once reported cost reaches the cap.
-    Spend {
-        folder: PathBuf,
-        #[arg(long)]
-        cap: f64,
-    },
-    /// Summarises each setup's scores against the reference setup.
-    Report {
-        scores: PathBuf,
-        responses: PathBuf,
-        #[arg(long)]
-        cases: PathBuf,
-        #[arg(long)]
-        reference: String,
-        #[arg(long, default_value_t = 2)]
-        trials: i64,
-    },
-}
 
 /// Why a command stopped: a bad argument (exit 2, with the usage) or a failure (exit 1).
 #[derive(Debug, PartialEq)]
@@ -163,6 +47,13 @@ impl From<&str> for Stop {
     }
 }
 
+/// A failed write to standard output.
+impl From<std::io::Error> for Stop {
+    fn from(error: std::io::Error) -> Self {
+        Stop::Failed(error.to_string())
+    }
+}
+
 /// A file in the repository's evals folder.
 fn evals(name: &str) -> PathBuf {
     cases::root().join("evals").join(name)
@@ -170,15 +61,6 @@ fn evals(name: &str) -> PathBuf {
 
 fn or_evals(path: Option<PathBuf>, name: &str) -> PathBuf {
     path.unwrap_or_else(|| evals(name))
-}
-
-fn append(path: &Path, line: &str) -> Result<(), String> {
-    std::fs::OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(path)
-        .and_then(|mut file| file.write_all(line.as_bytes()))
-        .map_err(|e| format!("{}: {e}", path.display()))
 }
 
 /// One judge call with a timeout.
@@ -197,6 +79,13 @@ struct Tools<'a> {
     claude: fact_setups::Exec<'a>,
     run_in: agent_bench::Run<'a>,
     which: &'a dyn Fn(&str) -> Option<PathBuf>,
+    /// The runner and judge commands of `run`, `judge` and `scenario run`.
+    runner: run_evals::Exec<'a>,
+    sleep: run_evals::Sleep<'a>,
+    /// Today's date in ISO form, in local time.
+    today: &'a (dyn Fn() -> String + Sync),
+    /// A new claude session id.
+    session: &'a dyn Fn() -> String,
 }
 
 /// The production judge: one claude CLI call.
@@ -217,7 +106,26 @@ const TOOLS: Tools<'static> = Tools {
     claude: &fact_setups::exec,
     run_in: &agent_bench::run_in,
     which: &fact_audit::which,
+    runner: &proc::run,
+    sleep: &std::thread::sleep,
+    today: &today,
+    session: &session,
 };
+
+fn today() -> String {
+    jiff::ZonedDateTime::now().date().to_string()
+}
+
+fn session() -> String {
+    uuid::Uuid::new_v4().to_string()
+}
+
+/// A `--call-timeout` a timer can use.
+fn call_timeout(seconds: f64) -> Result<f64, Stop> {
+    Duration::try_from_secs_f64(seconds)
+        .map(|_| seconds)
+        .map_err(|e| Stop::Usage(format!("--call-timeout: {e}")))
+}
 
 fn survival(command: Survival, out: &mut dyn Write, tools: &Tools) -> Result<u8, Stop> {
     let call = tools.judge;
@@ -258,8 +166,7 @@ fn survival(command: Survival, out: &mut dyn Write, tools: &Tools) -> Result<u8,
                 jobs,
                 budget_usd,
             )?;
-            writeln!(out, "judge cost: ${}", fact_survival::money(spent))
-                .map_err(|e| e.to_string())?;
+            writeln!(out, "judge cost: ${}", fact_survival::money(spent))?;
         }
         Survival::Calibrate {
             fixtures,
@@ -278,11 +185,11 @@ fn survival(command: Survival, out: &mut dyn Write, tools: &Tools) -> Result<u8,
                 &sources,
                 &judge(Duration::from_secs(300)),
             )?;
-            writeln!(out, "{}", py::dumps_pretty(&result)).map_err(|e| e.to_string())?;
+            writeln!(out, "{}", py::dumps_pretty(&result))?;
             if let Some(overhead) = overhead {
                 let line =
                     serde_json::json!({"stage": "calibrate", "cost_usd": result["cost_usd"]});
-                append(&overhead, &format!("{}\n", py::dumps(&line, None, true)))?;
+                cases::append(&overhead, &format!("{}\n", py::dumps(&line, None, true)))?;
             }
         }
         Survival::Spend { folder, cap } => {
@@ -292,8 +199,7 @@ fn survival(command: Survival, out: &mut dyn Write, tools: &Tools) -> Result<u8,
                 "reported cost: ${} of ${}",
                 fact_survival::money(total),
                 fact_survival::money(cap)
-            )
-            .map_err(|e| e.to_string())?;
+            )?;
             return Ok(u8::from(total >= cap));
         }
         Survival::Report {
@@ -316,7 +222,7 @@ fn survival(command: Survival, out: &mut dyn Write, tools: &Tools) -> Result<u8,
                 trials,
                 Some(&setups),
             )?;
-            writeln!(out, "{}", py::dumps_pretty(&summary)).map_err(|e| e.to_string())?;
+            writeln!(out, "{}", py::dumps_pretty(&summary))?;
         }
     }
     Ok(0)
@@ -325,6 +231,145 @@ fn survival(command: Survival, out: &mut dyn Write, tools: &Tools) -> Result<u8,
 /// Runs one parsed command, writing what it prints to `out`; returns the exit status.
 fn run(cli: Cli, out: &mut dyn Write, tools: &Tools) -> Result<u8, Stop> {
     let printed = match cli.command {
+        Command::Validate { cases } => {
+            return Ok(run_evals::validate(&or_evals(cases, "cases.jsonl"), out)?);
+        }
+        Command::Plan {
+            cases,
+            trials,
+            include_comparator,
+        } => run_evals::plan(&or_evals(cases, "cases.jsonl"), trials, include_comparator)?,
+        Command::Score { scores, reference } => {
+            let rows = cases::read_jsonl(&scores)?;
+            format!(
+                "{}\n",
+                py::dumps_pretty(&run_evals::summarize_scores(&rows, &reference)?)
+            )
+        }
+        Command::Measure {
+            responses,
+            reference,
+        } => {
+            let rows = cases::read_jsonl(&responses)?;
+            format!(
+                "{}\n",
+                py::dumps_pretty(&run_evals::summarize_usage(&rows, &reference)?)
+            )
+        }
+        Command::Checks { responses, cases } => {
+            let cases = run_evals::valid_cases(&or_evals(cases, "cases.jsonl"))?;
+            let summary = run_evals::summarize_checks(&cases, &cases::read_jsonl(&responses)?)?;
+            format!("{}\n", py::dumps_pretty(&summary))
+        }
+        Command::Run {
+            cases,
+            runner_config,
+            runner,
+            condition,
+            condition_skill,
+            case,
+            trials,
+            retries,
+            no_injection,
+            call_timeout: timeout,
+            jobs,
+            budget_usd,
+            allow_unmetered,
+            output,
+        } => {
+            let args = run_evals::RunArgs {
+                cases: or_evals(cases, "cases.jsonl"),
+                runner_config: or_evals(runner_config, "runners.example.json"),
+                runner,
+                condition,
+                condition_skill,
+                case,
+                trials,
+                retries,
+                no_injection,
+                call_timeout: call_timeout(timeout)?,
+                jobs,
+                budget_usd,
+                allow_unmetered,
+                output,
+            };
+            let world = run_evals::World {
+                exec: tools.runner,
+                sleep: tools.sleep,
+                today: tools.today,
+            };
+            return Ok(run_evals::run_evaluations(&args, &world, out)?);
+        }
+        Command::Judge {
+            calibrate,
+            responses,
+            cases,
+            rubric,
+            runner_config,
+            runner,
+            conditions,
+            retries,
+            call_timeout: timeout,
+            output,
+        } => {
+            if calibrate.is_none() && (responses.is_none() || output.is_none()) {
+                return Err(Stop::Usage(
+                    "--responses and --output are required unless --calibrate is given".into(),
+                ));
+            }
+            let args = judge::JudgeArgs {
+                calibrate,
+                responses,
+                cases: or_evals(cases, "cases.jsonl"),
+                rubric: or_evals(rubric, "rubric.md"),
+                runner_config: or_evals(runner_config, "runners.example.json"),
+                runner,
+                conditions,
+                retries,
+                call_timeout: call_timeout(timeout)?,
+                output,
+            };
+            return Ok(judge::command(&args, tools.runner, tools.sleep, out)?);
+        }
+        Command::Scenario {
+            command: Scenario::Validate { scenario },
+        } => {
+            scenario::load_scenario(&scenario)?;
+            let name = scenario
+                .file_name()
+                .map(|n| n.to_string_lossy().into_owned());
+            format!("Valid scenario: {}\n", name.unwrap_or_default())
+        }
+        Command::Scenario {
+            command:
+                Scenario::Run {
+                    scenario,
+                    condition,
+                    condition_skill,
+                    model,
+                    trial,
+                    budget_usd,
+                    output,
+                },
+        } => {
+            let args = scenario::ScenarioArgs {
+                scenario,
+                condition,
+                condition_skill,
+                model,
+                trial,
+                budget_usd,
+                output,
+            };
+            scenario::run_scenario(
+                &args,
+                tools.runner,
+                tools.session,
+                scenario::CALL_TIMEOUT,
+                out,
+            )?;
+            String::new()
+        }
         Command::FactAudit {
             laconic_check,
             cache,
@@ -338,7 +383,6 @@ fn run(cli: Cli, out: &mut dyn Write, tools: &Tools) -> Result<u8, Stop> {
             let check = |binary: &str, source: &str, rewrite: &str| {
                 fact_audit::preserve(binary, source, rewrite, loose, tools.preserve)
             };
-            let cache = cache.unwrap_or_else(|| evals("results").join("fact-audit"));
             let (counts, differences) =
                 fact_audit::run(&binary.display().to_string(), &cache, &check, tools.get)?;
             fact_audit::report(&counts, &differences)
@@ -391,8 +435,7 @@ fn run(cli: Cli, out: &mut dyn Write, tools: &Tools) -> Result<u8, Stop> {
             String::new()
         }
     };
-    out.write_all(printed.as_bytes())
-        .map_err(|e| e.to_string())?;
+    out.write_all(printed.as_bytes())?;
     Ok(0)
 }
 

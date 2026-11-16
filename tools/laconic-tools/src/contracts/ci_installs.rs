@@ -2,11 +2,11 @@
 // SPDX-License-Identifier: FSL-1.1-ALv2
 
 //! Offline guards for third-party CLI installation in load checks, pinned actions, Dependabot
-//! coverage and the one hashed pip install. Replaces `tests/test_ci_installs.py`, with its
+//! coverage and the absence of pip installs. Replaces `tests/test_ci_installs.py`, with its
 //! regular expressions unchanged.
 
 use super::{re, read, read_json, root, truthy};
-use crate::au_words::{is_space, split_lines};
+use crate::au_words::is_space;
 use serde_json::Value;
 use std::collections::BTreeMap;
 use std::fs;
@@ -17,7 +17,6 @@ const WORKFLOWS: [&str; 3] = [
     "pi-load-check.yml",
     "plugin-dist.yml",
 ];
-const PIP_LINE: &str = "        run: python -m pip install --only-binary=\":all:\" --require-hashes -r ci/requirements-coverage.txt";
 
 /// `shlex.split` for a command without quotes, escapes or comments, which is all the guard
 /// expects; anything else fails rather than being split differently from a shell.
@@ -237,7 +236,7 @@ fn dependabot_covers_actions_and_every_ci_lockfile() {
     assert_matches(r"(?m)^updates:$", &config, "dependabot.yml");
     let blocks = dependabot_blocks(&config);
     let ecosystems: Vec<&str> = blocks.keys().map(String::as_str).collect();
-    assert_eq!(ecosystems, ["cargo", "github-actions", "npm", "pip"]);
+    assert_eq!(ecosystems, ["cargo", "github-actions", "npm"]);
     for (ecosystem, block) in &blocks {
         assert_matches(
             r"(?m)^    schedule:\n      interval: \w+$",
@@ -262,13 +261,6 @@ fn dependabot_covers_actions_and_every_ci_lockfile() {
         let pattern = format!(r"(?m)^      - /ci/{}$", regex::escape(&directory));
         assert_matches(&pattern, &blocks["npm"], &directory);
     }
-    // Dependabot's pip updater reads every requirements file in the directory.
-    let requirements = fs::read_dir(root().join("ci"))
-        .unwrap()
-        .map(|entry| entry.unwrap().file_name().to_string_lossy().into_owned())
-        .any(|name| name.starts_with("requirements-") && name.ends_with(".txt"));
-    assert!(requirements);
-    assert_matches(r"(?m)^    directory: /ci$", &blocks["pip"], "pip");
     // Every Cargo lockfile that lists a registry package; laconic-check's lists none.
     let mut crates = Vec::new();
     for entry in fs::read_dir(root().join("tools")).unwrap() {
@@ -288,20 +280,14 @@ fn dependabot_covers_actions_and_every_ci_lockfile() {
 }
 
 #[test]
-fn pip_runs_only_the_hashed_coverage_install() {
-    // Like the npm guard, this expects one exact command, so any other line naming pip,
-    // however it is spelt, chained, continued or folded, fails until it is reviewed and
-    // added here.
-    let expected = BTreeMap::from([("tests.yml", vec![PIP_LINE])]);
-    for name in expected.keys() {
-        assert!(
-            root().join(".github/workflows").join(name).is_file(),
-            "{name}"
-        );
-    }
-    for (name, text) in workflow_files() {
-        let wanted = expected.get(name.as_str()).cloned().unwrap_or_default();
-        assert_eq!(pip_lines(&text), wanted, "{name}");
+fn no_workflow_installs_with_pip() {
+    // No workflow needs a Python package, so any line naming pip, however it is spelt,
+    // chained, continued or folded, fails until it is reviewed: an install must then be
+    // pinned by hash and covered by Dependabot.
+    let workflows = workflow_files();
+    assert!(workflows.iter().any(|(name, _)| name == "tests.yml"));
+    for (name, text) in workflows {
+        assert_eq!(pip_lines(&text), Vec::<&str>::new(), "{name}");
     }
     for text in [
         "run: pip3.11 install foo",
@@ -311,18 +297,5 @@ fn pip_runs_only_the_hashed_coverage_install() {
         "run: pipx install foo",
     ] {
         assert!(!pip_lines(text).is_empty(), "{text}");
-    }
-    // Each entry of the requirements file is an exact version followed by sha256 hashes.
-    let text = read(&root().join("ci/requirements-coverage.txt")).replace("\\\n", " ");
-    let hashed = re(r"^[\w.-]+==[\w.]+( +--hash=sha256:[0-9a-f]{64})+ *$");
-    let entries: Vec<&str> = split_lines(&text)
-        .into_iter()
-        .filter(|e| {
-            !e.trim_matches(is_space).is_empty() && !e.trim_start_matches(is_space).starts_with('#')
-        })
-        .collect();
-    assert!(!entries.is_empty());
-    for entry in entries {
-        assert!(hashed.is_match(entry), "{entry}");
     }
 }

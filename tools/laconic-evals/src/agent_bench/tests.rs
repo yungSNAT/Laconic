@@ -36,20 +36,6 @@ const FIXES: [(&str, &str, &str, &str); 5] = [
     ),
 ];
 
-/// Runs the fixtures' tests without writing bytecode, so same-size edits within a second
-/// cannot reuse a stale cache.
-#[cfg(unix)]
-fn fresh(
-    command: &[String],
-    input: &Input,
-    cwd: &Path,
-    timeout: Duration,
-) -> Result<Output, Failure> {
-    let mut wrapped = vec!["env".to_owned(), "PYTHONDONTWRITEBYTECODE=1".to_owned()];
-    wrapped.extend_from_slice(command);
-    run_in(&wrapped, input, cwd, timeout)
-}
-
 #[cfg(unix)]
 #[test]
 fn every_task_starts_failing_and_its_fix_passes() {
@@ -59,12 +45,17 @@ fn every_task_starts_failing_and_its_fix_passes() {
     for (task, rel, old, new) in FIXES {
         let dir = tempfile::tempdir().unwrap();
         build(task, dir.path()).unwrap();
-        assert!(!tests_pass(&python, dir.path(), &fresh).unwrap(), "{task}");
+        assert!(!tests_pass(&python, dir.path(), &run_in).unwrap(), "{task}");
         let path = dir.path().join(rel);
         let text = fs::read_to_string(&path).unwrap();
         assert_eq!(text.matches(old).count(), 1, "{task}");
+        let modified = fs::metadata(&path).unwrap().modified().unwrap();
         fs::write(&path, text.replace(old, new)).unwrap();
-        assert!(tests_pass(&python, dir.path(), &fresh).unwrap(), "{task}");
+        // The fix keeps the file's time, as an edit within the same second does; au-dates'
+        // also keeps its size, so bytecode cached by the first run would still look current.
+        let file = fs::File::options().write(true).open(&path).unwrap();
+        file.set_modified(modified).unwrap();
+        assert!(tests_pass(&python, dir.path(), &run_in).unwrap(), "{task}");
     }
 }
 
@@ -88,6 +79,38 @@ fn the_fixtures_are_the_ones_python_built() {
         build("missing", Path::new(".")),
         Err("no task missing".into())
     );
+    let dir = tempfile::tempdir().unwrap();
+    let file = dir.path().join("file");
+    fs::write(&file, "").unwrap();
+    let (task, files) = &TASKS[0];
+    let error = build(task, &file).unwrap_err();
+    let first = file.join(&files[0].0);
+    assert!(
+        error.starts_with(&format!("{}: ", first.display())),
+        "{error}"
+    );
+}
+
+#[test]
+fn main_reports_a_closed_standard_output() {
+    let dir = tempfile::tempdir().unwrap();
+    let out = dir.path().join("out.jsonl");
+    let before = std::cell::Cell::new(true);
+    let tests = |_: &[String], _: &Input, _: &Path, _: Duration| {
+        done(i32::from(before.replace(!before.get())), "", "")
+    };
+    let session = |_: &Path, _: &str, _: &Path| Ok(json!({"turns": 1}));
+    let mut closed: &mut [u8] = &mut [];
+    let error = command(
+        &args(&out),
+        Some(Path::new("claude")),
+        Path::new("python3"),
+        &session,
+        &tests,
+        &mut closed,
+    );
+    assert_eq!(error, Err("failed to write whole buffer".into()));
+    assert_eq!(fs::read_to_string(&out).unwrap().lines().count(), 1);
 }
 
 fn args(out: &Path) -> Vec<String> {
@@ -239,9 +262,16 @@ fn run_sums_tokens_and_counts_denials_as_python_did() {
         r#"{"usage": {"input_tokens": 9007199254740993, "cache_creation_input_tokens": 9007199254740997, "cache_read_input_tokens": 1.5}}"#,
     ));
     assert_eq!(mixed["input_tokens"], json!(18_014_398_509_481_992.0));
+    // After the first float, Python keeps adding with its compensated float sum: 1e16 + 1 + 1
+    // is 10000000000000002.0, where adding in turn would round each 1 away.
+    let after = session(&reply(
+        r#"{"usage": {"input_tokens": 1e16, "cache_creation_input_tokens": 1, "cache_read_input_tokens": 1}}"#,
+    ));
+    assert_eq!(after["input_tokens"], json!(10_000_000_000_000_002.0));
     let text = session(&reply(r#"{"usage": null, "permission_denials": "ab"}"#));
     assert_eq!(text["denials"], 2);
     assert_eq!(text["input_tokens"], 0);
+    assert_eq!(session(&reply("{}"))["denials"], 0);
 }
 
 #[test]

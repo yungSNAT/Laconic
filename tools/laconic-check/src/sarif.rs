@@ -19,20 +19,22 @@ fn message(s: &str) -> Json {
     object(vec![("text", text(s))])
 }
 
+/// The 0-based start and end of the character at a 1-based `column`, which `lint` counts in
+/// characters, in the code units `width` gives each character. Past the line's end, a
+/// character is one unit.
+pub(crate) fn span(line: &str, column: usize, width: fn(char) -> usize) -> (usize, usize) {
+    let mut units = line.chars().map(width).chain(std::iter::repeat(1));
+    let start = units.by_ref().take(column.saturating_sub(1)).sum();
+    (start, start + units.next().unwrap_or(1))
+}
+
 /// One finding in the file at `uri`, whose text on the finding's line is `line`, as a region
 /// of the character at the finding. SARIF counts columns in UTF-16 code units by default;
 /// `lint` counts characters.
 pub fn result(uri: &str, finding: Finding, line: &str) -> Json {
     let rule = finding.rule.rule();
-    let mut units = line
-        .chars()
-        .map(char::len_utf16)
-        .chain(std::iter::repeat(1));
-    let start = 1 + units
-        .by_ref()
-        .take(finding.column.saturating_sub(1))
-        .sum::<usize>();
-    let end = start + units.next().unwrap_or(1);
+    let (start, end) = span(line, finding.column, char::len_utf16);
+    let (start, end) = (start + 1, end + 1);
     let number = |n: usize| Json::Number(n.to_string());
     object(vec![
         ("ruleId", text(rule.name)),

@@ -8,16 +8,15 @@
 //! must quote the rewrite for every item it calls kept. A quote that is not in the rewrite
 //! counts as dropped, so a judge cannot invent support.
 
-use crate::cases::{parse, read_text};
+use crate::cases::{append, parse, read_text};
 use crate::fact_audit::Exec;
 use crate::humanise::{source_text, words};
 use crate::proc::{self, Input};
-use crate::py::{self, Num, field, text};
+use crate::py::{self, Num, field, text, type_name};
 use fancy_regex::Regex;
 use serde_json::{Map, Value, json};
 use std::collections::{BTreeMap, BTreeSet, HashSet};
-use std::fs::{self, OpenOptions};
-use std::io::Write;
+use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::{LazyLock, mpsc};
 use std::thread;
@@ -197,19 +196,6 @@ pub fn normalise(text: &str) -> String {
     icu_casemap::CaseMapper::new()
         .fold_string(&joined)
         .into_owned()
-}
-
-/// Python's type name for a JSON value, for error messages.
-fn type_name(value: &Value) -> &'static str {
-    match value {
-        Value::Null => "NoneType",
-        Value::Bool(_) => "bool",
-        Value::Number(n) if n.is_f64() => "float",
-        Value::Number(_) => "int",
-        Value::String(_) => "str",
-        Value::Array(_) => "list",
-        Value::Object(_) => "dict",
-    }
 }
 
 /// The reply's ids mapped to their rows, as `{row.get("id"): row for row in parsed["items"]}`.
@@ -428,14 +414,11 @@ pub fn total_spend(folder: &Path) -> Result<f64, String> {
 
 /// The production preserve call for `summarise`: how many items the rewrite added.
 pub fn added_count(exec: Exec, source: &str, rewrite: &str) -> Result<i64, String> {
-    let dir = tempfile::tempdir().map_err(|e| e.to_string())?;
-    let (original, edited) = (dir.path().join("original.md"), dir.path().join("edited.md"));
-    fs::write(&original, source).map_err(|e| e.to_string())?;
-    fs::write(&edited, rewrite).map_err(|e| e.to_string())?;
+    let (_dir, files) = crate::fact_audit::preserve_files(source, rewrite)?;
     let command: Vec<String> = ["laconic-check", "preserve"]
         .into_iter()
         .map(str::to_owned)
-        .chain([original.display().to_string(), edited.display().to_string()])
+        .chain(files)
         .collect();
     let done = exec(&command, &Input::Inherit).map_err(|e| e.message("laconic-check"))?;
     let stdout = proc::text(&done.stdout)?;

@@ -31,10 +31,6 @@ fn each_labelled_response_is_judged_alone_and_disagreements_are_counted() {
     );
 }
 
-fn cases_key(id: &str) -> String {
-    py::key(&json!(id))
-}
-
 #[test]
 fn calibration_fails_where_python_did() {
     let fixture = json!({"name": "n", "case_id": "c", "response": "r", "blocker": false});

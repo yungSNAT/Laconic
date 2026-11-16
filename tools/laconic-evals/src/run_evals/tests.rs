@@ -7,11 +7,6 @@ use crate::testing::{Run, Runs, done};
 use sha2::{Digest, Sha256};
 use std::sync::Mutex;
 
-mod runs;
-mod setup;
-mod summaries;
-mod usage;
-
 fn today() -> String {
     "2026-11-16".into()
 }
@@ -315,3 +310,9 @@ fn a_cost_python_cannot_add_stops_the_run_after_the_call() {
     fails(run(&args, &world).0, "could not convert string to float");
     assert!(rows(&args.output).is_empty());
 }
+
+// Declared after `world!`, which a macro must be to reach them.
+mod runs;
+mod setup;
+mod summaries;
+mod usage;

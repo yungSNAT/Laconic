@@ -17,8 +17,7 @@ const TEXT: &str = "We utilise the logs.\n\nGoing forward, we leverage the color
 
 /// A fresh directory for one test, holding the given files.
 fn folder(name: &str, files: &[(&str, &str)]) -> PathBuf {
-    let dir =
-        std::env::temp_dir().join(format!("laconic-check-rules-{}-{name}", std::process::id()));
+    let dir = Path::new(env!("CARGO_TARGET_TMPDIR")).join(format!("rules-{name}"));
     std::fs::create_dir_all(&dir).unwrap();
     for (file, text) in files {
         std::fs::write(dir.join(file), text).unwrap();

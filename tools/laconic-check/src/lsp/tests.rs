@@ -366,7 +366,10 @@ fn file_uris_become_local_paths_and_others_none() {
 
 #[test]
 fn a_project_rule_is_a_warning_with_its_name_and_no_reference_link() {
-    let root = std::env::temp_dir().join(format!("laconic-check-lsp-rules-{}", std::process::id()));
+    // Under the crate's target folder: scratch that only this test writes.
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("target")
+        .join(format!("lsp-rules-{}", std::process::id()));
     fs::create_dir_all(&root).unwrap();
     fs::write(root.join(PROJECT_FILE), "[rules]\nplain: utilise = use\n").unwrap();
     let init = format!(

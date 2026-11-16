@@ -9,6 +9,8 @@
 
 use std::collections::{BTreeMap, HashSet};
 
+mod reversal;
+
 const MEANING_WORDS: &[&str] = &[
     "not",
     "never",
@@ -333,6 +335,12 @@ pub fn report(original: &str, edited: &str, loose: bool) -> Report {
         loosened
             .iter()
             .map(|item| format!("check meaning word: {item}")),
+    );
+    // Like a lost name, a possible reversal is advice and never fails.
+    lines.extend(
+        reversal::reversals(&split_code(original).1, &split_code(edited).1)
+            .into_iter()
+            .map(|item| format!("check reversal: {item}")),
     );
     lines.extend(
         names(original, edited)
@@ -1427,6 +1435,29 @@ mod tests {
         assert_eq!(a["weekday"], vec!["Friday"]);
         // Only the capitalised day names count.
         assert!(!missing("A sunday drive.", "A drive.").contains_key("weekday"));
+    }
+
+    #[test]
+    fn the_report_lists_a_possible_reversal_to_check_outside_code() {
+        // A negation inside code is not prose.
+        let lines = report(
+            "Pass `--not cached` to the tool.",
+            "Pass `--cached` to the tool.",
+            false,
+        )
+        .lines;
+        assert!(
+            !lines.iter().any(|l| l.starts_with("check reversal:")),
+            "{lines:?}"
+        );
+        let lines = report("Do not delete the cache.", "Delete the cache.", true).lines;
+        assert!(
+            lines.contains(
+                &"check reversal: 'delete' is no longer negated in \"Delete the cache.\""
+                    .to_owned()
+            ),
+            "{lines:?}"
+        );
     }
 
     #[test]

@@ -46,6 +46,7 @@ The manifests other than Claude Code's still declare plugin 0.5.0, so a build fr
 
 ### laconic-check: added
 
+- `preserve` lists a possible reversal to check on a `check reversal:` line, which never fails: a sentence of the edit that states without a negation the word a sentence of the original negated, when the 2 share at least half of the original's content words. 'not just' and 'not only' add rather than negate, and an edit sentence with its own negation or 'rather than' is not a reversal.
 - `preserve` reports a dropped or added day name, such as 'Thursday', and reads a plural such as 'Sundays' as its day.
 - `lint --sarif` prints a SARIF 2.1.0 log for GitHub code scanning: every rule with its description and link, and each finding at level `warning`, or `note` if advisory, located by the file's absolute `file` URI and a one-character region in UTF-16 code units. The exit status is unchanged; `--sarif` cannot be combined with `--json`.
 - The MCP `preserve` tool takes an optional boolean `loose`, which does what `preserve --loose` does; without it, or with `false`, a lost word such as 'often' is still reported as dropped. Any other value is an error.

@@ -157,17 +157,17 @@ Each of the 11 humanisers rewrote 33 texts, 20 of which hold a unit the paper ju
 
 | Humaniser (benchmark name) | Documents with a unit altered | Share of the 20 | Units altered, of 94 | `preserve` fails, altered | `preserve` fails, kept |
 | --- | --- | --- | --- | --- | --- |
-| aihumanize | 13 | 65% | 28 | 13 of 13 | 19 of 20 |
-| writehuman | 13 | 65% | 36 | 13 of 13 | 20 of 20 |
-| stealthgpt | 11 | 55% | 33 | 11 of 11 | 21 of 22 |
-| undetectable-ai | 11 | 55% | 18 | 11 of 11 | 16 of 22 |
-| cleverhumanizer | 10 | 50% | 26 | 10 of 10 | 21 of 23 |
-| gptinf | 9 | 45% | 24 | 9 of 9 | 23 of 24 |
-| rehumanize | 9 | 45% | 18 | 9 of 9 | 20 of 24 |
-| smarthumanizer | 8 | 40% | 23 | 8 of 8 | 24 of 25 |
-| hix-bypass | 7 | 35% | 14 | 7 of 7 | 20 of 26 |
-| superhumanizer | 7 | 35% | 18 | 7 of 7 | 26 of 26 |
-| undetectedgpt | 7 | 35% | 21 | 7 of 7 | 25 of 26 |
+| `aihumanize` | 13 | 65% | 28 | 13 of 13 | 19 of 20 |
+| `writehuman` | 13 | 65% | 36 | 13 of 13 | 20 of 20 |
+| `stealthgpt` | 11 | 55% | 33 | 11 of 11 | 21 of 22 |
+| `undetectable-ai` | 11 | 55% | 18 | 11 of 11 | 16 of 22 |
+| `cleverhumanizer` | 10 | 50% | 26 | 10 of 10 | 21 of 23 |
+| `gptinf` | 9 | 45% | 24 | 9 of 9 | 23 of 24 |
+| `rehumanize` | 9 | 45% | 18 | 9 of 9 | 20 of 24 |
+| `smarthumanizer` | 8 | 40% | 23 | 8 of 8 | 24 of 25 |
+| `hix-bypass` | 7 | 35% | 14 | 7 of 7 | 20 of 26 |
+| `superhumanizer` | 7 | 35% | 18 | 7 of 7 | 26 of 26 |
+| `undetectedgpt` | 7 | 35% | 21 | 7 of 7 | 25 of 26 |
 | All 11 | 105 of 220 | 48% | 259 of 1,034 | 105 of 105 | 235 of 258 |
 
 The table measures the humanisers' rewrites, not Laconic's; the [public-set fact check](#public-set-fact-check) below measures Laconic's rewrites with the paper's checker, on the public texts of 3 cycles.

@@ -47,6 +47,7 @@ The manifests other than Claude Code's still declare plugin 0.5.0, so a build fr
 ### laconic-check: added
 
 - `laconic-check lsp`, a language server over standard input and output: it publishes `lint`'s findings for each open Markdown document as diagnostics, warnings or hints for advisory rules, each linked to its rule, with the settings of the `.laconic-check` file in the innermost workspace folder that holds the document. A project file it cannot read or parse is one error diagnostic. Positions are in UTF-8 when the client offers it and UTF-16 otherwise.
+- `laconic-check hook`, an opt-in Stop hook for Claude Code and Codex: once a turn, before the agent finishes, it lints the repository's uncommitted Markdown with the top-level `.laconic-check` file and, if `lint` would fail, asks the agent to look at up to 50 failing findings.
 - An `accept` line in `.laconic-check` lists words of letters only that `us-spelling` does not flag, each matched as a whole word in the same case.
 - `lint --sarif` prints a SARIF 2.1.0 log for GitHub code scanning: every rule with its description and link, and each finding at level `warning`, or `note` if advisory, located by the file's absolute `file` URI and a one-character region in UTF-16 code units. The exit status is unchanged; `--sarif` cannot be combined with `--json`.
 - The MCP `preserve` tool takes an optional boolean `loose`, which does what `preserve --loose` does; without it, or with `false`, a lost word such as 'often' is still reported as dropped. Any other value is an error.

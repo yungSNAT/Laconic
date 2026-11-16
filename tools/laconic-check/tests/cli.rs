@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: FSL-1.1-ALv2
 
 //! Top-level options: `--version` and `--help` succeed on standard output; anything else
-//! unknown is a usage error on standard error. Also `lsp`'s exit statuses.
+//! unknown is a usage error on standard error. Also `lsp`'s and `hook`'s exit statuses.
 
 use std::process::Command;
 
@@ -42,6 +42,39 @@ fn an_unknown_option_is_still_a_usage_error() {
 }
 
 /// `lsp` exits 0 after `shutdown` and `exit`, 1 for `exit` alone, and 2 on a broken header.
+#[test]
+fn hook_is_silent_once_a_turn_continued_and_fails_on_bad_input() {
+    use std::io::Write;
+    use std::process::Stdio;
+    for (input, code, out, err) in [
+        (r#"{"stop_hook_active":true}"#, 0, "", ""),
+        (
+            "not json",
+            1,
+            "",
+            "laconic-check hook: standard input is not a JSON object\n",
+        ),
+    ] {
+        let mut child = Command::new(env!("CARGO_BIN_EXE_laconic-check"))
+            .arg("hook")
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .unwrap();
+        child
+            .stdin
+            .take()
+            .unwrap()
+            .write_all(input.as_bytes())
+            .unwrap();
+        let done = child.wait_with_output().unwrap();
+        assert_eq!(done.status.code(), Some(code), "{input}");
+        assert_eq!(String::from_utf8(done.stdout).unwrap(), out, "{input}");
+        assert_eq!(String::from_utf8(done.stderr).unwrap(), err, "{input}");
+    }
+}
+
 #[test]
 fn lsp_exit_statuses_follow_the_protocol() {
     use std::io::Write;

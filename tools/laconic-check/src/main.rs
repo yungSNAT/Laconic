@@ -16,7 +16,7 @@ use std::process::ExitCode;
 
 use laconic_check::mcp::Json;
 use laconic_check::settings::{self, PROJECT_FILE, Settings};
-use laconic_check::{lint, lsp, mcp, preserve, sarif};
+use laconic_check::{hook, lint, lsp, mcp, preserve, sarif};
 
 fn usage_text() -> String {
     let advisory: Vec<&str> = lint::RULES
@@ -25,7 +25,7 @@ fn usage_text() -> String {
         .map(|r| r.name)
         .collect();
     format!(
-        "usage:\n  laconic-check lint [options] <file.md | ->...\n  laconic-check preserve [--strict] [--loose] <original> <edited>\n  laconic-check mcp\n  laconic-check lsp\n\n\
+        "usage:\n  laconic-check lint [options] <file.md | ->...\n  laconic-check preserve [--strict] [--loose] <original> <edited>\n  laconic-check mcp\n  laconic-check lsp\n  laconic-check hook\n\n\
          lint options:\n  \
            --json              print one JSON document instead of a line a finding\n  \
            --sarif             print a SARIF 2.1.0 log instead of a line a finding\n  \
@@ -49,6 +49,9 @@ fn usage_text() -> String {
          lsp is a language server over standard input and output: it publishes lint's\n\
          findings for open Markdown documents, with the settings of the .laconic-check\n\
          file in the workspace folder that holds each one.\n\
+         hook reads a Claude Code or Codex Stop event on standard input and, once a turn,\n\
+         asks the agent to look at lint's failing findings in the uncommitted Markdown of\n\
+         the repository that holds the event's directory before it finishes.\n\
          --version prints the version and --help this text.",
         advisory.join(", "),
         lint::RULES_URL
@@ -298,6 +301,7 @@ fn main() -> ExitCode {
                 }
             }
         }
+        Some("hook") if args.len() == 1 => stop_hook(),
         Some("--help") if args.len() == 1 => {
             println!("{}", usage_text());
             ExitCode::SUCCESS
@@ -314,6 +318,28 @@ fn serve() -> ExitCode {
         Err(e) => {
             eprintln!("mcp: {e}");
             ExitCode::from(2)
+        }
+    }
+}
+
+/// Answers one Stop event on standard input with a block decision or nothing. Claude Code
+/// reports exit status 1 as a hook error without blocking the turn.
+fn stop_hook() -> ExitCode {
+    let mut input = String::new();
+    let read = std::io::Read::read_to_string(&mut std::io::stdin(), &mut input);
+    match read
+        .map_err(|e| e.to_string())
+        .and_then(|_| hook::stop(&input))
+    {
+        Ok(decision) => {
+            if let Some(decision) = decision {
+                println!("{decision}");
+            }
+            ExitCode::SUCCESS
+        }
+        Err(message) => {
+            eprintln!("laconic-check hook: {message}");
+            ExitCode::from(1)
         }
     }
 }

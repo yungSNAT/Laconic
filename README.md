@@ -259,8 +259,8 @@ Set the color property of the heading to red.
 
 | Exit status | Meaning |
 | --- | --- |
-| 0 | `lint` found no more failing findings than `--max-findings` allows, or ran with `--warn`; `preserve` found nothing dropped, and nothing added under `--strict`; `mcp` reached the end of its input; `lsp` received `exit` after `shutdown`; `--version` or `--help` printed its text. |
-| 1 | `lint` found more failing findings than allowed; `preserve` found an item dropped, or one added under `--strict`; `lsp` received `exit` without `shutdown`, or its input ended. |
+| 0 | `lint` found no more failing findings than `--max-findings` allows, or ran with `--warn`; `preserve` found nothing dropped, and nothing added under `--strict`; `mcp` reached the end of its input; `lsp` received `exit` after `shutdown`; `hook` answered its event; `--version` or `--help` printed its text. |
+| 1 | `lint` found more failing findings than allowed; `preserve` found an item dropped, or one added under `--strict`; `lsp` received `exit` without `shutdown`, or its input ended; `hook` could not read its event, the project file or Git. |
 | 2 | A usage, project file or read error, or an input or output error in `mcp` or `lsp`. After a read error, `lint` still lints the other files (on `main`, not yet in a release). |
 
 To run it with [pre-commit](https://pre-commit.com), put `laconic-check` on the PATH and add its hooks; the commit message hook also needs `pre-commit install --hook-type commit-msg`, and laconic-check 0.4.0 or later, as 0.3.0 lacks `--commit-msg`:
@@ -339,6 +339,18 @@ args = ["lsp"]
 [[language]]
 name = "markdown"
 language-servers = ["laconic-check"]
+```
+
+`laconic-check hook` is a Stop hook for Claude Code and Codex, off until you add it (on `main`, not yet in a release). When the agent is about to end its turn, it lints the uncommitted Markdown (staged, unstaged and untracked) of the repository that holds the session's directory, with the `.laconic-check` file at the repository's top level. If `lint` would fail, it asks the agent to look at the failing findings first and lists up to 50 of them. It asks once a turn, so the agent can still finish when a finding is a false positive. It also lints your own uncommitted edits, not only the agent's. In Claude Code, add this to `.claude/settings.json` or `~/.claude/settings.json`; Codex reads the same block from `~/.codex/hooks.json` and lists a new hook as untrusted until you review it in `/hooks`:
+
+```json
+{
+  "hooks": {
+    "Stop": [
+      { "hooks": [{ "type": "command", "command": "laconic-check hook", "timeout": 60 }] }
+    ]
+  }
+}
 ```
 
 ## Always on

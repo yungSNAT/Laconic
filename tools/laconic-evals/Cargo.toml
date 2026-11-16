@@ -2,6 +2,7 @@
 name = "laconic-evals"
 version = "0.1.0"
 edition = "2024"
+rust-version = "1.100"
 license = "FSL-1.1-ALv2"
 description = "Laconic's evaluation harness: runs, judges and scores paired evaluations and measures fact keeping, ported from the Python scripts with the same commands and outputs."
 publish = false

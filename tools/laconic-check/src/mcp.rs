@@ -19,8 +19,8 @@ const PROTOCOL_VERSIONS: [&str; 4] = ["2025-11-25", "2025-06-18", "2025-03-26", 
 /// The deepest nesting a request may use; deeper input is a parse error, not a stack overflow.
 const MAX_DEPTH: usize = 64;
 
-const LINT: &str = "Flag Australian English and house-style candidates in Markdown prose: em dashes, US spellings, 'while' and 'among', double quotation marks, possible serial commas, numbers 2 to 20 written as words, dates and times in non-Style Manual forms, weekdays that do not match their date, Latin abbreviations, chatbot closers, stock phrases and chat-tool residue. Code, URLs and quoted text are skipped. A finding is a reason to look, not proof of a defect. Each finding names its rule, described under that name at https://github.com/yungSNAT/Laconic/blob/main/docs/rules.md.";
-const PRESERVE: &str = "Compare an original and an edited text and report numbers, sizes and units, dated months, inline code, URLs and meaning words and bounds (not, never, must, may, will, if, before, likely, some, all, only, unless, up to, about 50% and similar) that the edit dropped, then, as advice, those it added (an added figure or obligation can be invented) and any names to check. A clean result rules out these losses only; it does not prove the meaning survived.";
+const LINT: &str = "Flag Australian English and house-style candidates in Markdown prose, such as em dashes, US spellings, double quotation marks, numbers written as words, Style Manual dates and times, stock phrases, staged contrasts and chat-tool residue. Code, URLs and quoted text are skipped. A finding is a reason to look, not proof of a defect. Each finding names its rule, described under that name at https://github.com/yungSNAT/Laconic/blob/main/docs/rules.md.";
+const PRESERVE: &str = "Compare an original and an edited text and report numbers, sizes and units, dated months, inline code, URLs, quotations, and meaning words and bounds (not, never, must, may, will, if, before, likely, some, all, only, unless, up to, about 50% and similar) that the edit dropped, then, as advice, those it added (an added figure or obligation can be invented) and any names to check. A clean result rules out these losses only; it does not prove the meaning survived.";
 
 /// A JSON value. A number keeps its text, so a request's `id` is echoed exactly.
 #[derive(Debug, Clone, PartialEq)]
@@ -357,11 +357,17 @@ fn tool(
     ])
 }
 
+/// `LINT` and every rule's name, so the list cannot fall behind the rule table.
+fn lint_description() -> String {
+    let names: Vec<&str> = lint::RULES.iter().map(|r| r.name).collect();
+    format!("{LINT} The rules: {}.", names.join(", "))
+}
+
 fn tools() -> Json {
     Json::Array(vec![
         tool(
             "lint",
-            LINT,
+            &lint_description(),
             &[("text", "The Markdown or plain prose to check.")],
             &[],
         ),
@@ -555,6 +561,34 @@ mod tests {
     #[test]
     fn lint_description_links_the_rule_reference() {
         assert!(LINT.contains(lint::RULES_URL));
+    }
+
+    fn description(tool: &str) -> String {
+        let Json::Array(tools) = tools() else {
+            panic!("tools is a list")
+        };
+        let found = tools
+            .iter()
+            .find(|t| t.get("name").and_then(Json::as_str) == Some(tool))
+            .unwrap();
+        found
+            .get("description")
+            .and_then(Json::as_str)
+            .unwrap()
+            .to_owned()
+    }
+
+    #[test]
+    fn the_lint_tool_names_every_rule() {
+        let described = description("lint");
+        for rule in lint::RULES {
+            assert!(described.contains(rule.name), "{} missing", rule.name);
+        }
+    }
+
+    #[test]
+    fn the_preserve_tool_names_quotations() {
+        assert!(description("preserve").contains("quotations"));
     }
 
     fn result(line: &str) -> Json {

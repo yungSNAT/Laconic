@@ -9,7 +9,7 @@
 //! Records whether the tests pass afterwards, plus turns, tokens and cost. Everything runs in
 //! temporary folders. The fixtures stay Python: they are what the agent fixes.
 
-use crate::cases::parse;
+use crate::cases::{append, parse};
 use crate::proc::{self, Failure, Input, Output};
 use crate::py::{self, Num};
 use serde_json::{Map, Value};
@@ -261,7 +261,7 @@ pub fn command(
                 if done.contains(&key) {
                     continue;
                 }
-                let dir = tempfile::tempdir().map_err(|e| e.to_string())?;
+                let dir = crate::run_evals::neutral_cwd(".tmp")?;
                 build(task, dir.path())?;
                 if tests_pass(python, dir.path(), run)? {
                     return Err(format!("{task} should start failing"));
@@ -275,12 +275,7 @@ pub fn command(
                 map.insert("passed".into(), Value::from(passed));
                 drop(dir);
                 let line = py::dumps(&result, None, true);
-                fs::OpenOptions::new()
-                    .create(true)
-                    .append(true)
-                    .open(out)
-                    .and_then(|mut file| file.write_all(format!("{line}\n").as_bytes()))
-                    .map_err(|e| format!("{}: {e}", out.display()))?;
+                append(out, &format!("{line}\n"))?;
                 writeln!(stdout, "{line}")
                     .and_then(|()| stdout.flush())
                     .map_err(|e| e.to_string())?;

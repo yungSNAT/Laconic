@@ -283,6 +283,15 @@ fn run_refuses_a_repeated_or_missing_rewrite() {
 }
 
 #[test]
+fn run_stops_when_a_download_fails() {
+    let dir = tempfile::tempdir().unwrap();
+    let down = |_: &str| Err("offline".to_owned());
+    let check = |_: &str, _: &str, _: &str| Ok((false, kinds(&[])));
+    let error = run("lc", dir.path(), &check, &down).unwrap_err();
+    assert!(error.contains("offline"), "{error}");
+}
+
+#[test]
 fn run_reads_no_cache_from_another_pin() {
     let dir = tempfile::tempdir().unwrap();
     let cache = dir.path();

@@ -13,7 +13,7 @@ use std::fmt::Write as _;
 mod num;
 mod random;
 
-pub use num::{Num, mean, mean_f64, round_num, sum};
+pub use num::{Num, mean, mean_f64, round, round_num, sum};
 pub use random::Random;
 
 /// Python's `str.isspace`, which `str.split()` and `str.strip()` use.
@@ -132,6 +132,19 @@ fn escape_into(out: &mut String, text: &str, ascii: bool) {
     out.push('"');
 }
 
+/// The type name Python's error messages give a JSON value.
+pub fn type_name(value: &Value) -> &'static str {
+    match value {
+        Value::Null => "NoneType",
+        Value::Bool(_) => "bool",
+        Value::Number(n) if n.is_f64() => "float",
+        Value::Number(_) => "int",
+        Value::String(_) => "str",
+        Value::Array(_) => "list",
+        Value::Object(_) => "dict",
+    }
+}
+
 /// `json.dumps(value, ensure_ascii=ascii, indent=indent)`.
 pub fn dumps(value: &Value, indent: Option<usize>, ascii: bool) -> String {
     let mut out = String::new();
@@ -142,6 +155,11 @@ pub fn dumps(value: &Value, indent: Option<usize>, ascii: bool) -> String {
 /// `json.dumps(value, indent=2)`, as the commands print their summaries.
 pub fn dumps_pretty(value: &Value) -> String {
     dumps(value, Some(2), true)
+}
+
+/// `print(line)` to `out`.
+pub fn print(out: &mut dyn std::io::Write, line: &str) -> Result<(), String> {
+    writeln!(out, "{line}").map_err(|e| e.to_string())
 }
 
 /// `json.dumps(value, ensure_ascii=False)`, as the commands write JSON Lines rows.
@@ -304,8 +322,7 @@ pub fn compare(a: &Value, b: &Value) -> Result<Ordering, String> {
                 if let (Some(p), Some(q)) = (a.as_i64(), b.as_i64()) {
                     Ok(p.cmp(&q))
                 } else {
-                    x.partial_cmp(&y)
-                        .ok_or_else(|| "cannot order NaN".to_owned())
+                    Ok(x.partial_cmp(&y).expect("a JSON number is never NaN"))
                 }
             }
             _ => Err(format!(

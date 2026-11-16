@@ -24,7 +24,6 @@ use crate::py::{self, Num};
 use fancy_regex::Regex;
 use serde_json::{Map, Value};
 use std::collections::BTreeMap;
-use std::fs;
 use std::path::Path;
 use std::sync::LazyLock;
 use std::time::Duration;
@@ -101,11 +100,7 @@ pub fn lint_output(exec: Exec, text: &str) -> Result<String, String> {
 
 /// Protected items the rewrite dropped; preserve exits 1 when it finds any.
 pub fn preserve_drops(exec: Exec, source: &str, rewrite: &str) -> Result<i64, String> {
-    let dir = tempfile::tempdir().map_err(|e| e.to_string())?;
-    let (original, edited) = (dir.path().join("original.md"), dir.path().join("edited.md"));
-    fs::write(&original, source).map_err(|e| e.to_string())?;
-    fs::write(&edited, rewrite).map_err(|e| e.to_string())?;
-    let (original, edited) = (original.display().to_string(), edited.display().to_string());
+    let (_dir, [original, edited]) = crate::fact_audit::preserve_files(source, rewrite)?;
     let out = run(
         exec,
         &["laconic-check", "preserve", &original, &edited],

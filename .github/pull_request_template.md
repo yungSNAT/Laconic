@@ -44,7 +44,8 @@
 <!-- Common checks, when relevant:
 cargo test --manifest-path tools/laconic-tools/Cargo.toml
 python3 -m unittest discover -s tests -v
-python3 scripts/run_evals.py validate
+cargo test --manifest-path tools/laconic-evals/Cargo.toml
+cargo run --quiet --locked --manifest-path tools/laconic-evals/Cargo.toml -- validate
 -->
 
 - `<command>`: `<result>`

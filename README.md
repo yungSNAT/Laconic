@@ -336,12 +336,13 @@ Delete the file to turn session mode off. Choose one or the other: session mode 
 
 ## Development
 
-The Codecov badge measures the Python evaluation scripts. The Rust checks run in CI.
+The Codecov badge measures `laconic-evals`, the evaluation harness in `tools/laconic-evals`. The other Rust checks run in CI.
 
 ```sh
 cargo test --manifest-path tools/laconic-tools/Cargo.toml
+cargo test --manifest-path tools/laconic-evals/Cargo.toml
+cargo run --quiet --locked --manifest-path tools/laconic-evals/Cargo.toml -- validate
 python3 -m unittest discover -s tests -v
-python3 scripts/run_evals.py validate
 ```
 
 [CONTRIBUTING.md](CONTRIBUTING.md) covers verification, evaluations and the release gate.

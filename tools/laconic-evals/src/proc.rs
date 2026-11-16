@@ -48,6 +48,13 @@ impl Failure {
     }
 }
 
+/// A child that could not be started or waited for.
+impl From<std::io::Error> for Failure {
+    fn from(error: std::io::Error) -> Self {
+        Failure::Spawn(error.to_string())
+    }
+}
+
 fn code(status: ExitStatus) -> i32 {
     #[cfg(unix)]
     {
@@ -70,14 +77,11 @@ fn drain(mut source: impl Read + Send + 'static) -> thread::JoinHandle<Vec<u8>> 
 /// Waits for `child`, killing it once `timeout` passes.
 fn wait(child: &mut Child, timeout: Option<Duration>) -> Result<ExitStatus, Failure> {
     let Some(timeout) = timeout else {
-        return child.wait().map_err(|e| Failure::Spawn(e.to_string()));
+        return Ok(child.wait()?);
     };
     let deadline = Instant::now() + timeout;
     loop {
-        if let Some(status) = child
-            .try_wait()
-            .map_err(|e| Failure::Spawn(e.to_string()))?
-        {
+        if let Some(status) = child.try_wait()? {
             return Ok(status);
         }
         if Instant::now() >= deadline {
@@ -112,7 +116,7 @@ pub fn run(
     if let Some(cwd) = cwd {
         builder.current_dir(cwd);
     }
-    let mut child = builder.spawn().map_err(|e| Failure::Spawn(e.to_string()))?;
+    let mut child = builder.spawn()?;
     let stdout = drain(child.stdout.take().expect("piped stdout"));
     let stderr = drain(child.stderr.take().expect("piped stderr"));
     if let Input::Bytes(bytes) = input {

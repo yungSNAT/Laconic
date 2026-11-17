@@ -48,7 +48,9 @@ fn path(dirs: &[&Path]) -> OsString {
 
 /// The folder holding the `laconic-check` this test runs.
 fn binary_dir() -> &'static Path {
-    Path::new(env!("CARGO_BIN_EXE_laconic-check")).parent().unwrap()
+    Path::new(env!("CARGO_BIN_EXE_laconic-check"))
+        .parent()
+        .unwrap()
 }
 
 /// Runs the server in `dir` with `LACONIC_CHECK` unset and PATH set to `path`, sends one `lint`
@@ -117,8 +119,11 @@ fn a_path_entry_resolves_dot_dot_after_its_links() {
     std::fs::create_dir_all(real.join("pkg")).unwrap();
     std::fs::create_dir_all(real.join("bin")).unwrap();
     let _ = std::fs::remove_file(real.join("bin/laconic-check"));
-    std::os::unix::fs::symlink(env!("CARGO_BIN_EXE_laconic-check"), real.join("bin/laconic-check"))
-        .unwrap();
+    std::os::unix::fs::symlink(
+        env!("CARGO_BIN_EXE_laconic-check"),
+        real.join("bin/laconic-check"),
+    )
+    .unwrap();
     std::fs::create_dir_all(dir.join("bin")).unwrap();
     std::fs::rename(dir.join("laconic-check"), dir.join("bin/laconic-check")).unwrap();
     let _ = std::fs::remove_file(dir.join("link"));

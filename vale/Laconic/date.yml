@@ -6,8 +6,8 @@ link: 'https://github.com/yungSNAT/Laconic/blob/main/docs/rules.md#date'
 level: warning
 nonword: true
 raw:
-  - '(?<=\b\d{1,2}(?:st|nd|rd|th) (?:of )?)(?:January|February|March|April|May|June|July|August|September|October|November|December)\b'
-  - '|(?<=\b\d{1,2}(?:st|nd|rd|th)? )(?:January|February|March|April|May|June|July|August|September|October|November|December)(?=, \d{4}\b)'
-  - '|\b(?:January|February|March|April|June|July|August|September|October|November|December)(?= \d{1,2}(?:st|nd|rd|th)?\b(?![,.]?\d))'
+  - '(?<=\b\d{1,2}(?i:st|nd|rd|th)\s+(?:of\s+)?)(?:(?i:january|february|march|april|june|july|august|september|october|november|december)|May|MAY)\b'
+  - '|(?<=\b\d{1,2}(?i:st|nd|rd|th)?\s+)(?:(?i:january|february|march|april|june|july|august|september|october|november|december)|(?i:may))(?=,\s+\d{4}\b)'
+  - '|\b(?i:january|february|march|april|june|july|august|september|october|november|december)(?=\s+\d{1,2}(?i:st|nd|rd|th)?\b(?![,.]?\d))'
   - '|(?<=\b(?i:(?:the|early|mid|late|those|these))\s+|[-\x{2013}])\d{3}0[''\x{2019}]s\b'
   - '|\b\d{3}0[''\x{2019}]s(?=[*_)\]''"]*(?:[.,;:!?]|$))'

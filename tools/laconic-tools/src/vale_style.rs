@@ -160,12 +160,27 @@ fn substitution(name: &str, message: &str, ignorecase: bool, swap: &[(String, St
     out
 }
 
-/// The months, capitalised, optionally without May (a verb when a number follows it).
-fn months(with_may: bool) -> String {
-    any(lint::MONTHS
+/// The months in any case, as `lint` reads them, with May written as `may` gives it, or left
+/// out: `lint` reads the verb 'may' as a month in some checks only.
+fn months(may: Option<&str>) -> String {
+    let others: Vec<&str> = lint::MONTHS
         .iter()
-        .filter(|m| with_may || **m != "may")
-        .map(|m| capitalised(m)))
+        .filter(|m| **m != "may")
+        .copied()
+        .collect();
+    let months = format!("(?i:{})", others.join("|"));
+    match may {
+        Some(may) => format!("(?:{months}|{may})"),
+        None => months,
+    }
+}
+
+/// `pattern`, outside inline code: `lint` skips a backtick span on its line, pairing each
+/// backtick with the next one, so a match counts after an even number of backticks or with
+/// no backtick after it on the line. Fenced code blocks are not excluded.
+fn outside_code(pattern: &str) -> String {
+    let even = r"[^`\n]*(?:`[^`\n]*`[^`\n]*)*";
+    format!(r"(?m:(?<=^{even})(?:{pattern})|(?:{pattern})(?![^`\n]*`))")
 }
 
 /// The US-to-Australian pairs `lint` checks first, the hand-written list winning.
@@ -312,9 +327,11 @@ pub fn rules() -> Vec<ValeRule> {
         ),
     );
 
-    let all = months(true);
-    let after_day = months(false);
-    let ordinal = r"\d{1,2}(?:st|nd|rd|th)";
+    // 'Friday the 13th may be rooted in fear': a lower-case 'may' after an ordinal is the verb.
+    let ordinal_month = months(Some("May|MAY"));
+    let any_month = months(Some("(?i:may)"));
+    let after_day = months(None);
+    let ordinal = r"\d{1,2}(?i:st|nd|rd|th)";
     let decade_before = any(["the", "early", "mid", "late", "those", "these"]);
     add(
         "date",
@@ -323,9 +340,9 @@ pub fn rules() -> Vec<ValeRule> {
             "Write dates as 19 October 2026, and decades as 1980s.",
             "",
             &[
-                format!(r"(?<=\b{ordinal} (?:of )?){all}\b"),
-                format!(r"(?<=\b\d{{1,2}}(?:st|nd|rd|th)? ){all}(?=, \d{{4}}\b)"),
-                format!(r"\b{after_day}(?= \d{{1,2}}(?:st|nd|rd|th)?\b(?![,.]?\d))"),
+                format!(r"(?<=\b{ordinal}\s+(?:of\s+)?){ordinal_month}\b"),
+                format!(r"(?<=\b\d{{1,2}}(?i:st|nd|rd|th)?\s+){any_month}(?=,\s+\d{{4}}\b)"),
+                format!(r"\b{after_day}(?=\s+\d{{1,2}}(?i:st|nd|rd|th)?\b(?![,.]?\d))"),
                 format!(r"(?<=\b(?i:{decade_before})\s+|[-\x{{2013}}])\d{{3}}0['\x{{2019}}]s\b"),
                 r#"\b\d{3}0['\x{2019}]s(?=[*_)\]'"]*(?:[.,;:!?]|$))"#.into(),
             ],
@@ -458,7 +475,8 @@ pub fn rules() -> Vec<ValeRule> {
                     .into(),
                 format!(r"(?<![\x{{1F3F4}}\x{{E0000}}-\x{{E007F}}]){tags}+"),
                 format!(r"(?<=\x{{1F3F4}})(?!{flags}(?!{tags})){tags}+"),
-            ],
+            ]
+            .map(|pattern| outside_code(&pattern)),
         ),
     );
     out
@@ -474,21 +492,33 @@ fn ize_word(word: &str) -> bool {
     .any(|s| word.ends_with(s))
 }
 
+/// A `.yml` file under `dir`, at any depth, that is not one of `names` at the top: Vale loads
+/// rules from subfolders too.
+fn stray(dir: &Path, names: &[String], top: bool) -> Option<String> {
+    for entry in fs::read_dir(dir).ok()?.flatten() {
+        let path = entry.path();
+        if path.is_dir() {
+            if let Some(found) = stray(&path, names, false) {
+                return Some(found);
+            }
+            continue;
+        }
+        let name = entry.file_name().to_string_lossy().into_owned();
+        if name.ends_with(".yml") && !(top && names.contains(&name)) {
+            return Some(path.display().to_string());
+        }
+    }
+    None
+}
+
 /// Writes the style, or with `check` only reports whether the files on disk differ. A `.yml`
-/// file in the folder that the generator does not write is an error either way.
+/// file in the folder or under it that the generator does not write is an error either way.
 pub fn run(root: &Path, check: bool) -> Result<String, String> {
     let dir = root.join(STYLE_DIR);
     let wanted = rules();
     let names: Vec<String> = wanted.iter().map(|(n, _)| format!("{n}.yml")).collect();
-    if let Ok(entries) = fs::read_dir(&dir) {
-        for entry in entries.flatten() {
-            let name = entry.file_name().to_string_lossy().into_owned();
-            if name.ends_with(".yml") && !names.contains(&name) {
-                return Err(format!(
-                    "{STYLE_DIR}/{name} is not a generated rule; delete it"
-                ));
-            }
-        }
+    if let Some(path) = stray(&dir, &names, true) {
+        return Err(format!("{path} is not a generated rule; delete it"));
     }
     let stale: Vec<&(String, String)> = wanted
         .iter()

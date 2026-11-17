@@ -41,7 +41,7 @@ Generated, each with the `lint` rule it follows:
 | `stacked-hedge` | Stacked hedges such as 'could potentially' | |
 | `staged-contrast` | 'Not X, it's Y' contrasts | Only the openers and turns `lint` lists, within one sentence |
 | `reveal-question` | Question-and-answer reveals | Only a capitalised reveal question answered by the next sentence |
-| `residue` | Chat-tool markers and tracking parameters, and zero-width, bidirectional and tag characters other than the England, Scotland and Wales flags | |
+| `residue` | Chat-tool markers and tracking parameters, and zero-width, bidirectional and tag characters other than the England, Scotland and Wales flags, in the raw Markdown so that link targets count | Inline code is skipped as in `lint`, but a fenced code block is not, so a marker named in one is flagged |
 
 Not generated, and why:
 

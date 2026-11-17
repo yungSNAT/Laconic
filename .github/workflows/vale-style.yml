@@ -49,3 +49,16 @@ jobs:
           fi
           "$RUNNER_TEMP/vale" --output=line faults.md > "$RUNNER_TEMP/faults.txt"
           diff -u faults.expected "$RUNNER_TEMP/faults.txt"
+      # As a user gets it: the style packed as the release packs it, installed by vale sync.
+      - name: Install the style as a package and run it
+        run: |
+          set -euo pipefail
+          package="$RUNNER_TEMP/package"
+          mkdir -p "$package/styles"
+          (cd vale && zip -qr "$package/Laconic.zip" Laconic)
+          cp vale/tests/faults.md "$package/"
+          cd "$package"
+          printf 'StylesPath = styles\nMinAlertLevel = suggestion\nPackages = %s/Laconic.zip\n\n[*.md]\nBasedOnStyles = Laconic\n' "$package" > .vale.ini
+          "$RUNNER_TEMP/vale" sync
+          "$RUNNER_TEMP/vale" --output=line faults.md > faults.txt
+          diff -u "$GITHUB_WORKSPACE/vale/tests/faults.expected" faults.txt

@@ -33,3 +33,7 @@ It is not the cause. The fix? Did it work?
 Use `color: red` and `e.g.` in code, and the open source tools.
 
 The England flag 🏴󠁧󠁢󠁥󠁮󠁧󠁿 is fine.
+
+The marker is `oaicite`, and the `utm_source=chatgpt` tag is named in code.
+
+The office opens at ٩am, in Arabic-Indic digits.

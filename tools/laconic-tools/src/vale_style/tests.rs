@@ -122,6 +122,11 @@ fn writing_reports_stale_rules_and_refuses_strays() {
         .replace('\n', "\r\n");
     fs::write(style.join("em-dash.yml"), crlf).unwrap();
     assert!(run(&dir, true).is_ok());
+    // Vale loads rules from subfolders too.
+    fs::create_dir_all(style.join("Extra")).unwrap();
+    fs::write(style.join("Extra/extra.yml"), "").unwrap();
+    assert!(run(&dir, true).unwrap_err().contains("extra.yml"));
+    fs::remove_dir_all(style.join("Extra")).unwrap();
     fs::write(style.join("Old.yml"), "").unwrap();
     assert!(run(&dir, false).unwrap_err().contains("Old.yml"));
     fs::remove_dir_all(&dir).unwrap();

@@ -59,17 +59,19 @@ pub extern "C" fn output() -> *const u8 {
 /// when one of them is not UTF-8.
 fn respond(slots: usize, check: impl FnOnce(&[&str]) -> Json) -> usize {
     let report = INPUTS.with_borrow(|inputs| {
-        match inputs[..slots]
-            .iter()
-            .map(|bytes| std::str::from_utf8(bytes))
-            .collect::<Result<Vec<_>, _>>()
-        {
-            Ok(texts) => check(&texts),
-            Err(_) => Json::Object(vec![(
-                "error".into(),
-                Json::String("the text is not UTF-8".into()),
-            )]),
+        let mut texts = [""; 2];
+        for (text, bytes) in texts.iter_mut().zip(&inputs[..slots]) {
+            match std::str::from_utf8(bytes) {
+                Ok(valid) => *text = valid,
+                Err(_) => {
+                    return Json::Object(vec![(
+                        "error".into(),
+                        Json::String("the text is not UTF-8".into()),
+                    )]);
+                }
+            }
         }
+        check(&texts[..slots])
     });
     OUTPUT.with_borrow_mut(|out| {
         *out = to_string(&report);

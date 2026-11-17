@@ -73,13 +73,19 @@ function call(texts, run) {
   return JSON.parse(decoder.decode(new Uint8Array(wasm.memory.buffer, wasm.output(), length)));
 }
 
-// Runs a check; if the checker stops, says so and starts a fresh one for the next check.
-function guarded(statusId, check) {
+// Runs a check; if the checker stops, clears the check's old results, says so and starts a
+// fresh checker before the next check runs.
+function guarded(statusId, listId, check) {
   try {
     check();
   } catch (error) {
+    byId(listId).replaceChildren();
     show(statusId, false, "The checker stopped on this text: " + error.message);
-    WebAssembly.instantiate(module).then((instance) => { wasm = instance.exports; });
+    try {
+      wasm = new WebAssembly.Instance(module).exports;
+    } catch (restart) {
+      show(statusId, false, "The checker stopped and could not restart: " + restart.message + ". Reload the page.");
+    }
   }
 }
 
@@ -127,8 +133,8 @@ WebAssembly.instantiate(Uint8Array.from(atob("{{WASM}}"), (c) => c.charCodeAt(0)
   (loaded) => {
     module = loaded.module;
     wasm = loaded.instance.exports;
-    const runLint = () => guarded("lint-status", lint);
-    const runPreserve = () => guarded("preserve-status", preserve);
+    const runLint = () => guarded("lint-status", "lint-findings", lint);
+    const runPreserve = () => guarded("preserve-status", "preserve-lines", preserve);
     byId("lint-run").addEventListener("click", runLint);
     byId("preserve-run").addEventListener("click", runPreserve);
     runLint();

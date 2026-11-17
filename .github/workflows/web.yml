@@ -3,7 +3,7 @@ name: web
 # Builds the browser checker: tools/laconic-web (lint and preserve) as WebAssembly, put into
 # web/index.html as one file whose content security policy blocks every request. Tests the
 # crate, then opens the page in headless Chromium and checks that it lints and checks its
-# sample texts. On main, publishes the page with GitHub Pages once Pages is turned on with
+# sample texts and recovers when the checker stops. On main, publishes the page with GitHub Pages once Pages is turned on with
 # GitHub Actions as its source; until then the publish job is skipped.
 on:
   pull_request:
@@ -67,19 +67,48 @@ jobs:
         run: |
           set -euo pipefail
           browser=$(command -v chromium || command -v chromium-browser || command -v google-chrome)
-          "$browser" --headless=new --disable-gpu --no-sandbox --virtual-time-budget=10000 \
-            --dump-dom "file://$RUNNER_TEMP/site/index.html" > "$RUNNER_TEMP/dom.html"
-          for wanted in \
+          # expect <page> <text>...: fails unless the page, as Chromium renders it, shows each text.
+          expect() {
+            page=$1
+            shift
+            "$browser" --headless=new --disable-gpu --no-sandbox --virtual-time-budget=10000 \
+              --dump-dom "file://$page" > "$page.dom"
+            for wanted in "$@"; do
+              grep -qF "$wanted" "$page.dom" || {
+                echo "::error::$(basename "$page") did not show '$wanted'"
+                exit 1
+              }
+            done
+          }
+          expect "$RUNNER_TEMP/site/index.html" \
             '<p id="lint-status" class="status fail">4 findings</p>' \
             '<span class="rule">us-spelling</span>' \
             '<span class="rule">number-word</span>' \
             '<p id="preserve-status" class="status fail">Fails: the edit changed a protected item.</p>' \
-            '<li><span>dropped number: 5%</span></li>'; do
-            grep -qF "$wanted" "$RUNNER_TEMP/dom.html" || {
-              echo "::error::The page did not show '$wanted'"
-              exit 1
-            }
-          done
+            '<li><span>dropped number: 5%</span></li>'
+          # variant <name> <sed script>: the page built from web/index.html with a lint that
+          # throws, as a trap in the checker would.
+          variant() {
+            sed -e "$2" "$RUNNER_TEMP/template.html" > web/index.html
+            cargo run --locked --quiet --manifest-path tools/laconic-tools/Cargo.toml -- web-page \
+              tools/laconic-web/target/wasm32-unknown-unknown/release/laconic_web.wasm \
+              "$RUNNER_TEMP/$1.html"
+          }
+          cp web/index.html "$RUNNER_TEMP/template.html"
+          # The startup lint throws: the startup preserve must run on a fresh instance.
+          variant restart '/^function lint() {$/a if (!window.first) { window.first = wasm; throw new Error("injected"); }
+          /^function preserve() {$/a document.title = wasm === window.first ? "old instance" : "new instance";'
+          # A second lint throws: the first lint's findings must go.
+          variant clear '/^function lint() {$/a if ((window.lints = (window.lints || 0) + 1) === 2) throw new Error("injected");
+          /^    runPreserve();$/a runLint();'
+          cp "$RUNNER_TEMP/template.html" web/index.html
+          expect "$RUNNER_TEMP/restart.html" \
+            '<title>new instance</title>' \
+            '<p id="lint-status" class="status fail">The checker stopped on this text: injected</p>' \
+            '<p id="preserve-status" class="status fail">Fails: the edit changed a protected item.</p>'
+          expect "$RUNNER_TEMP/clear.html" \
+            '<p id="lint-status" class="status fail">The checker stopped on this text: injected</p>' \
+            '<ol id="lint-findings"></ol>'
       - if: github.event_name != 'pull_request'
         uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:

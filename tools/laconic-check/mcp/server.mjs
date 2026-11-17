@@ -18,11 +18,15 @@ import { createInterface } from "node:readline";
 const WINDOWS = process.platform === "win32";
 const MAX_INPUT = 200_000; // characters per text argument
 
-// PATH's entries: on Windows split at semicolons outside double quotes, which are then dropped.
+// PATH's entries. On Windows, as libuv splits them: an entry that starts with a double or single
+// quote runs to the matching quote and then to the next semicolon; one leading and one trailing
+// quote are dropped.
 function pathEntries() {
   const path = process.env.PATH ?? "";
   if (!WINDOWS) return path.split(":");
-  return (path.match(/(?:"[^"]*"|[^;"])+/g) ?? []).map((entry) => entry.replaceAll('"', ""));
+  return path.match(/(?:"[^"]*"?|'[^']*'?)?[^;]*/g).map((entry) =>
+    entry.replace(/^["']/, "").replace(/["']$/, ""),
+  );
 }
 
 // Only fully qualified entries are searched. Node on Windows looks in the working directory (the

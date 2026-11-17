@@ -58,11 +58,12 @@ Restart the agent, then type `/laconic`. It stays on for the session until you s
 
 ## When to choose something else
 
-- **Token cost comes first:** [caveman](https://github.com/JuliusBrussee/caveman) is built for that and also compresses what the agent reads. Laconic is not built for it: session mode cost about 27% more per task than its compact rules. The 2 have not been compared on token cost.
+- **Token cost comes first:** [caveman](https://github.com/JuliusBrussee/caveman) is built for that and also compresses what the agent reads, and [Chisle](https://github.com/JayPokale/Chisle) writes fewer output tokens still. On Laconic's 47 cases ([token cost](#token-cost-against-caveman-and-chisle), 17 November 2026), Laconic's compact rules wrote 14% more output tokens than caveman and 44% more than Chisle. With the rules read from the prompt cache, as in a session, an answer cost 17% more than with caveman and 45% more than with Chisle; in single cold calls that each wrote the rules to the cache, it cost 11% less than with caveman (whose rules are longer) and 5% more than with Chisle. Session mode cost about 27% more per task than the compact rules.
 - **You need another variety of English:** Laconic writes Australian English only. [LanguageTool](https://github.com/languagetool-org/languagetool) checks grammar and style in Australian, British, Canadian, New Zealand, South African and US English, after the text is written.
 - **You accept a rewrite that adds detail:** [humanizer](https://github.com/blader/humanizer) 4.0.0 (10 November 2026) tells the model, where a text is generic, to 'add a specific detail you know to be true'. Laconic adds no facts, and `laconic-check preserve --strict` fails an edit that adds a figure, URL, quotation or other item it protects.
 - **You want only the writing guidance:** [No AI Slop](https://github.com/petergyang/no-ai-slop), which Laconic's writing guidance builds on, has it without the response rules or Australian English.
-- **You want your own house style checked in CI:** [Vale](https://github.com/vale-cli/vale) lints prose against rules you configure; `laconic-check` checks only Laconic's.
+- **You edit in Microsoft Word:** [PerfectIt](https://www.perfectit.com/) checks consistency in Word against a style sheet, including one for Australian Government Style. Laconic works in agents, chat assistants and CI, not in Word.
+- **You want your own house style checked in CI:** [Vale](https://github.com/vale-cli/vale) lints prose against rules you configure, with regular expressions, rule types and packages; `laconic-check` adds a project's own word substitutions and banned phrases to Laconic's rules, and nothing more.
 - **You need an open source licence:** Laconic is under FSL-1.1-ALv2 (see [Licence](#licence)). [humanizer](https://github.com/blader/humanizer), [avoid-ai-writing](https://github.com/conorbronsdon/avoid-ai-writing), No AI Slop and Vale are MIT; LanguageTool is LGPL-2.1; caveman is Apache-2.0.
 
 ## What changes
@@ -163,7 +164,57 @@ Laconic beats the plain instruction by 0.56 weighted. The changes are neutral on
 
 </details>
 
-Limits: 18 to 90 answers per setup from one generating model; the cases are in `evals/cases.jsonl` and the rubric in `evals/rubric.md`. These cases also guided the rule wording, so the scores are not a held-out test; the next public comparison will use the 10 frozen cases in `evals/holdout-cases.jsonl`, written on 1 November 2026 and not used to tune the rules. Serial commas remain the most common slip.
+Limits: 18 to 90 answers per setup from one generating model; the cases are in `evals/cases.jsonl` and the rubric in `evals/rubric.md`. These cases also guided the rule wording, so the scores are not a held-out test; the comparison with Claude Code's Concise style below uses the 10 frozen cases in `evals/holdout-cases.jsonl`, written on 1 November 2026 and not used to tune the rules. Serial commas remain the most common slip.
+
+### Against Claude Code's Concise style
+
+On 17 November 2026, 3 setups answered the 10 held-out cases, 3 trials each, generated and judged by Claude Opus 5.5 (`claude-opus-5-5`, high effort) in Claude Code 2.1.325 with no tools: Laconic's compact rules, Claude Code's built-in Concise output style (`"outputStyle": "Concise"`) and the plain instruction 'Answer concisely.'. The judge saw a case's 3 answers together under shuffled letters, blind to the setups' names though not to their style. It judged them twice: for correctness alone, against `evals/rubric-correctness.md`, which tells it not to score style; and against Laconic's own rubric, `evals/rubric.md`, after agreeing with all 10 of its hand-labelled calibration answers.
+
+| Measure | Laconic | Concise style | 'Answer concisely.' |
+| --- | --- | --- | --- |
+| Correctness, style excluded (1 to 5) | 4.80 | 4.27 | 4.47 |
+| Difference from the Concise style (95% interval) | +0.53 (0.00 to +1.17) | | +0.20 (−0.13 to +0.53) |
+| Blocking findings, style excluded | 0 | 4 | 1 |
+| Weighted score, Laconic's own rubric (1 to 5) | 4.69 | 4.06 | 4.11 |
+| Difference from the Concise style (95% interval) | +0.63 (+0.29 to +1.00) | | +0.05 (−0.10 to +0.22) |
+| Blocking findings, Laconic's own rubric | 1 | 13 | 10 |
+| Answers with no `laconic-check` 0.5.0 findings | 24 of 30 | 16 of 30 | 13 of 30 |
+| Regex checks passed | 9 of 12 | 9 of 12 | 9 of 12 |
+| Mean answer length (characters) | 782 | 614 | 627 |
+| Mean output tokens, thinking included | 475 | 327 | 298 |
+| Mean cost per answer, one cold call, as Claude Code reports it | US$0.022 | US$0.019 | US$0.016 |
+| Laconic's cost against it (95% interval) | | 1.18 times (1.07 to 1.29) | 1.39 times (1.30 to 1.50) |
+
+Laconic's own rubric scores Australian English and the house mechanics, which only Laconic asks for, and the judge applied them to correctness and blocking findings as well as to the weighted score, so of the judged rows only the first 3 are neutral on style. Judged for correctness alone, Laconic scored 0.53 higher than the Concise style, but on 10 cases the interval reaches no difference, so this is not a clear lead; Laconic had no blocking finding against its 4. The first judging's notes record that the Concise style gave the wrong weekday for 26 or 28 November 2026 in 2 of 3 payroll emails and buried the deadline in the third, claimed test coverage the task did not establish in 2 of 3 reviewer notes and misquoted the audited text once; 'Answer concisely.' made similar slips. Laconic wrote 46% more output tokens than the Concise style and cost 18% more per answer. All 3 setups kept the Style Manual's en dash in '2026–27', where Laconic's rules ask for the house hyphen, so each failed that case's regex check.
+
+Limits: 30 answers per setup from one model, which also judged them, on cases Laconic's author wrote; the style-excluded judging had no calibration set. Each interval resamples the 10 cases (10,000 resamples, seed 2282). Each call wrote its prompt to the prompt cache, so the cost rows are for single cold calls; with the rules cached, as in a session, Laconic's extra output would probably weigh more, though this run did not measure it. Claude Code and its Concise style are built for software engineering sessions, and most of these cases are writing and advice tasks. The run script, the per-answer scores, token counts and costs, and the script that recomputes this table are in [`evals/runs/concise-style-2026-11-17`](evals/runs/concise-style-2026-11-17/); the answers are not stored.
+
+### Token cost against caveman and Chisle
+
+On 17 November 2026, 3 rule sets answered all 47 cases in `evals/cases.jsonl`, generated and judged by Claude Opus 5.5 (`claude-opus-5-5`, high effort) in Claude Code 2.1.325 with no tools: Laconic's compact rules, [caveman](https://github.com/JuliusBrussee/caveman) 4.1.0's `skills/caveman/SKILL.md` and [Chisle](https://github.com/JayPokale/Chisle) 3.12.1's `skills/chisle/SKILL.md`, each appended to the system prompt without its front matter. Cold calls (2 trials) each ran from a fresh working directory and so wrote the rules to the prompt cache; cached calls (1 trial, not judged) ran from one directory after a priming call and so read them from it, as calls in one session do. The judge saw a case's 3 cold answers together under shuffled letters, and its prompt named no rule set, though it could see their style and 3 of Laconic's 94 answers mentioned Laconic, 2 by quoting a working directory and 1 by naming its skill. It judged them twice: for correctness alone, against `evals/rubric-correctness.md`, which tells it not to score style; and against Laconic's own rubric, `evals/rubric.md`.
+
+| Measure | Laconic | caveman | Chisle |
+| --- | --- | --- | --- |
+| Mean output tokens, thinking included, cold calls | 745 | 655 | 516 |
+| Laconic's output tokens against it (95% interval) | | 1.14 times (1.04 to 1.27) | 1.44 times (1.27 to 1.68) |
+| Mean input tokens, cold calls | 3,218 | 4,285 | 3,861 |
+| Mean output tokens, thinking included, cached calls | 780 | 637 | 492 |
+| Mean cost per answer, rules read from the cache | US$0.018 | US$0.016 | US$0.013 |
+| Laconic's cost against it, rules read from the cache (95% interval) | | 1.17 times (1.05 to 1.29) | 1.45 times (1.25 to 1.61) |
+| Mean cost per answer, one cold call, cache write included | US$0.028 | US$0.031 | US$0.026 |
+| Laconic's cost against it, cold calls (95% interval) | | 0.89 times (0.83 to 0.94) | 1.05 times (0.96 to 1.15) |
+| Mean answer length (characters), cold calls | 1,297 | 1,198 | 977 |
+| Correctness, style excluded (1 to 5) | 4.68 | 4.44 | 4.38 |
+| Laconic's difference (95% interval) | | +0.24 (+0.06 to +0.45) | +0.30 (+0.10 to +0.53) |
+| Blocking findings, style excluded | 2 | 5 | 7 |
+| Weighted score, Laconic's own rubric (1 to 5) | 4.63 | 4.11 | 4.11 |
+| Blocking findings, Laconic's own rubric | 8 | 43 | 44 |
+| Regex checks passed, cold calls | 18 of 18 | 16 of 18 | 16 of 18 |
+| Answers with no `laconic-check` 0.5.0 findings, cold calls | 70 of 94 | 36 of 94 | 39 of 94 |
+
+Laconic wrote the most: 14% more output tokens than caveman and 44% more than Chisle. In cold calls caveman's longer rules cost more to write to the cache than Laconic's extra output, so an answer cost 11% less with Laconic; with the rules read from the cache, as in a session, Laconic's extra output made an answer 17% dearer than with caveman and 45% dearer than with Chisle. Judged for correctness alone, Laconic led caveman by 0.24 and Chisle by 0.30; its 2 style-excluded blocking findings were an arithmetic error and a misquoted RFC 7636 test value. Laconic's own rubric also scored Australian English and the house mechanics, which neither rival asks for, under correctness and as blocking findings, and most of the rivals' blocking findings under it are on those: serial commas, double quotation marks, numbers written as words and US spelling. In that judging both rivals gave typical timeframes in both answers to the case that forbids them, where Laconic gave none; Laconic's blocking findings include an answer that, told it had no tools, would not edit a file the task said it could reach (as did one of Chisle's), one with a material arithmetic error and 2 that added a limits disclaimer the task forbade.
+
+Limits: one model, which also judged the answers, on cases that also guided Laconic's rule wording; the style-excluded judging had no calibration set. Token and cost figures are Claude Code's reports for each call. caveman's own evaluation replaces the system prompt with its skill, where this run appended it. Neither rival's compression of what the agent reads was exercised, and both publish figures from their own prompts and models, which this run does not reproduce. The intervals resample the 47 cases (10,000 resamples, seed 2282). The run script, the per-answer scores, token counts and costs, and the script that recomputes this table are in [`evals/runs/token-cost-2026-11-17`](evals/runs/token-cost-2026-11-17/); the answers are not stored.
 
 ### Against other humanisers
 
@@ -207,16 +258,28 @@ Under Opus 5.5 Laconic lost units in more rewrites than `humanizer` (18 against 
 
 Limits: the checker matches units and can flag a harmless paraphrase of a quotation; it does not see changed conditions, negations or invented claims, so this is not a full test of factual fidelity. Of the 99 texts, 32 have no unit it can check, so the rates cover 134 rewrites per skill. Each round used one model to rewrite, 3 texts to a fresh context; the instructions were supplied as text, not as installed plugins. The Opus round was added after the Codex round, with the method unchanged. Laconic's author chose the rival, wrote the method and ran both rounds. [evals/README.md](evals/README.md#public-set-fact-check) gives the pinned revisions.
 
+On the 33 texts of the 2026-10 cycle, rewritten once each, one text a call, by Claude Opus 5.5 on 17 November 2026, Laconic's skill altered a unit in 5 of the 20 documents that hold one, as did `humanizer`, against 1 for avoid-ai-writing and for `work-humanizer`, 0 for patina with `--verify` and 8 for the request alone; the 11 commercial humanisers altered 7 to 13. One rewrite per text is too few to show a difference between the skills ([by humaniser](evals/README.md#by-humaniser)).
+
 ## Checker
 
-`tools/laconic-check` is a small Rust CLI with no dependencies. `lint` flags candidates in Markdown prose: em dashes, US spellings, 'while' and 'among' as conjunction and preposition, double quotation marks, possible serial commas, numbers written as words, a space in '5 %' or '$ 27.99', dates and times in non-Style Manual forms such as '21st of September' and the decade '1980's', weekdays that do not match their date, Latin abbreviations, chatbot closers, stock phrases such as 'Bottom line:' or 'circle back', staged contrasts ('it's not X, it's Y'; 'not just X but Y'), verbless reveal questions ('The result? A 40% cut.'), timeless openers such as 'since the dawn of time' and unnecessary hyphens such as 'open-source' or 'e-mail', skipping code, URLs and quoted text. It also flags chat-tool residue, such as zero-width characters, citation markers and ChatGPT tracking tags, including inside links, and invisible characters that can hide or reorder text: runs of Unicode tag characters (the England, Scotland and Wales flags excepted) and bidirectional controls. As advice that never fails `lint`, it flags a paragraph with clause dashes (an em dash, or a spaced en dash, hyphen or double hyphen) in 2 or more sentences, where a pair around one aside counts once, stacked hedges such as 'could potentially' and 'may possibly', and 3 or more bullets in a row that open with a bold label ('**Cause:** ...'). `preserve` reports numbers, sizes and units ('$47.3 million' to '$47.3 billion', '150 km' to '150 miles'), dated months, inline code, URLs, quotations, words such as 'not', 'must', 'will', 'if', 'before' and 'likely' and bounds such as 'up to' and 'about 50%' that an edit dropped, and fails on them. With `--loose`, a lost word of frequency, quantity, ability, prediction, cause or hedging, such as 'often', 'some', 'can', 'will', 'because' or 'likely', is listed to check instead, as a heavy paraphrase often drops one without changing a fact; a lost hedge can still overstate a claim, so read each listed word (on `main`, not yet in a release). A number keeps its sign, its currency and accounting brackets around money or a comma-grouped figure, so '-3%' to '3%', '(1,200)' to '1,200' and '$500' to '£500' are changes; other bracketed numbers, such as '(62%)', are asides. A currency is a mark before the digits ('$', '£', '¥' or one from the Unicode Currency Symbols block, such as '€', '₹' and '₩') or 'dollars', 'euros' or 'yen' after them, so '$30 billion' and '30 billion dollars' match. 'Pounds' after a number is money when either text writes '£' with that number, and a weight otherwise. The currency words, the rest of the Currency Symbols block and 'pounds' are on `main`, not yet in a release. It counts 'three' and '3', '1000' and '1,000', and '5 per cent' and '5%' as the same value, reads both bounds of '45 to 60 minutes' or '45-60 minutes' as minutes (on `main`, not yet in a release), reads 'didn't' and 'did not' alike but 'can't' and 'won't' apart, and ignores ordered list markers of up to 2 digits, bold ones included. It also lists those the edit added, such as an invented figure, as advice; `--strict` fails on them too, for a rewrite that must add nothing. Names of 2 or 3 capitalised words that an edit lost or added are listed to check and never fail. Its last line gives both lengths in whitespace-separated words and the edit's as a share of the original's. It does not read for meaning, so a clean result only rules out these losses. A finding is a reason to look, not proof of a defect.
+`tools/laconic-check` is a small Rust CLI with no dependencies. `lint` flags candidates in Markdown prose: em dashes, US spellings, 'while' and 'among' as conjunction and preposition, double quotation marks, possible serial commas, numbers written as words, a space in '5 %' or '$ 27.99', dates and times in non-Style Manual forms such as '21st of September' and the decade '1980's', weekdays that do not match their date, Latin abbreviations, chatbot closers, stock phrases such as 'Bottom line:' or 'circle back', staged contrasts ('it's not X, it's Y'; 'not just X but Y'), verbless reveal questions ('The result? A 40% cut.'), timeless openers such as 'since the dawn of time' and unnecessary hyphens such as 'open-source' or 'e-mail', skipping code, URLs and quoted text. It also flags chat-tool residue, such as zero-width characters, citation markers and ChatGPT tracking tags, including inside links, and invisible characters that can hide or reorder text: runs of Unicode tag characters (the England, Scotland and Wales flags excepted) and bidirectional controls. As advice that never fails `lint`, it flags a paragraph with clause dashes (an em dash, or a spaced en dash, hyphen or double hyphen) in 2 or more sentences, where a pair around one aside counts once, stacked hedges such as 'could potentially' and 'may possibly', and 3 or more bullets in a row that open with a bold label ('**Cause:** ...'). `preserve` reports numbers, sizes and units ('$47.3 million' to '$47.3 billion', '150 km' to '150 miles'), dated months, day names such as 'Thursday' (on `main`, not yet in a release), inline code, URLs, quotations, words such as 'not', 'must', 'will', 'if', 'before' and 'likely' and bounds such as 'up to' and 'about 50%' that an edit dropped, and fails on them. With `--loose`, a lost word of frequency, quantity, ability, prediction, cause or hedging, such as 'often', 'some', 'can', 'will', 'because' or 'likely', is listed to check instead, as a heavy paraphrase often drops one without changing a fact; a lost hedge can still overstate a claim, so read each listed word (on `main`, not yet in a release). A number keeps its sign, its currency and accounting brackets around money or a comma-grouped figure, so '-3%' to '3%', '(1,200)' to '1,200' and '$500' to '£500' are changes; other bracketed numbers, such as '(62%)', are asides. A currency is a mark before the digits ('$', '£', '¥' or one from the Unicode Currency Symbols block, such as '€', '₹' and '₩') or 'dollars', 'euros' or 'yen' after them, so '$30 billion' and '30 billion dollars' match. 'Pounds' after a number is money when either text writes '£' with that number, and a weight otherwise. The currency words, the rest of the Currency Symbols block and 'pounds' are on `main`, not yet in a release. It counts 'three' and '3', '1000' and '1,000', and '5 per cent' and '5%' as the same value, reads both bounds of '45 to 60 minutes' or '45-60 minutes' as minutes (on `main`, not yet in a release), reads 'didn't' and 'did not' alike but 'can't' and 'won't' apart, reads '5:00 p.m.' and '5pm' as the same hour, though a colon number such as '5:30' is a time only after a word such as 'at' or 'until', before 'am' or 'pm', or after 'to' or 'and' that follows a time, and 2 numbers otherwise, as in a ratio (on `main`, not yet in a release), and ignores ordered list markers of up to 2 digits, bold ones included. It also lists those the edit added, such as an invented figure, as advice; `--strict` fails on them too, for a rewrite that must add nothing. Names of 2 or 3 capitalised words that an edit lost or added are listed to check and never fail. So is a possible reversal: a sentence of the edit that states without a negation what a sentence of the original negated, such as 'is not cast' to 'is cast'; dropping the negated half of a staged contrast loses the negated word too, so it is not listed. On the 693 commercial rewrites of the AI Humanizer Benchmark's 2026-10 and 2026-11 cycles it listed 4, each a false alarm: 2 rewrites kept the meaning in other words ('So stop guessing'; 'Otherwise ...'), and 2 matched a sentence that makes another claim (on `main`, not yet in a release). Its last line gives both lengths in whitespace-separated words and the edit's as a share of the original's. It does not read for meaning, so a clean result only rules out these losses. A finding is a reason to look, not proof of a defect.
 
 ```bash
 cargo run --manifest-path tools/laconic-check/Cargo.toml -- lint README.md
 cargo run --manifest-path tools/laconic-check/Cargo.toml -- preserve original.md edited.md
 ```
 
+`lint` and `preserve` also run in a browser, compiled to WebAssembly (on `main`, not yet published). The page is one HTML file whose content security policy blocks every network request, so text pasted into it stays on the machine; `web/index.html` is its source and `tools/laconic-web` the WebAssembly crate. Build it with:
+
+```bash
+rustup target add wasm32-unknown-unknown
+cargo build --release --target wasm32-unknown-unknown --manifest-path tools/laconic-web/Cargo.toml
+cargo run --manifest-path tools/laconic-tools/Cargo.toml -- web-page tools/laconic-web/target/wasm32-unknown-unknown/release/laconic_web.wasm laconic.html
+```
+
 Prebuilt binaries for Linux (x86_64, static), Windows (x86_64) and macOS (Apple silicon) are attached to each `laconic-check-v*` release, with SHA-256 checksums; put the binary on the PATH. Building from source needs only Rust.
+
+For a project that already runs [Vale](https://vale.sh), `vale/Laconic` is a Vale style generated from `lint`'s rule table and attached to each release as the package `Laconic.zip` (on `main`, not yet in a release). It covers the rules a regular expression can express; [vale/README.md](vale/README.md) lists the 7 it cannot and how the rest differ from `lint`.
 
 Releases from 0.4.0 also carry a build provenance attestation for each archive and manifests for Scoop, Homebrew, winget and the MCP Registry. Their MCP bundle, `laconic-check.mcpb`, installs in Claude Desktop in one step. Check a downloaded archive with `gh attestation verify <archive> --repo yungSNAT/Laconic`. Scoop installs straight from the release:
 
@@ -241,11 +304,23 @@ To run `lint` as a gate in CI or a pre-commit hook, these options set what it re
 | `--commit-msg` | Reads each file as a Git commit message, without comment lines or anything below the scissors line. |
 | `--config <file>` | Reads settings from this file instead of `.laconic-check`. |
 
-A `.laconic-check` file in the directory `lint` runs from holds `key = value` lines for `disable`, `only` and `max-findings`, and `#` comment lines. Rules on the command line add to its lists, and `--max-findings` replaces its count:
+A `.laconic-check` file in the directory `lint` runs from holds `key = value` lines for `disable`, `only` and `max-findings`, and `#` comment lines. An `accept` line lists words of letters only that `us-spelling` does not flag, each matched as a whole word in the same case, so `accept = color` keeps 'Color' at the start of a sentence flagged (on `main`, not yet in a release). Rules on the command line add to its lists, and `--max-findings` replaces its count:
 
 ```text
-# CSS property names such as color are expected here.
-disable = us-spelling
+# The CSS property names color and center are expected here.
+accept = color, center
+# This project uses serial commas.
+disable = serial-comma
+```
+
+After the settings, a `[rules]` section holds the project's own rules, one phrase a line: `id: phrase = replacement` suggests the replacement and `id: phrase =` bans the phrase (on `main`, not yet in a release). Each finding names its rule `project/<id>`, which `disable`, `only`, `--disable`, `--only` and suppression comments accept; several lines may share an id. A phrase is one or more words of letters and digits, with hyphens or apostrophes inside a word. It matches whole words in prose, never in code, URLs or quotations, and across a line break. Written in lower case it matches in any case; with a capital it matches only as written. Text written exactly as its replacement is not flagged, so `github = GitHub` leaves 'GitHub' alone. Project findings fail `lint` like Laconic's own. They have no rule reference link: `url` is `null` in `--json`, and the SARIF log lists their rules after Laconic's, without one. A malformed line or an unknown section stops `lint` with the line's number:
+
+```text
+[rules]
+plain-words: utilise = use
+plain-words: leverage = use
+filler: going forward =
+names: Javascript = JavaScript
 ```
 
 To silence one finding, put a comment naming its rule on its own line before it. It covers the next non-blank line only, and `lint` reports each named rule that silences nothing as `unused-suppression`, even when the comment silences another:
@@ -257,9 +332,9 @@ Set the color property of the heading to red.
 
 | Exit status | Meaning |
 | --- | --- |
-| 0 | `lint` found no more failing findings than `--max-findings` allows, or ran with `--warn`; `preserve` found nothing dropped, and nothing added under `--strict`; `mcp` reached the end of its input; `--version` or `--help` printed its text. |
-| 1 | `lint` found more failing findings than allowed; `preserve` found an item dropped, or one added under `--strict`. |
-| 2 | A usage, project file or read error, or an input or output error in `mcp`. After a read error, `lint` still lints the other files (on `main`, not yet in a release). |
+| 0 | `lint` found no more failing findings than `--max-findings` allows, or ran with `--warn`; `preserve` found nothing dropped, and nothing added under `--strict`; `mcp` reached the end of its input; `lsp` received `exit` after `shutdown`; `hook` answered its event; `--version` or `--help` printed its text. |
+| 1 | `lint` found more failing findings than allowed; `preserve` found an item dropped, or one added under `--strict`; `lsp` received `exit` without `shutdown`, or its input ended; `hook` could not read its event, the project file or an uncommitted Markdown file, or Git failed other than by finding no repository. |
+| 2 | A usage error; a project file or read error in a command other than `hook`; or an input or output error in `mcp` or `lsp`. After a read error, `lint` still lints the other files (on `main`, not yet in a release). |
 
 To run it with [pre-commit](https://pre-commit.com), put `laconic-check` on the PATH and add its hooks; the commit message hook also needs `pre-commit install --hook-type commit-msg`, and laconic-check 0.4.0 or later, as 0.3.0 lacks `--commit-msg`:
 
@@ -304,9 +379,9 @@ On 13 November 2026, `preserve` ran on the 363 rewrites by 11 commercial humanis
 | Names altered | 28 | 20 list a name to check | 20 | 20 |
 | Every unit kept | 258 | 17 pass; 224 fail only on meaning words; 0 fail on a month, inline code or URL; 17 fail on a number, quantity or quotation | 23 pass; 222; 0; 13 | 64 pass; 182; 0; 12 |
 
-On the same documents, avoid-ai-writing's `validate.js` fails 23 of the 105 altered and Zero Slop's fidelity check all 105; they pass 233 and 15 of the 258 kept, against 23 for `preserve` and 64 with `--loose` ([evals/README.md](evals/README.md#against-other-fact-checkers), 16 November 2026).
+On the same documents, avoid-ai-writing's `validate.js` fails 23 of the 105 altered and Zero Slop's fidelity check all 105; they pass 233 and 15 of the 258 kept, against 23 for `preserve` and 64 with `--loose` ([evals/README.md](evals/README.md#against-other-fact-checkers), 16 November 2026). By the paper's Table 1, each humaniser altered at least one unit in 7 to 13 of the 20 texts it rewrote that hold one (35% to 65%; Undetectable AI 11 of 20); [evals/README.md](evals/README.md#by-humaniser) gives the table with `preserve`'s results for each.
 
-`laconic-check mcp` serves `lint` and `preserve` as MCP tools over standard input and output, with nothing else to install. The `preserve` tool takes `loose: true` for what `--loose` does (on `main`, not yet in a release):
+`laconic-check mcp` serves `lint` and `preserve` as MCP tools over standard input and output, with nothing else to install. The `preserve` tool takes `loose: true` for what `--loose` does, and the `lint` tool applies the `.laconic-check` file in the directory the server runs in, as `lint` does, reread on each call; a malformed one makes the call an error naming its line (both on `main`, not yet in a release):
 
 ```bash
 claude mcp add --scope user laconic-check -- laconic-check mcp
@@ -316,6 +391,41 @@ It is in laconic-check 0.3.0 and later. A laconic-check 0.2.0 binary needs the e
 
 ```bash
 claude mcp add --scope user laconic-check -- node /path/to/laconic/tools/laconic-check/mcp/server.mjs
+```
+
+`laconic-check lsp` is a language server over standard input and output, so an editor shows `lint`'s findings as you type (on `main`, not yet in a release). It lints each open Markdown document whenever it changes and marks each finding as a warning, or a hint if advisory, linked to its rule. It applies the `.laconic-check` file of the workspace folder that holds the document, the innermost when folders nest, and shows a file it cannot read or parse as an error on the first line. It offers nothing but diagnostics. In Neovim 0.11 or later, which makes the folder holding `.laconic-check` or `.git` the workspace folder:
+
+```lua
+vim.lsp.config('laconic_check', {
+  cmd = { 'laconic-check', 'lsp' },
+  filetypes = { 'markdown' },
+  root_markers = { '.laconic-check', '.git' },
+})
+vim.lsp.enable('laconic_check')
+```
+
+In Helix's `languages.toml`, where the list replaces Helix's default Markdown servers, so add any others you use:
+
+```toml
+[language-server.laconic-check]
+command = "laconic-check"
+args = ["lsp"]
+
+[[language]]
+name = "markdown"
+language-servers = ["laconic-check"]
+```
+
+`laconic-check hook` is a Stop hook for Claude Code and Codex, off until you add it (on `main`, not yet in a release). When the agent is about to end its turn, it lints the uncommitted Markdown (staged, unstaged and untracked) of the repository that holds the session's directory, with the `.laconic-check` file at the repository's top level. If `lint` would fail, it asks the agent to look at the failing findings first and lists up to 50 of them. It asks once a turn, so the agent can still finish when a finding is a false positive. It also lints your own uncommitted edits, not only the agent's. In Claude Code, add this to `.claude/settings.json` or `~/.claude/settings.json`; Codex reads the same block from `~/.codex/hooks.json` and lists a new hook as untrusted until you review it in `/hooks`:
+
+```json
+{
+  "hooks": {
+    "Stop": [
+      { "hooks": [{ "type": "command", "command": "laconic-check hook", "timeout": 60 }] }
+    ]
+  }
+}
 ```
 
 ## Always on

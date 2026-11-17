@@ -9,7 +9,11 @@
 //! the body of a GitHub alert (`> [!NOTE]`), which is the author's prose.
 
 use std::collections::HashMap;
+use std::rc::Rc;
 use std::sync::OnceLock;
+
+mod project;
+pub use project::{Phrase, ProjectRule};
 
 /// One lint rule. `docs/rules.md` is generated from this table and the seeded-fault tests;
 /// every finding's `RuleId` has an entry here.
@@ -204,15 +208,71 @@ impl std::fmt::Display for RuleId {
 /// The rule reference; each rule's name is its anchor there.
 pub const RULES_URL: &str = "https://github.com/yungSNAT/Laconic/blob/main/docs/rules.md";
 
+/// The rule a finding names: one of `RULES`, or one from a project file's `[rules]` section.
+#[derive(Clone, Debug, PartialEq)]
+pub enum RuleRef {
+    Builtin(RuleId),
+    Project(Rc<ProjectRule>),
+}
+
+impl RuleRef {
+    /// The name the finding prints.
+    pub fn name(&self) -> &str {
+        match self {
+            RuleRef::Builtin(id) => id.name(),
+            RuleRef::Project(rule) => &rule.name,
+        }
+    }
+
+    /// The house rule, or `None` for a project file's rule.
+    pub fn house(&self) -> Option<RuleId> {
+        match self {
+            RuleRef::Builtin(id) => Some(*id),
+            RuleRef::Project(_) => None,
+        }
+    }
+
+    /// Whether the finding is advice that never fails `lint`; no project rule is.
+    pub fn advisory(&self) -> bool {
+        matches!(self, RuleRef::Builtin(id) if id.rule().advisory)
+    }
+
+    /// The rule's entry in the rule reference; a project rule has none.
+    pub fn url(&self) -> Option<String> {
+        match self {
+            RuleRef::Builtin(id) => Some(format!("{RULES_URL}#{}", id.name())),
+            RuleRef::Project(_) => None,
+        }
+    }
+}
+
+impl From<RuleId> for RuleRef {
+    fn from(id: RuleId) -> Self {
+        RuleRef::Builtin(id)
+    }
+}
+
+impl PartialEq<RuleId> for RuleRef {
+    fn eq(&self, id: &RuleId) -> bool {
+        *self == RuleRef::Builtin(*id)
+    }
+}
+
+impl std::fmt::Display for RuleRef {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.name())
+    }
+}
+
 #[derive(Debug, PartialEq)]
 pub struct Finding {
     pub line: usize,
     pub column: usize,
-    pub rule: RuleId,
+    pub rule: RuleRef,
     pub message: String,
 }
 
-const CLOSERS: &[&str] = &[
+pub const CLOSERS: &[&str] = &[
     "hope this helps",
     "let me know if",
     "feel free to",
@@ -225,7 +285,7 @@ const CLOSERS: &[&str] = &[
 /// Stock phrases from the pattern catalogue that rarely carry meaning: staged
 /// openers, emphasis crutches, summary labels and business jargon. Matched as whole
 /// words, so 'circle backwards' is not a finding.
-const STOCK_PHRASES: &[&str] = &[
+pub const STOCK_PHRASES: &[&str] = &[
     "here's the thing",
     "let me be clear",
     "make no mistake",
@@ -260,7 +320,7 @@ const STOCK_PHRASES: &[&str] = &[
 /// Stacked hedges: a modal followed at once by a second qualifier. Advisory, as human
 /// writers stack them too; 'can possibly' is left out, as it is usually emphatic ('how can
 /// we possibly').
-const STACKED_HEDGES: &[&str] = &[
+pub const STACKED_HEDGES: &[&str] = &[
     "could potentially",
     "could possibly",
     "could perhaps",
@@ -282,7 +342,7 @@ const STACKED_HEDGES: &[&str] = &[
 /// Unnecessary hyphens: set phrases the house writes open and established compounds
 /// it writes closed, each with the suffixes that keep it the same word. A whole-word
 /// match only, so 'code-based' and 'data-setting' are not 'codebase' and 'dataset'.
-const HYPHENATED_FORMS: &[(&str, &str, &[&str])] = &[
+pub const HYPHENATED_FORMS: &[(&str, &str, &[&str])] = &[
     ("open-source", "open source", &["", "d"]),
     ("plain-language", "plain language", &[""]),
     ("public-sector", "public sector", &[""]),
@@ -303,7 +363,7 @@ const HYPHENATED_FORMS: &[(&str, &str, &[&str])] = &[
 
 /// Openers of a staged contrast ('not just a tool, it's a platform'). 'Not only ...
 /// but' is left alone: it is ordinary formal English and common in human prose.
-const CONTRAST_OPENERS: &[&str] = &[
+pub const CONTRAST_OPENERS: &[&str] = &[
     "not just ",
     "not simply ",
     "not merely ",
@@ -319,7 +379,7 @@ const CONTRAST_OPENERS: &[&str] = &[
 ];
 
 /// What follows the turn of a staged contrast, after a comma, semicolon or dash.
-const CONTRAST_TURNS: &[&str] = &[
+pub const CONTRAST_TURNS: &[&str] = &[
     "it's ",
     "it is ",
     "it was ",
@@ -332,7 +392,7 @@ const CONTRAST_TURNS: &[&str] = &[
 
 /// Reveal questions answered in the next sentence ('The result? A 40% cut.'). An explicit
 /// list: a general 'short question' test flags ordinary questions ('The dog died?').
-const REVEAL_PHRASES: &[&str] = &[
+pub const REVEAL_PHRASES: &[&str] = &[
     "the result",
     "the results",
     "the outcome",
@@ -359,13 +419,13 @@ const REVEAL_PHRASES: &[&str] = &[
 ];
 
 /// Auxiliary verbs that open a question; a reveal's answer never starts with one.
-const QUESTION_OPENERS: &[&str] = &[
+pub const QUESTION_OPENERS: &[&str] = &[
     "do", "does", "did", "is", "are", "was", "were", "can", "could", "will", "would", "should",
     "has", "have", "had", "don't", "doesn't", "didn't", "isn't", "aren't", "wasn't",
 ];
 
 /// US forms that are not caught by the -ize/-yze rule, with the Australian form.
-const US_WORDS: &[(&str, &str)] = &[
+pub const US_WORDS: &[(&str, &str)] = &[
     ("color", "colour"),
     ("colors", "colours"),
     ("colored", "coloured"),
@@ -401,10 +461,10 @@ const US_WORDS: &[(&str, &str)] = &[
 ];
 
 /// House overrides of the Style Manual, which prefers while and among.
-const WORD_CHOICES: &[(&str, &str)] = &[("while", "whilst"), ("among", "amongst")];
+pub const WORD_CHOICES: &[(&str, &str)] = &[("while", "whilst"), ("among", "amongst")];
 
 /// Words before 'while' that make it a noun: a while, a short while, worth your while.
-const WHILE_NOUN_BEFORE: &[&str] = &[
+pub const WHILE_NOUN_BEFORE: &[&str] = &[
     "a", "the", "this", "that", "short", "long", "little", "good", "great", "whole", "my", "your",
     "his", "her", "its", "our", "their",
 ];
@@ -452,7 +512,7 @@ const MARKERS_BEFORE_COMMA: &[&str] = &[
 /// Words that open a parenthetical segment between commas ('a folder, not a repository,').
 const PARENTHETICAL_OPENERS: &[&str] = &["which", "not"];
 
-const MONTHS: [&str; 12] = [
+pub const MONTHS: [&str; 12] = [
     "january",
     "february",
     "march",
@@ -470,7 +530,7 @@ const MONTHS: [&str; 12] = [
 /// Stems whose -ize is part of the word, not a US suffix, alone or compounded and inflected:
 /// downsizing, outsized, capsize, prized, seizing. US -ise words with these endings, such as
 /// emphasize, are in the word lists, which are checked first.
-const IZE_STEMS: &[&str] = &["size", "seize", "prize", "maize", "baize"];
+pub const IZE_STEMS: &[&str] = &["size", "seize", "prize", "maize", "baize"];
 
 fn ize_is_part_of_word(word: &str) -> bool {
     let base = match word.strip_suffix("ing") {
@@ -482,11 +542,12 @@ fn ize_is_part_of_word(word: &str) -> bool {
 
 /// Candidate findings in `text`, less those its suppression comments silence.
 pub fn lint(text: &str) -> Vec<Finding> {
-    lint_counting(text).0
+    lint_counting(text, &[]).0
 }
 
-/// `lint`'s findings and how many findings suppression comments silenced.
-pub fn lint_counting(text: &str) -> (Vec<Finding>, usize) {
+/// `lint`'s findings, with those of a project file's own rules, and how many findings
+/// suppression comments silenced.
+pub fn lint_counting(text: &str, project: &[Rc<ProjectRule>]) -> (Vec<Finding>, usize) {
     let mut findings = Vec::new();
     let mut suppressions: Vec<Suppression> = Vec::new();
     let mut paragraph = Paragraph::default();
@@ -548,7 +609,7 @@ pub fn lint_counting(text: &str) -> (Vec<Finding>, usize) {
             continue;
         }
         if trimmed.starts_with("```") || trimmed.starts_with("~~~") {
-            paragraph.flush(&mut findings, &mut document);
+            paragraph.flush(&mut findings, &mut document, project);
             fence = Some(if trimmed.starts_with("```") {
                 "```"
             } else {
@@ -566,11 +627,15 @@ pub fn lint_counting(text: &str) -> (Vec<Finding>, usize) {
                     target: None,
                     rules: names
                         .into_iter()
-                        .map(|n| (n, RuleId::named(n), false))
+                        .map(|n| {
+                            let known = RuleId::named(n).is_some()
+                                || project.iter().any(|rule| rule.name == n);
+                            (n, known, false)
+                        })
                         .collect(),
                 });
             }
-            paragraph.flush(&mut findings, &mut document);
+            paragraph.flush(&mut findings, &mut document, project);
             continue;
         }
         let marker_width = if is_break_line(trimmed) {
@@ -595,7 +660,7 @@ pub fn lint_counting(text: &str) -> (Vec<Finding>, usize) {
             || is_break_line(trimmed)
             || indented_code;
         if single_line || list_item {
-            paragraph.flush(&mut findings, &mut document);
+            paragraph.flush(&mut findings, &mut document, project);
         }
         // Bullets nested under a run leave it open; a sibling without a label ends it.
         if list_item && (labels.1 == 0 || indent <= labels.0) {
@@ -609,7 +674,7 @@ pub fn lint_counting(text: &str) -> (Vec<Finding>, usize) {
                 findings.push(Finding {
                     line: line_no,
                     column: indent + 1,
-                    rule: RuleId::BoldLabel,
+                    rule: RuleId::BoldLabel.into(),
                     message: "3 or more bullets in a row open with a bold label (advisory); use prose or plain bullets unless a template requires the labels".into(),
                 });
             }
@@ -619,10 +684,10 @@ pub fn lint_counting(text: &str) -> (Vec<Finding>, usize) {
         paragraph.push(raw, line_no);
         // A hard line break (two trailing spaces or a backslash) also ends the run.
         if single_line || raw.ends_with("  ") || raw.trim_end().ends_with('\\') {
-            paragraph.flush(&mut findings, &mut document);
+            paragraph.flush(&mut findings, &mut document, project);
         }
     }
-    paragraph.flush(&mut findings, &mut document);
+    paragraph.flush(&mut findings, &mut document, project);
     // Rules that compare paragraphs report once the whole document is read.
     findings.extend(document.findings());
     let before = findings.len();
@@ -631,7 +696,7 @@ pub fn lint_counting(text: &str) -> (Vec<Finding>, usize) {
             .iter_mut()
             .filter(|s| s.target == Some(f.line))
             .flat_map(|s| s.rules.iter_mut())
-            .find(|(_, id, _)| *id == Some(f.rule));
+            .find(|(name, known, _)| *known && *name == f.rule.name());
         match hit {
             Some((_, _, used)) => {
                 *used = true;
@@ -646,10 +711,10 @@ pub fn lint_counting(text: &str) -> (Vec<Finding>, usize) {
             .rules
             .iter()
             .filter(|(_, _, used)| !used)
-            .map(|&(name, id, _)| match (id, s.target) {
-                (None, _) => format!("'{name}' is not a rule, so the suppression silences nothing (advisory)"),
-                (Some(_), None) => format!("no line follows for the suppression of '{name}' (advisory)"),
-                (Some(_), Some(target)) => format!(
+            .map(|&(name, known, _)| match (known, s.target) {
+                (false, _) => format!("'{name}' is not a rule, so the suppression silences nothing (advisory)"),
+                (true, None) => format!("no line follows for the suppression of '{name}' (advisory)"),
+                (true, Some(target)) => format!(
                     "no '{name}' finding on line {target} to silence (advisory); remove it from the suppression"
                 ),
             })
@@ -660,7 +725,7 @@ pub fn lint_counting(text: &str) -> (Vec<Finding>, usize) {
         findings.extend(messages.into_iter().map(|message| Finding {
             line: s.line,
             column: s.column,
-            rule: RuleId::UnusedSuppression,
+            rule: RuleId::UnusedSuppression.into(),
             message,
         }));
     }
@@ -676,8 +741,8 @@ struct Suppression<'a> {
     column: usize,
     /// The next non-blank line that is not itself a suppression; `None` until it is read.
     target: Option<usize>,
-    /// Each name, its rule if it names one, and whether it silenced a finding.
-    rules: Vec<(&'a str, Option<RuleId>, bool)>,
+    /// Each name, whether it names a rule, and whether it silenced a finding.
+    rules: Vec<(&'a str, bool, bool)>,
 }
 
 /// The rule names a suppression comment lists, comma or space separated, or `None` when the
@@ -924,7 +989,12 @@ impl Paragraph {
     }
 
     /// Runs the rules over the joined paragraph, records its words in `document` and clears it.
-    fn flush(&mut self, findings: &mut Vec<Finding>, document: &mut Document) {
+    fn flush(
+        &mut self,
+        findings: &mut Vec<Finding>,
+        document: &mut Document,
+        project: &[Rc<ProjectRule>],
+    ) {
         if self.lines.is_empty() {
             return;
         }
@@ -935,7 +1005,7 @@ impl Paragraph {
             found.push(self.place(Finding {
                 line: 0,
                 column,
-                rule: RuleId::DoubleQuotes,
+                rule: RuleId::DoubleQuotes.into(),
                 message: "double quotation marks in prose; use single marks".into(),
             }));
         }
@@ -944,6 +1014,7 @@ impl Paragraph {
         }
         let mut joined = Vec::new();
         check_line(&masked, 0, &mut joined);
+        project::check(&masked, project, &mut joined);
         found.extend(joined.into_iter().map(|f| self.place(f)));
         // Report in line order; the sort is stable, so each line keeps its rule order.
         found.sort_by_key(|f| f.line);
@@ -1069,7 +1140,7 @@ impl Document {
             found.push(Finding {
                 line: at.0,
                 column: at.1,
-                rule: RuleId::HyphenConsistency,
+                rule: RuleId::HyphenConsistency.into(),
                 message: format!(
                     "'{here}' here and '{there}' on line {} (advisory); use one form unless they are different words",
                     there_at.0
@@ -1083,7 +1154,7 @@ impl Document {
                 found.push(Finding {
                     line: used.0,
                     column: used.1,
-                    rule: RuleId::AcronymBeforeDefinition,
+                    rule: RuleId::AcronymBeforeDefinition.into(),
                     message: format!(
                         "'{acronym}' is used before its definition on line {} (advisory); define it at first use",
                         defined.0
@@ -1110,12 +1181,21 @@ fn acronym(word: &str) -> Option<&str> {
 /// Hearst's algorithm for finding abbreviation definitions.
 fn spells(before: &[char], acronym: &str) -> bool {
     let capitals = acronym.strip_suffix('s').unwrap_or(acronym);
-    let text: String = before.iter().collect();
-    let words: Vec<&str> = text.split_whitespace().collect();
     // The definition lies within min(|A| + 5, 2|A|) words before the parenthesis, after any
     // earlier use of the acronym itself, singular or plural.
     let limit = (capitals.len() + 5).min(capitals.len() * 2);
-    let mut window = &words[words.len().saturating_sub(limit)..];
+    // Read back only as far as those words, so each acronym costs the same however long the
+    // paragraph before it is.
+    let (mut start, mut counted) = (before.len(), 0);
+    while start > 0 && counted < limit {
+        start -= 1;
+        if !before[start].is_whitespace() && (start == 0 || before[start - 1].is_whitespace()) {
+            counted += 1;
+        }
+    }
+    let text: String = before[start..].iter().collect();
+    let words: Vec<&str> = text.split_whitespace().collect();
+    let mut window = &words[..];
     if let Some(last) = window.iter().rposition(|w| {
         let bare = w.trim_matches(|c: char| !c.is_alphanumeric());
         bare.strip_suffix('s').unwrap_or(bare) == capitals
@@ -1141,7 +1221,7 @@ fn spells(before: &[char], acronym: &str) -> bool {
 }
 
 /// Chat-tool leftovers: citation markers and tracking tags in links.
-const RESIDUE_MARKERS: &[&str] = &[
+pub const RESIDUE_MARKERS: &[&str] = &[
     "oaicite",
     "contentreference",
     "utm_source=chatgpt",
@@ -1187,7 +1267,7 @@ fn check_residue(chars: &[char], line: usize, findings: &mut Vec<Finding>) {
                 findings.push(Finding {
                     line,
                     column: k + 1,
-                    rule: RuleId::Residue,
+                    rule: RuleId::Residue.into(),
                     message: format!(
                         "{n} hidden tag character{} (U+E0000 to U+E007F)",
                         if n == 1 { "" } else { "s" }
@@ -1211,7 +1291,7 @@ fn check_residue(chars: &[char], line: usize, findings: &mut Vec<Finding>) {
             findings.push(Finding {
                 line,
                 column: k + 1,
-                rule: RuleId::Residue,
+                rule: RuleId::Residue.into(),
                 message: format!("{kind} U+{:04X}", c as u32),
             });
         }
@@ -1224,7 +1304,7 @@ fn check_residue(chars: &[char], line: usize, findings: &mut Vec<Finding>) {
             findings.push(Finding {
                 line,
                 column: lower[..from + pos].chars().count() + 1,
-                rule: RuleId::Residue,
+                rule: RuleId::Residue.into(),
                 message: format!("chat-tool residue '{marker}'"),
             });
             from += pos + marker.len();
@@ -1334,7 +1414,20 @@ fn starts_with(chars: &[char], at: usize, s: &str) -> bool {
 fn opens_quote(chars: &[char], i: usize) -> bool {
     let before = if i == 0 { ' ' } else { chars[i - 1] };
     let after = chars.get(i + 1).copied().unwrap_or(' ');
-    !before.is_alphanumeric() && !after.is_whitespace()
+    !before.is_alphanumeric() && !after.is_whitespace() && !elides(chars, i)
+}
+
+/// Whether the apostrophe at `i` stands for the elided start of a year ('90s, '22) or of
+/// 'them', 'until', 'it is' or 'it was', so it opens no quotation.
+fn elides(chars: &[char], i: usize) -> bool {
+    let word: String = chars[i + 1..]
+        .iter()
+        .take_while(|c| c.is_alphanumeric())
+        .collect::<String>()
+        .to_lowercase();
+    let year = word.strip_suffix('s').unwrap_or(&word);
+    (year.len() == 2 && year.chars().all(|c| c.is_ascii_digit()))
+        || ["em", "til", "tis", "twas"].contains(&word.as_str())
 }
 
 fn closes_quote(chars: &[char], j: usize) -> bool {
@@ -1396,7 +1489,7 @@ fn check_line(masked: &[char], line: usize, findings: &mut Vec<Finding>) {
             findings.push(Finding {
                 line,
                 column: k + 1,
-                rule: RuleId::EmDash,
+                rule: RuleId::EmDash.into(),
                 message: "em dash in original prose".into(),
             });
         }
@@ -1414,7 +1507,7 @@ fn check_line(masked: &[char], line: usize, findings: &mut Vec<Finding>) {
         findings.push(Finding {
             line,
             column: at + 1,
-            rule: RuleId::ClauseDashes,
+            rule: RuleId::ClauseDashes.into(),
             message: "clause dashes in 2 or more sentences of one paragraph (advisory); use a comma, colon or full stop where one reads as well".into(),
         });
     }
@@ -1428,7 +1521,7 @@ fn check_line(masked: &[char], line: usize, findings: &mut Vec<Finding>) {
             findings.push(Finding {
                 line,
                 column: col,
-                rule: RuleId::Closer,
+                rule: RuleId::Closer.into(),
                 message: format!("chatbot phrase '{phrase}'"),
             });
             from += pos + phrase.len();
@@ -1458,7 +1551,7 @@ fn check_line(masked: &[char], line: usize, findings: &mut Vec<Finding>) {
                 findings.push(Finding {
                     line,
                     column: plain[..at].chars().count() + 1,
-                    rule: RuleId::StockPhrase,
+                    rule: RuleId::StockPhrase.into(),
                     message: format!("stock phrase '{phrase}'; state the point directly"),
                 });
             }
@@ -1476,7 +1569,7 @@ fn check_line(masked: &[char], line: usize, findings: &mut Vec<Finding>) {
                 findings.push(Finding {
                     line,
                     column: plain[..at].chars().count() + 1,
-                    rule: RuleId::StackedHedge,
+                    rule: RuleId::StackedHedge.into(),
                     message: format!("stacked hedge '{phrase}' (advisory); keep one qualifier at the confidence the source supports"),
                 });
             }
@@ -1500,7 +1593,7 @@ fn check_line(masked: &[char], line: usize, findings: &mut Vec<Finding>) {
             findings.push(Finding {
                 line,
                 column: plain[..at].chars().count() + 1,
-                rule: RuleId::Hyphen,
+                rule: RuleId::Hyphen.into(),
                 message: format!("'{hyphenated}{suffix}': write '{house}{suffix}'"),
             });
         }
@@ -1522,7 +1615,7 @@ fn check_line(masked: &[char], line: usize, findings: &mut Vec<Finding>) {
                     findings.push(Finding {
                         line,
                         column: s + 1,
-                        rule: RuleId::UsSpelling,
+                        rule: RuleId::UsSpelling.into(),
                         message: format!("'{word}': Australian form is '{au}'"),
                     });
                 }
@@ -1535,7 +1628,7 @@ fn check_line(masked: &[char], line: usize, findings: &mut Vec<Finding>) {
                     findings.push(Finding {
                         line,
                         column: s + 1,
-                        rule: RuleId::WordChoice,
+                        rule: RuleId::WordChoice.into(),
                         message: format!("'{word}': the house style prefers '{house}'"),
                     });
                 }
@@ -1548,7 +1641,7 @@ fn check_line(masked: &[char], line: usize, findings: &mut Vec<Finding>) {
                     findings.push(Finding {
                         line,
                         column: s + 1,
-                        rule: RuleId::NumberWord,
+                        rule: RuleId::NumberWord.into(),
                         message: format!("'{word}': use the numeral {numeral} (words only at the start of a sentence)"),
                     });
                 }
@@ -1640,7 +1733,7 @@ fn check_line(masked: &[char], line: usize, findings: &mut Vec<Finding>) {
             && !introductory
             && !clause_join
         {
-            findings.push(Finding { line, column: k + 1, rule: RuleId::SerialComma, message: "possible comma before a final 'and' or 'or'; keep it only if it prevents a misreading".into() });
+            findings.push(Finding { line, column: k + 1, rule: RuleId::SerialComma.into(), message: "possible comma before a final 'and' or 'or'; keep it only if it prevents a misreading".into() });
         }
     }
 }
@@ -1773,7 +1866,7 @@ fn check_structure(masked: &[char], plain: &str, line: usize, findings: &mut Vec
             findings.push(Finding {
                 line,
                 column: start + sentence[..at].chars().count() + 1,
-                rule: RuleId::StagedContrast,
+                rule: RuleId::StagedContrast.into(),
                 message: "staged contrast ('not X, it's Y'); state what it is".into(),
             });
         }
@@ -1802,7 +1895,7 @@ fn check_structure(masked: &[char], plain: &str, line: usize, findings: &mut Vec
             findings.push(Finding {
                 line,
                 column: start + lead + 1,
-                rule: RuleId::RevealQuestion,
+                rule: RuleId::RevealQuestion.into(),
                 message: "question-and-answer reveal; state the answer directly".into(),
             });
         }
@@ -1891,7 +1984,7 @@ fn check_style_manual_forms(lower: &str, text: &str, line: usize, findings: &mut
         findings.push(Finding {
             line,
             column: lower[..at].chars().count() + 1,
-            rule,
+            rule: rule.into(),
             message: message.into(),
         })
     };
@@ -2094,30 +2187,35 @@ fn capitalise(word: &str) -> String {
         .unwrap_or_default()
 }
 
-/// Numbers from 2 to 20 written as words. 'Zero' and 'one' stay as words.
+/// The numbers from 2 to 20 as words, in order. 'Zero' and 'one' stay as words.
+pub const NUMBER_WORDS: [&str; 19] = [
+    "two",
+    "three",
+    "four",
+    "five",
+    "six",
+    "seven",
+    "eight",
+    "nine",
+    "ten",
+    "eleven",
+    "twelve",
+    "thirteen",
+    "fourteen",
+    "fifteen",
+    "sixteen",
+    "seventeen",
+    "eighteen",
+    "nineteen",
+    "twenty",
+];
+
+/// A number from 2 to 20 written as a word, as its value.
 fn number_word(word: &str) -> Option<u8> {
-    const WORDS: [&str; 19] = [
-        "two",
-        "three",
-        "four",
-        "five",
-        "six",
-        "seven",
-        "eight",
-        "nine",
-        "ten",
-        "eleven",
-        "twelve",
-        "thirteen",
-        "fourteen",
-        "fifteen",
-        "sixteen",
-        "seventeen",
-        "eighteen",
-        "nineteen",
-        "twenty",
-    ];
-    WORDS.iter().position(|w| *w == word).map(|i| i as u8 + 2)
+    NUMBER_WORDS
+        .iter()
+        .position(|w| *w == word)
+        .map(|i| i as u8 + 2)
 }
 
 /// The word before position `s`, lower case, or an empty string.
@@ -2162,7 +2260,8 @@ fn starts_sentence(chars: &[char], s: usize) -> bool {
 /// by `laconic-tools gen-au-words`, one "us au" pair per line.
 const ESDB_US_WORDS: &str = include_str!("us_words.txt");
 
-fn esdb_us_words() -> &'static HashMap<&'static str, &'static str> {
+/// The generated US forms and their Australian spelling, keyed by the US form.
+pub fn esdb_us_words() -> &'static HashMap<&'static str, &'static str> {
     static MAP: OnceLock<HashMap<&'static str, &'static str>> = OnceLock::new();
     MAP.get_or_init(|| {
         ESDB_US_WORDS
@@ -2207,7 +2306,10 @@ mod tests {
     use super::*;
 
     fn rules(text: &str) -> Vec<&'static str> {
-        lint(text).into_iter().map(|f| f.rule.name()).collect()
+        lint(text)
+            .into_iter()
+            .map(|f| f.rule.house().unwrap().name())
+            .collect()
     }
 
     #[test]
@@ -2669,6 +2771,28 @@ mod tests {
     }
 
     #[test]
+    fn an_elided_year_or_word_opens_no_quotation() {
+        for text in [
+            "In the '90s, organized teams' work was good.",
+            "In the \u{2018}90s, organized teams\u{2019} work was good.",
+            "The class of '22 organized the teams' work.",
+            "Tell 'em the organized teams' work is good.",
+            "Wait 'til the organized teams' work is done.",
+            "'Tis organized, and the teams' work is good.",
+            "'Twas organized, and the teams' work was good.",
+        ] {
+            assert_eq!(rules(text), vec!["us-spelling"], "{text}");
+        }
+        for text in [
+            "She said 'the organized teams' work.",
+            "Quote '1980's organized' in the guide.",
+            "She quoted '5 organized' as a fault.",
+        ] {
+            assert!(rules(text).is_empty(), "{text}: {:?}", rules(text));
+        }
+    }
+
+    #[test]
     fn flags_decades_with_an_apostrophe_but_not_a_year_possessive() {
         for text in [
             "The 1980's were loud.",
@@ -2822,12 +2946,12 @@ mod tests {
         let text = "<!-- laconic-check-disable-next-line us-spelling, em-dash -->\n\n\
                     The color changed \u{2014} slowly, e.g. today.\n\nThe color stayed.";
         assert_eq!(rules(text), ["latin", "us-spelling"]);
-        assert_eq!(lint_counting(text).1, 2);
+        assert_eq!(lint_counting(text, &[]).1, 2);
         // Stacked suppressions share the next line; space-separated names work too.
         let stacked = "<!-- laconic-check-disable-next-line us-spelling -->\n\
                        <!--laconic-check-disable-next-line latin em-dash-->\n\
                        The color changed \u{2014} slowly, e.g. today.";
-        assert_eq!(lint_counting(stacked), (Vec::new(), 3));
+        assert_eq!(lint_counting(stacked, &[]), (Vec::new(), 3));
         // Paragraph and document findings are silenced on the line they are reported on.
         let later = "The BOM met.\n\n\
                      <!-- laconic-check-disable-next-line acronym-before-definition -->\n\
@@ -2850,7 +2974,7 @@ mod tests {
             let text = format!(
                 "{indent}<!-- laconic-check-disable-next-line us-spelling -->\n\nThe color is red."
             );
-            let (findings, suppressed) = lint_counting(&text);
+            let (findings, suppressed) = lint_counting(&text, &[]);
             assert_eq!(suppressed, 0, "{indent:?}");
             assert_eq!(findings.len(), 1, "{indent:?}: {findings:?}");
             assert_eq!(findings[0].rule, RuleId::UsSpelling);
@@ -2858,17 +2982,17 @@ mod tests {
         }
         // Up to 3 spaces leave a comment outside a code block.
         let text = "   <!-- laconic-check-disable-next-line us-spelling -->\nThe color is red.";
-        assert_eq!(lint_counting(text), (Vec::new(), 1));
+        assert_eq!(lint_counting(text, &[]), (Vec::new(), 1));
         // An indented comment within a list remains a suppression.
         let text = "- The colour is red.\n\n    <!-- laconic-check-disable-next-line us-spelling -->\n    The color is red.";
-        assert_eq!(lint_counting(text), (Vec::new(), 1));
+        assert_eq!(lint_counting(text, &[]), (Vec::new(), 1));
         for (item, content_indent) in [("- ", 2), ("12. ", 4)] {
             let code = " ".repeat(content_indent + 4);
             let prose = " ".repeat(content_indent);
             let text = format!(
                 "{item}The colour is red.\n\n{code}<!-- laconic-check-disable-next-line us-spelling -->\n\n{prose}The color is red."
             );
-            let (findings, suppressed) = lint_counting(&text);
+            let (findings, suppressed) = lint_counting(&text, &[]);
             assert_eq!(suppressed, 0, "{item:?}");
             assert_eq!(findings.len(), 1, "{item:?}: {findings:?}");
             assert_eq!(findings[0].rule, RuleId::UsSpelling);
@@ -2925,7 +3049,7 @@ mod tests {
         let at = |text: &str| -> Vec<(usize, usize, &'static str)> {
             lint(text)
                 .into_iter()
-                .map(|f| (f.line, f.column, f.rule.name()))
+                .map(|f| (f.line, f.column, f.rule.house().unwrap().name()))
                 .collect()
         };
         assert!(RuleId::BoldLabel.rule().advisory);
@@ -3087,7 +3211,7 @@ mod tests {
         let at = |text: &str| -> Vec<(usize, usize, &'static str)> {
             lint(text)
                 .into_iter()
-                .map(|f| (f.line, f.column, f.rule.name()))
+                .map(|f| (f.line, f.column, f.rule.house().unwrap().name()))
                 .collect()
         };
         // Present day, present time: the wrap falls inside each phrase.
@@ -3155,6 +3279,29 @@ mod tests {
         assert!(
             large < small * 24,
             "8 times the words took {:.1} times as long ({small:?} to {large:?})",
+            large.as_secs_f64() / small.as_secs_f64()
+        );
+    }
+
+    #[test]
+    fn checks_acronym_definitions_in_linear_time() {
+        // Each '(ACRONYM)' once read its whole paragraph back to the start, so 8 times the
+        // definitions in one paragraph took about 64 times as long.
+        let fastest = |repeats: usize| {
+            let text = "The Bureau of Meteorology (BOM) reports. ".repeat(repeats);
+            (0..3)
+                .map(|_| {
+                    let start = std::time::Instant::now();
+                    lint(&text);
+                    start.elapsed()
+                })
+                .min()
+                .unwrap()
+        };
+        let (small, large) = (fastest(500), fastest(4_000));
+        assert!(
+            large < small * 24,
+            "8 times the definitions took {:.1} times as long ({small:?} to {large:?})",
             large.as_secs_f64() / small.as_secs_f64()
         );
     }

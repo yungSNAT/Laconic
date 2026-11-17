@@ -185,6 +185,17 @@ fn random_matches_python_seeded_with_zero() {
 }
 
 #[test]
+fn a_row_reads_back_as_one_line() {
+    // `split_lines` ends lines at these too, so a raw one would split a row on resume.
+    let value = json!({"response": "a\u{85}b\u{2028}c\u{2029}d"});
+    let row = dumps_row(&value);
+    let expected = r#"{"response": "a_0085b_2028c_2029d"}"#.replace('_', "\\u");
+    assert_eq!(row, expected);
+    assert_eq!(split_lines(&row), [row.as_str()]);
+    assert_eq!(serde_json::from_str::<Value>(&row).unwrap(), value);
+}
+
+#[test]
 fn object_keeps_insertion_order() {
     let value = object([("b", json!(1)), ("a", json!(2))]);
     assert_eq!(dumps_row(&value), "{\"b\": 1, \"a\": 2}");

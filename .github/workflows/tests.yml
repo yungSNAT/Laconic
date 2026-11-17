@@ -25,6 +25,8 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - name: Install the Rust toolchain rust-toolchain.toml pins
+        run: rustup toolchain install
       # unittest is the only required check, so laconic-check's format, lints, tests and prose
       # lint, and the .cursor copy check, block here.
       - name: Format, lint and test laconic-check
@@ -124,6 +126,8 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - name: Install the Rust toolchain rust-toolchain.toml pins
+        run: rustup toolchain install
       - name: Test laconic-check
         working-directory: tools/laconic-check
         run: cargo test --locked

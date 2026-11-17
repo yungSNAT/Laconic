@@ -19,6 +19,10 @@
 //!   laconic-tools build-plugin-dist <destination>
 //!                                        write the skills-only plugin that the
 //!                                        Claude plugin directory reads
+//!   laconic-tools vale-style [--check]   write vale/Laconic, a Vale style
+//!                                        generated from laconic-check's rules
+//!   laconic-tools web-page <wasm> <out>  build the browser checker from web/index.html
+//!                                        and laconic-web's WebAssembly
 
 mod au_words;
 mod calibrate;
@@ -27,6 +31,8 @@ mod contracts;
 mod packages;
 mod pi_check;
 mod plugin_dist;
+mod vale_style;
+mod web_page;
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -134,13 +140,16 @@ fn main() -> ExitCode {
         ["calibrate", json] => calibrate::run(&root(), Path::new(json), false),
         ["calibrate", "--check", json] => calibrate::run(&root(), Path::new(json), true),
         ["build-plugin-dist", destination] => plugin_dist::build(&root(), Path::new(destination)),
+        ["vale-style"] => vale_style::run(&root(), false),
+        ["vale-style", "--check"] => vale_style::run(&root(), true),
+        ["web-page", wasm, out] => web_page::run(&root(), Path::new(wasm), Path::new(out)),
         _ => Err(
             "usage: laconic-tools <sync-rules [--check] | check-pi [--runtime pi|omp] \
              | gen-au-words <scowl-pre.txt> <style-manual.txt> \
              | mcpb-manifest <version> <bundle-dir> \
              | package-manifests <version> <dist> <out> \
              | calibrate [--check] <human_detectors.json> \
-             | build-plugin-dist <destination>>"
+             | build-plugin-dist <destination> | vale-style [--check] | web-page <wasm> <out>>"
                 .into(),
         ),
     };

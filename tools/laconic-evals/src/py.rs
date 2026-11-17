@@ -120,7 +120,12 @@ fn escape_into(out: &mut String, text: &str, ascii: bool) {
             '\t' => out.push_str("\\t"),
             '\u{8}' => out.push_str("\\b"),
             '\u{c}' => out.push_str("\\f"),
-            c if c < ' ' || (ascii && !(' '..='~').contains(&c)) => {
+            // Python's json writes U+0085, U+2028 and U+2029 raw; escaping them keeps a row on
+            // one line for `split_lines`, which ends lines there.
+            c if c < ' '
+                || matches!(c, '\u{85}' | '\u{2028}' | '\u{2029}')
+                || (ascii && !(' '..='~').contains(&c)) =>
+            {
                 let mut units = [0; 2];
                 for unit in c.encode_utf16(&mut units) {
                     let _ = write!(out, "\\u{unit:04x}");

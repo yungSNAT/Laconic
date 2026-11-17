@@ -7,6 +7,7 @@
 
 use std::io::{BufRead, Read, Write};
 
+use crate::settings::Settings;
 use crate::{lint, preserve};
 
 /// The longest text argument, in characters.
@@ -19,8 +20,8 @@ const PROTOCOL_VERSIONS: [&str; 4] = ["2025-11-25", "2025-06-18", "2025-03-26", 
 /// The deepest nesting a request may use; deeper input is a parse error, not a stack overflow.
 const MAX_DEPTH: usize = 64;
 
-const LINT: &str = "Flag Australian English and house-style candidates in Markdown prose, such as em dashes, US spellings, double quotation marks, numbers written as words, Style Manual dates and times, stock phrases, staged contrasts and chat-tool residue. Code, URLs and quoted text are skipped. A finding is a reason to look, not proof of a defect. Each finding names its rule, described under that name at https://github.com/yungSNAT/Laconic/blob/main/docs/rules.md.";
-const PRESERVE: &str = "Compare an original and an edited text and report numbers, sizes and units, dated months, inline code, URLs, quotations, and meaning words and bounds (not, never, must, may, will, if, before, likely, some, all, only, unless, up to, about 50% and similar) that the edit dropped, then, as advice, those it added (an added figure or obligation can be invented) and any names to check. A clean result rules out these losses only; it does not prove the meaning survived.";
+const LINT: &str = "Flag Australian English and house-style candidates in Markdown prose, such as em dashes, US spellings, double quotation marks, numbers written as words, Style Manual dates and times, stock phrases, staged contrasts and chat-tool residue. Code, URLs and quoted text are skipped. A finding is a reason to look, not proof of a defect. Each finding names its rule, described under that name at https://github.com/yungSNAT/Laconic/blob/main/docs/rules.md. The .laconic-check file in the server's working directory applies, as it does for the command line, including its own rules, named project/<id>.";
+const PRESERVE: &str = "Compare an original and an edited text and report numbers, sizes and units, dated months, day names, inline code, URLs, quotations, and meaning words and bounds (not, never, must, may, will, if, before, likely, some, all, only, unless, up to, about 50% and similar) that the edit dropped, then, as advice, those it added (an added figure or obligation can be invented), any names to check and any sentence the edit states without a negation the original had. A clean result rules out these losses only; it does not prove the meaning survived.";
 
 /// A JSON value. A number keeps its text, so a request's `id` is echoed exactly.
 #[derive(Debug, Clone, PartialEq)]
@@ -35,14 +36,14 @@ pub enum Json {
 
 impl Json {
     /// A member of an object; of repeated keys, the last, as JavaScript reads them.
-    fn get(&self, key: &str) -> Option<&Json> {
+    pub(crate) fn get(&self, key: &str) -> Option<&Json> {
         match self {
             Json::Object(members) => members.iter().rev().find(|(k, _)| k == key).map(|(_, v)| v),
             _ => None,
         }
     }
 
-    fn as_str(&self) -> Option<&str> {
+    pub(crate) fn as_str(&self) -> Option<&str> {
         match self {
             Json::String(s) => Some(s),
             _ => None,
@@ -420,8 +421,15 @@ fn call_tool(params: Option<&Json>) -> Result<String, String> {
     match name {
         "lint" => {
             let text = arg("text").ok_or("text is required")?;
-            let lines: Vec<String> = lint::lint(text)
+            let settings = Settings::current_dir()?;
+            let source: Vec<&str> = text.lines().collect();
+            let lines: Vec<String> = lint::lint_counting(text, &settings.rules)
+                .0
                 .iter()
+                .filter(|f| {
+                    let line = f.line.checked_sub(1).and_then(|i| source.get(i));
+                    settings.keeps(f, line.copied().unwrap_or(""))
+                })
                 .map(|f| format!("line {}:{}: {}: {}", f.line, f.column, f.rule, f.message))
                 .collect();
             Ok(if lines.is_empty() {
@@ -444,7 +452,7 @@ fn call_tool(params: Option<&Json>) -> Result<String, String> {
     }
 }
 
-fn reply(id: Json, outcome: Result<Json, (i32, String)>) -> String {
+pub(crate) fn reply(id: Json, outcome: Result<Json, (i32, String)>) -> String {
     let body = match outcome {
         Ok(result) => ("result", result),
         Err((code, message)) => (

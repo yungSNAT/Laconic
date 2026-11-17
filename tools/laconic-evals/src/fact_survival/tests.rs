@@ -403,7 +403,8 @@ fn a_row_that_exhausts_its_retries_records_its_cost_for_spend() {
 }
 
 #[test]
-fn a_reply_python_could_not_retry_loses_its_cost() {
+fn a_reply_that_ends_the_row_still_counts_its_cost() {
+    // The Python script recorded 0 here, losing a paid call from the spend total.
     let dir = tempfile::tempdir().unwrap();
     let call = |_: &str| Ok((json!(null), 0.5));
     let error = judge_rows(
@@ -416,5 +417,10 @@ fn a_reply_python_could_not_retry_loses_its_cost() {
         12.0,
     );
     assert!(error.unwrap_err().starts_with("a c: expected string"));
-    assert_eq!(total_spend(dir.path()), Ok(0.0));
+    assert_eq!(total_spend(dir.path()), Ok(0.5));
+    let overhead = fs::read_to_string(dir.path().join("overhead.jsonl")).unwrap();
+    assert_eq!(
+        overhead,
+        "{\"stage\": \"failed-judge\", \"cost_usd\": 0.5}\n"
+    );
 }

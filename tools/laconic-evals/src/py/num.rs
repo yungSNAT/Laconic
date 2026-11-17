@@ -15,8 +15,8 @@ pub enum Num {
 impl Num {
     pub fn as_f64(self) -> f64 {
         match self {
-            // Every count here is far below 2**53.
-            #[expect(clippy::cast_precision_loss, reason = "counts are below 2**53")]
+            // Past 2**53 this rounds to nearest, ties to even, as CPython's float(int) does.
+            #[expect(clippy::cast_precision_loss, reason = "rounds as Python's float(int)")]
             Num::Int(i) => i as f64,
             Num::Float(f) => f,
         }

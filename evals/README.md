@@ -80,6 +80,8 @@ laconic-evals run --runner-config setups.json --runner setup-laconic   --conditi
 
 Judge with `--conditions candidate comparator`, then score and measure with `--reference comparator`, which compares the candidate with the comparator in place of a baseline. Give every setup the same tools and the same reachable files, or the comparison measures access rather than instructions.
 
+A Claude Code output style is a setup too: add `--settings '{"outputStyle":"Concise"}'` to a runner's command (the name is case-sensitive), and check that the `init` event of one `--output-format stream-json --verbose` call reports it as `output_style`, as `--setting-sources ""` leaves `--settings` in force. `measure` refuses rows from more than one runner, so measure whole setups on a copy of the responses with the `runner` field set to one name. The README's comparison with the Concise style ran this way on 17 November 2026, with `--effort high` in every runner and the judge.
+
 ## Humanising benchmark
 
 `humanise-cases.jsonl` holds 20 AI-written texts to humanise for an Australian reader, each with regex checks for the facts that must survive and the patterns that must go. To compare humanisers, install each as a Claude Code plugin in its own runner (`--plugin-dir`, `--add-dir`, `--tools Skill,Read` and an `--append-system-prompt-file` naming the skill to use), run each with `--no-injection` as one of the 3 conditions, then judge all 3 together:
@@ -151,6 +153,57 @@ The paper's judgements are the reference here, so the table measures agreement w
 
 Two documents the paper marks kept, cleverhumanizer's s24 and s28, keep scare-quoted terms ('flexible leave', 'safe zone') but drop their quotation marks, and `preserve` reports each as a dropped quotation. It keeps counting the marks: without them, a reader takes words the source set apart as the writer's own. Ignoring the marks would let neither document pass, as each also fails on a dropped meaning word with or without `--loose` ('subject to' in s24; 'every', 'might' and 'before' in s28).
 
+### The 2026-11 cycle
+
+The rules above were tuned on the 2026-10 cycle. To test them on rewrites they were not tuned on, `factalign.py`, the checker in `humanizer-fact-audit` at the commit above, judged the benchmark's 2026-11 cycle at revision `35cf47ea697819c30d2d7845d37389db318e0363`: 330 rewrites, 33 by each of 10 commercial humanisers. Run with spaCy 3.8.7 and `en_core_web_sm` 3.8.0, it first reproduced all 363 of the paper's 2026-10 judgements exactly, all 1,034 units. `preserve` ran as a release build on Windows (x86_64) on 17 November 2026, with 2 fixes this cycle prompted, so the cycle is not wholly held out: it reports a dropped day name, and '5:00 p.m.' matches '5 p.m.', but '5:30' does not match 5.
+
+| Documents `factalign.py` marks as | Documents | `preserve` | `preserve --loose` |
+| --- | --- | --- | --- |
+| Any unit altered | 82 | 79 fail | 76 fail |
+| Numbers and dates altered | 48 | 30 report a dropped number or quantity | 30 |
+| Quotations of 3 or more words altered | 28 | 28 report a dropped quotation | 28 |
+| Names altered | 35 | 23 list a name to check | 23 |
+| Every unit kept | 248 | 19 pass; 203 fail only on meaning words; 0 fail on a month, inline code or URL; 26 fail on a number, quantity or quotation | 51 pass; 171; 0; 26 |
+
+Of the 3 altered documents that pass, 2 lost only a name and 1 only the ordinal 'first'. Of the 18 number documents without a dropped number, 15 lost a list item's marker ('7.' or '2.') or the ordinal 'first', which `preserve` does not track; 2 lost 'Thursday', which `preserve` now reports as a dropped day name, a line the table counts under neither kind; and in 1 `factalign.py` counts the '00' of '5:00 p.m.' as a number, though the rewrite says '5 p.m.'. Without the 2 fixes, `preserve` failed 78 altered documents, reported that '00' as a dropped number and failed 3 more kept documents on a number. Of the 26 kept documents that fail on a number, quantity or quotation, 21 fail on a quotation: 14 lost a quotation of 1 or 2 words, which the paper does not judge, and 7 kept a longer quotation's words but not its quotation marks as written.
+### By humaniser
+
+Each of the 11 humanisers rewrote 33 texts, 20 of which hold a unit the paper judges. Its Table 1 gives the documents in which each humaniser altered at least one unit, out of those 20. The counts below were taken again on 17 November 2026 from the paper's per-document judgements (`data/fact_units.jsonl` at `humanizer-fact-audit` commit `e665dda0506a64c834886c94d8f328d447119a07`, 2026-10 cycle), and they match Table 1. The `preserve` columns are those of the next section's table, run on 16 November 2026 with `laconic-check` built from commit `9a9323a` on Linux (x86_64). A document counts as kept here when the paper marks no unit of it altered, including the 13 texts with no unit, as in the tables above. `preserve` fails most kept documents too, mostly on meaning words, so a failure does not show that a fact changed.
+
+| Humaniser (benchmark name) | Documents with a unit altered | Share of the 20 | Units altered, of 94 | `preserve` fails, altered | `preserve` fails, kept |
+| --- | --- | --- | --- | --- | --- |
+| `aihumanize` | 13 | 65% | 28 | 13 of 13 | 19 of 20 |
+| `writehuman` | 13 | 65% | 36 | 13 of 13 | 20 of 20 |
+| `stealthgpt` | 11 | 55% | 33 | 11 of 11 | 21 of 22 |
+| `undetectable-ai` | 11 | 55% | 18 | 11 of 11 | 16 of 22 |
+| `cleverhumanizer` | 10 | 50% | 26 | 10 of 10 | 21 of 23 |
+| `gptinf` | 9 | 45% | 24 | 9 of 9 | 23 of 24 |
+| `rehumanize` | 9 | 45% | 18 | 9 of 9 | 20 of 24 |
+| `smarthumanizer` | 8 | 40% | 23 | 8 of 8 | 24 of 25 |
+| `hix-bypass` | 7 | 35% | 14 | 7 of 7 | 20 of 26 |
+| `superhumanizer` | 7 | 35% | 18 | 7 of 7 | 26 of 26 |
+| `undetectedgpt` | 7 | 35% | 21 | 7 of 7 | 25 of 26 |
+| All 11 | 105 of 220 | 48% | 259 of 1,034 | 105 of 105 | 235 of 258 |
+
+The table measures the humanisers' rewrites, not Laconic's; the [public-set fact check](#public-set-fact-check) below measures Laconic's rewrites with the paper's checker, on the public texts of 3 cycles.
+
+On 17 November 2026, 4 humaniser skills, patina and a one-line request with no skill each rewrote the same 33 texts once, one text a call, and `factalign.py` judged the rewrites as the paper judged the commercial humanisers. Each skill's `SKILL.md`, with the reference files it calls on for a rewrite added as labelled sections, was appended to the system prompt of Claude Opus 5.5 (`claude-opus-5-5`, high effort) in Claude Code 2.1.325 with no tools, and every skill rewrite had the same request: 'Rewrite this text so it reads as if a person wrote it. Reply with the rewritten text only.' The added files were Laconic's `edit-and-audit.md` and `eval.md`, with its `patterns.md` and `style-manual-rules.md` (`main` at `a462993`); avoid-ai-writing's `references/patterns.md`; and `work-humanizer`'s `tells.md`. `humanizer`'s `SKILL.md` names no file to read. patina ran as its own CLI, `patina --verify --lang en --backend claude-cli --model claude-opus-5-5 --format json`, through the same Claude Code at high effort; it wrote its own prompts. Each source compared with itself kept all 94 units, and the same `factalign.py` setup reproduced the `aihumanize` row above (13 documents, 28 units).
+
+| Rewriter | Documents with a unit altered | Share of the 20 | Units altered, of 94 | `preserve` fails, altered | `preserve` fails, kept | Mean length against source, in words |
+| --- | --- | --- | --- | --- | --- | --- |
+| [patina](https://github.com/devswha/patina) 9.1.0 with `--verify` | 0 | 0% | 0 | none altered | 25 of 33 | 1.03 |
+| [avoid-ai-writing](https://github.com/conorbronsdon/avoid-ai-writing) 3.38.0 | 1 | 5% | 1 | 1 of 1 | 22 of 32 | 0.97 |
+| [work-humanizer](https://github.com/phuryn/work-humanizer) at `0a90657` | 1 | 5% | 2 | 1 of 1 | 23 of 32 | 1.07 |
+| [humanizer](https://github.com/blader/humanizer) 4.0.0 | 5 | 25% | 6 | 5 of 5 | 26 of 28 | 0.96 |
+| Laconic's prose skill | 5 | 25% | 8 | 5 of 5 | 21 of 28 | 0.87 |
+| The request alone, no skill | 8 | 40% | 17 | 8 of 8 | 23 of 25 | 1.21 |
+
+Each skill altered fewer documents than any of the 11 commercial humanisers (7 to 13), and the request alone altered 8. Laconic's skill matched `humanizer` on documents altered and exceeded it on units; patina, avoid-ai-writing and `work-humanizer` altered fewer of both. Laconic's skill altered 5 quotations of 3 or more words in 2 documents (s05 and s25) and a capitalised programme name (s07), dropped the name 'EQ' (s19) and altered the ordinal 'first' (s17). avoid-ai-writing and `work-humanizer` changed only the capitalised programme names in s07. An earlier run that day, before Laconic's `eval.md` and avoid-ai-writing's `patterns.md` were added, gave 4 documents (5 units) for Laconic and 1 document (1 unit) for avoid-ai-writing.
+
+patina's `--verify` passed its model scorers on all 33 rewrites (meaning score 100 on each; fidelity 100 on 29 and 91.7 on 4), with no retry. Its numeric check failed 12: 10 for a changed numeric claim and 2 for a dropped number. `factalign.py` found no altered unit in any of the 33, so each of the 12 is a rewrite the paper's method counts as kept. With no altered rewrite, this run cannot show whether the model scorers catch one.
+
+Limits: one rewrite per text and rewriter, from one model, too few to show a difference between the skills; each skill was supplied as text with no tools, not installed; `work-humanizer` asks questions when a draft lacks facts, which a one-turn request does not allow, and its optional `check.py` was not run. The checker sees numbers, names and long quotations, not changed hedges or invented claims. The rewrites by `humanizer`, `work-humanizer` and the request alone each ran from a fresh working directory, and the other 2 skills' from one fixed directory, which changes only what is read from the prompt cache. The run script, the per-rewrite units, `preserve` verdicts, lengths and costs, and the script that recomputes this table are in [`evals/runs/rival-rewrites-2026-11-17`](runs/rival-rewrites-2026-11-17/); the rewrites are not stored.
+
 ### Against other fact checkers
 
 Two rival humanisers ship a deterministic check that a rewrite kept the source's facts. On 16 November 2026, each ran on the same 363 pairs as `laconic-check` built from commit `9a9323a`, all on Linux (x86_64):
@@ -160,13 +213,15 @@ Two rival humanisers ship a deterministic check that a rewrite kept the source's
 
 Each fails a rewrite with exit status 1. Both ran through the functions behind those commands (`validate` and `fidelity`), on the pairs `laconic-evals fact-audit` downloads.
 
-| Documents the paper marks as | Documents | `preserve` fails | `preserve --loose` fails | `validate.js` fails | Zero Slop fails |
-| --- | --- | --- | --- | --- | --- |
-| Any unit altered | 105 | 105 | 105 | 23 | 105 |
-| Numbers altered | 47 | 47 | 47 | 9 | 47 |
-| Quotations of 3 or more words altered | 58 | 58 | 58 | 15 | 58 |
-| Names altered | 28 | 28 | 28 | 5 | 28 |
-| Every unit kept | 258 | 235 | 194 | 25 | 243 |
+[patina](https://github.com/devswha/patina) 9.1.0 (npm `patina-cli`) calls its `--verify` a meaning check, but `--verify` rewrites the input through a model and scores the result with one, so it cannot compare a given pair; its model-judged part is measured on patina's own rewrites in [By humaniser](#by-humaniser). Only its mechanical number check was measured: `assessRewriteMeaningSafety` in `src/verify.js`, which the CLI runs on every rewrite it makes and which fails `--verify` (exit status 4), ran on the same pairs on 17 November 2026 (Node 26.13.1). It fails a rewrite that drops a source number or changes a numeric claim, such as a sign or a number word. Of the 68 altered documents it fails, 35 fail on a dropped number; of the 112 kept documents it fails, 105 fail on a changed numeric claim and 7 on a dropped number. It does not check quotations or names, so each document it fails in those rows had a number change too.
+
+| Documents the paper marks as | Documents | `preserve` fails | `preserve --loose` fails | `validate.js` fails | Zero Slop fails | patina number check fails |
+| --- | --- | --- | --- | --- | --- | --- |
+| Any unit altered | 105 | 105 | 105 | 23 | 105 | 68 |
+| Numbers altered | 47 | 47 | 47 | 9 | 47 | 43 |
+| Quotations of 3 or more words altered | 58 | 58 | 58 | 15 | 58 | 33 |
+| Names altered | 28 | 28 | 28 | 5 | 28 | 17 |
+| Every unit kept | 258 | 235 | 194 | 25 | 243 | 112 |
 
 A failure need not name the altered unit. Of the 47 documents with an altered number, `preserve` reports a dropped number or quantity in 43 and Zero Slop a dropped figure in 30; `validate.js` warns of a missing number in 20 but fails only on a changed heading structure. Of the 58 with an altered quotation, `preserve` and Zero Slop report a dropped quotation in all 58; `validate.js` has no check for a quotation inside a paragraph. Of the 28 with an altered name, Zero Slop reports a dropped name in 27 and `preserve` lists one to check in 20, though it never fails on a name.
 

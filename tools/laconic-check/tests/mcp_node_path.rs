@@ -56,10 +56,17 @@ fn binary_dir() -> &'static Path {
 /// Runs the server in `dir` with `LACONIC_CHECK` unset and PATH set to `path`, sends one `lint`
 /// call and returns its reply.
 fn lint_reply(node: &Path, dir: &Path, path: &OsStr) -> String {
-    let mut child = Command::new(node)
+    let mut server = Command::new(node);
+    server.env_remove("LACONIC_CHECK");
+    reply(server, dir, path)
+}
+
+/// Runs the server with `node`, a Node command holding the rest of its environment, in `dir`
+/// with PATH set to `path`; sends one `lint` call and returns its reply.
+fn reply(mut node: Command, dir: &Path, path: &OsStr) -> String {
+    let mut child = node
         .arg(SERVER)
         .current_dir(dir)
-        .env_remove("LACONIC_CHECK")
         .env("PATH", path)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
@@ -133,6 +140,19 @@ fn a_path_entry_resolves_dot_dot_after_its_links() {
     assert!(!reply.contains("planted"), "{reply}");
 }
 
+/// `LACONIC_CHECK` is the user's choice and is not searched for: a bare name runs as the system
+/// finds it.
+#[cfg(unix)]
+#[test]
+fn laconic_check_is_used_as_given() {
+    let Some(node) = node() else { return };
+    let dir = planted("path-given");
+    let mut server = Command::new(node);
+    server.env("LACONIC_CHECK", "laconic-check");
+    let reply = reply(server, &dir, OsStr::new("."));
+    assert!(reply.contains("planted"), "{reply}");
+}
+
 /// `\folder` names a folder on the working directory's drive.
 #[cfg(windows)]
 #[test]
@@ -152,6 +172,17 @@ fn a_quoted_entry_is_searched() {
     let Some(node) = node() else { return };
     let dir = planted("path-quoted");
     let quoted = format!("\"{}\"", binary_dir().display());
+    let reply = lint_reply(&node, &dir, OsStr::new(&quoted));
+    assert!(reply.contains("line 3:"), "{reply}");
+}
+
+/// libuv also takes an entry in single quotes.
+#[cfg(windows)]
+#[test]
+fn a_single_quoted_entry_is_searched() {
+    let Some(node) = node() else { return };
+    let dir = planted("path-single-quoted");
+    let quoted = format!("'{}'", binary_dir().display());
     let reply = lint_reply(&node, &dir, OsStr::new(&quoted));
     assert!(reply.contains("line 3:"), "{reply}");
 }

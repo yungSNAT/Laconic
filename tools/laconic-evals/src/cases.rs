@@ -207,7 +207,7 @@ pub fn validate_checks(checks: &Value) -> Vec<String> {
 
 /// Whether `pattern` matches anywhere in `text`, case-insensitively. Patterns are validated
 /// before use; one that cannot compile or run never matches.
-fn found(pattern: &str, text: &str) -> bool {
+pub fn found(pattern: &str, text: &str) -> bool {
     compile(pattern).is_ok_and(|re| re.is_match(text).unwrap_or(false))
 }
 

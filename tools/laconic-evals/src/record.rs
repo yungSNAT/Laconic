@@ -318,8 +318,10 @@ fn divide(a: Num, b: Num) -> Result<f64, String> {
     Ok(a.as_f64() / b.as_f64())
 }
 
-/// `Decimal(repr(x)).quantize(Decimal(1).scaleb(-places), ROUND_HALF_UP)`, as text.
-pub fn half_up(x: Num, places: usize) -> Result<String, String> {
+/// `Decimal(repr(x)).quantize(Decimal(1).scaleb(-places), ROUND_HALF_UP)`, as text. Up to 6
+/// places, where Python writes no exponent.
+fn half_up(x: Num, places: usize) -> Result<String, String> {
+    assert!(places <= 6, "Python writes an exponent past 6 places");
     let text = match x {
         Num::Int(i) => i.to_string(),
         Num::Float(f) if f.is_finite() => py::float_repr(f),
@@ -1048,3 +1050,6 @@ fn items(value: &Value) -> Result<&Vec<Value>, String> {
         .as_array()
         .ok_or_else(|| format!("{} is not a list", py::repr(value)))
 }
+
+#[cfg(test)]
+mod tests;

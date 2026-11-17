@@ -1,0 +1,64 @@
+name: vale-style
+
+# Runs Vale on the generated style's fixtures: faults.md must give exactly faults.expected and
+# clean.md nothing. laconic-tools' tests, in the tests workflow, check that vale/Laconic matches
+# laconic-check's rule table and that lint flags the lines and rules faults.expected lists.
+on:
+  pull_request:
+    paths:
+      - .github/workflows/vale-style.yml
+      - vale/**
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/vale-style.yml
+      - vale/**
+
+permissions:
+  contents: read
+
+jobs:
+  vale:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      VALE_VERSION: 3.27.0
+      VALE_SHA256: c80d62f6bce87b81843ac5b512a26e63213927b957adba0a64fc594570da2000
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install Vale
+        run: |
+          set -euo pipefail
+          archive="vale_${VALE_VERSION}_Linux_64-bit.tar.gz"
+          curl --proto '=https' --tlsv1.2 -fsSL -o "$RUNNER_TEMP/$archive" \
+            "https://github.com/vale-cli/vale/releases/download/v${VALE_VERSION}/$archive"
+          echo "$VALE_SHA256  $RUNNER_TEMP/$archive" | sha256sum -c -
+          tar -xzf "$RUNNER_TEMP/$archive" -C "$RUNNER_TEMP" vale
+      - name: Run Vale on the fixtures
+        working-directory: vale/tests
+        run: |
+          set -euo pipefail
+          # The style has no error-level rules, so Vale exits 0 with findings; compare output.
+          "$RUNNER_TEMP/vale" --output=line clean.md > "$RUNNER_TEMP/clean.txt"
+          if [ -s "$RUNNER_TEMP/clean.txt" ]; then
+            echo "::error::Vale flagged clean.md"
+            cat "$RUNNER_TEMP/clean.txt"
+            exit 1
+          fi
+          "$RUNNER_TEMP/vale" --output=line faults.md > "$RUNNER_TEMP/faults.txt"
+          diff -u faults.expected "$RUNNER_TEMP/faults.txt"
+      # As a user gets it: the style packed as the release packs it, installed by vale sync.
+      - name: Install the style as a package and run it
+        run: |
+          set -euo pipefail
+          package="$RUNNER_TEMP/package"
+          mkdir -p "$package/styles"
+          (cd vale && zip -qr "$package/Laconic.zip" Laconic)
+          cp vale/tests/faults.md "$package/"
+          cd "$package"
+          printf 'StylesPath = styles\nMinAlertLevel = suggestion\nPackages = %s/Laconic.zip\n\n[*.md]\nBasedOnStyles = Laconic\n' "$package" > .vale.ini
+          "$RUNNER_TEMP/vale" sync
+          "$RUNNER_TEMP/vale" --output=line faults.md > faults.txt
+          diff -u "$GITHUB_WORKSPACE/vale/tests/faults.expected" faults.txt

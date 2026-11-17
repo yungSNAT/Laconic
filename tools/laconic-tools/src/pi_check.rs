@@ -781,7 +781,10 @@ mod tests {
     fn agent(work: &TempDir, script: &str) -> Rpc {
         let path = work.0.join("agent.sh");
         let written = Command::new("/bin/sh")
-            .args(["-c", r#"printf '#!/bin/sh\n%s\n' "$1" > "$2" && chmod 755 "$2""#])
+            .args([
+                "-c",
+                r#"printf '#!/bin/sh\n%s\n' "$1" > "$2" && chmod 755 "$2""#,
+            ])
             .args(["sh", script])
             .arg(&path)
             .status()

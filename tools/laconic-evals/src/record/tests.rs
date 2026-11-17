@@ -128,6 +128,9 @@ fn regex_checks_must_be_lists_of_strings() {
     // Python's re.search raises on a pattern it cannot compile, and `.get` on checks that
     // are not a dict.
     assert!(regex_failed(&case(json!({"must_not_include": ["["]})), "x").is_err());
+    // A search past the backtracking limit, where Python would run on, is refused too.
+    let runaway = case(json!({"must_include": [r"^(a|a)*\1b$"]}));
+    assert!(regex_failed(&runaway, &"a".repeat(40)).is_err());
     assert_eq!(
         regex_failed(&case(json!("invalid")), "x").unwrap_err(),
         "checks is 'invalid'"

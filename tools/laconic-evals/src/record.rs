@@ -20,8 +20,8 @@ pub const RUNS: [&str; 3] = [
     "rival-rewrites-2026-11-17",
 ];
 
-/// The Claude Code flags every run used, after the program.
-const FLAGS: [&str; 13] = [
+/// The Claude Code flags every run used, after the program, ending `--tools ""`.
+const FLAGS: [&str; 14] = [
     "--disable-slash-commands",
     "--print",
     "--output-format",
@@ -35,15 +35,15 @@ const FLAGS: [&str; 13] = [
     "--effort",
     "high",
     "--tools",
+    "",
 ];
 
-/// One runner configuration: `program`, the flags (ending `--tools ""`) and `extra`.
+/// One runner configuration: `program`, the flags and `extra`.
 fn runner(program: &str, extra: &[String]) -> Value {
     let command: Vec<String> = [program]
         .iter()
         .chain(FLAGS.iter())
         .map(|s| (*s).to_owned())
-        .chain([String::new()])
         .chain(extra.iter().cloned())
         .collect();
     json!({"command": command, "response_format": "claude-json", "budget_flag": "--max-budget-usd"})
@@ -204,12 +204,20 @@ const DIMENSIONS: [&str; 5] = [
 ];
 
 /// `d.get(key, default)` on a dict, or on `{}` when `d` is falsy, as `r.get("usage") or {}`.
-fn usage_field(usage: Option<&Value>, key: &str) -> Value {
-    usage
-        .filter(|u| py::truthy(u))
-        .and_then(|u| py::get(u, key))
-        .cloned()
-        .unwrap_or(json!(0))
+/// Any other truthy value raises in Python, as `.get` does on it.
+fn usage_field(usage: Option<&Value>, key: &str) -> Result<Value, String> {
+    match usage.filter(|u| py::truthy(u)) {
+        None => Ok(json!(0)),
+        Some(Value::Object(u)) => Ok(u.get(key).cloned().unwrap_or(json!(0))),
+        Some(other) => Err(format!("usage is {}", py::repr(other))),
+    }
+}
+
+/// `re.search(pattern, text, re.IGNORECASE)`, raising on a pattern that cannot compile or run.
+fn search(pattern: &str, text: &str) -> Result<bool, String> {
+    cases::compile(pattern)?
+        .is_match(text)
+        .map_err(|e| e.to_string())
 }
 
 /// The case's regex checks the answer fails, or null when the case has none.
@@ -217,6 +225,9 @@ fn regex_failed(case: &Value, text: &str) -> Result<Value, String> {
     let Some(checks) = py::get(case, "checks").filter(|c| py::truthy(c)) else {
         return Ok(Value::Null);
     };
+    if !checks.is_object() {
+        return Err(format!("checks is {}", py::repr(checks)));
+    }
     let patterns = |field| -> Result<Vec<&str>, String> {
         match py::get(checks, field) {
             None => Ok(Vec::new()),
@@ -229,12 +240,12 @@ fn regex_failed(case: &Value, text: &str) -> Result<Value, String> {
     };
     let mut failed: Vec<String> = Vec::new();
     for p in patterns("must_include")? {
-        if !cases::found(p, text) {
+        if !search(p, text)? {
             failed.push(format!("missing {}", py::str_repr(p)));
         }
     }
     for p in patterns("must_not_include")? {
-        if cases::found(p, text) {
+        if search(p, text)? {
             failed.push(format!("has {}", py::str_repr(p)));
         }
     }
@@ -264,10 +275,10 @@ pub fn style_results(work: &Path) -> Result<String, String> {
             "trial": py::field(&r, "trial")?,
             "condition": py::field(&r, "condition")?,
             "setup": py::field(&r, "runner")?,
-            "input_tokens": usage_field(usage, "input_tokens"),
-            "cache_write_tokens": usage_field(usage, "cache_creation_input_tokens"),
-            "cache_read_tokens": usage_field(usage, "cache_read_input_tokens"),
-            "output_tokens": usage_field(usage, "output_tokens"),
+            "input_tokens": usage_field(usage, "input_tokens")?,
+            "cache_write_tokens": usage_field(usage, "cache_creation_input_tokens")?,
+            "cache_read_tokens": usage_field(usage, "cache_read_input_tokens")?,
+            "output_tokens": usage_field(usage, "output_tokens")?,
             "cost_usd": py::get(&r, "cost_usd").cloned().unwrap_or(Value::Null),
             "characters": response.chars().count(),
             "lint_clean": flag(&work.join(format!("lint/{run}-{n}")))?,
@@ -909,7 +920,7 @@ pub fn rewrite_results(work: &Path) -> Result<String, String> {
             });
             if let Some(run) = runs.get(sid) {
                 let usage = py::get(run, "usage");
-                row["output_tokens"] = usage_field(usage, "output_tokens");
+                row["output_tokens"] = usage_field(usage, "output_tokens")?;
                 row["cost_usd"] = py::get(run, "cost_usd").cloned().unwrap_or(Value::Null);
             }
             if *s == "patina" {
@@ -945,7 +956,18 @@ fn counter(values: impl IntoIterator<Item = Value>) -> Result<Value, String> {
         let key = py::key(&value);
         match seen.iter_mut().find(|(k, _, _)| *k == key) {
             Some(entry) => entry.2 += 1,
-            None => seen.push((key, json_key(&value)?, 1)),
+            None => {
+                let name = json_key(&value)?;
+                // Python would write 2 keys with one spelling, such as None and 'null'.
+                if seen.iter().any(|(_, n, _)| *n == name) {
+                    return Err(format!(
+                        "{} and another value both count as {}",
+                        py::repr(&value),
+                        py::str_repr(&name)
+                    ));
+                }
+                seen.push((key, name, 1));
+            }
         }
     }
     Ok(Value::Object(

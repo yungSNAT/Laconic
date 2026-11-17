@@ -19,7 +19,7 @@ mkdir -p "$CLAUDE_CONFIG_DIR" "$W/fixed-cwd"
 cd "$W"
 
 fetch() { # <name> <url> <commit>
-  [ -d "$1" ] || git clone -q "$2" "$1"
+  [[ -d "$1" ]] || git clone -q "$2" "$1"
   git -C "$1" checkout -q "$3"
 }
 fetch caveman https://github.com/JuliusBrussee/caveman.git 1e91f13
@@ -60,5 +60,12 @@ for rubric in rubric:scores rubric-correctness:correctness; do
     --rubric "$REPO/evals/${rubric%%:*}.md" --conditions baseline candidate comparator \
     --responses responses.jsonl --output "${rubric#*:}.jsonl"
 done
-python3 -I "$HERE/results.py" "$W" "$CASES" "$LC" > results.jsonl
-python3 -I "$HERE/summary.py" results.jsonl
+cp "$CASES" cases.jsonl
+python3 -I "$HERE/results.py" answers
+mkdir -p lint
+for answer in answers/*.txt; do
+  if "$LC" lint --json - < "$answer" | grep -qF '{"findings":[]'; then echo 1; else echo 0; fi \
+    > "lint/$(basename "$answer" .txt)"
+done
+python3 -I "$HERE/results.py" > results.jsonl
+python3 -I "$HERE/summary.py" < results.jsonl

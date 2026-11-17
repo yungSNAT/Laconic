@@ -1,12 +1,14 @@
 """The published figures, recomputed from results.jsonl.
 
-Usage: python3 -I summary.py <results.jsonl>
+Usage: python3 -I summary.py < results.jsonl
 Means are rounded once, half up, from the computed value. Each 95% interval resamples the cases
 with replacement (10,000 resamples, a fresh random.Random(2282) per interval) and takes the
 251st and 9,751st of the sorted values.
 """
+import functools
 import itertools
 import json
+import operator
 import random
 import sys
 from decimal import ROUND_HALF_UP, Decimal
@@ -14,8 +16,7 @@ from decimal import ROUND_HALF_UP, Decimal
 # evals/rubric.md weights.
 WEIGHTS = {"correctness": .35, "autonomy": .25, "actionability": .2, "safety": .1, "concision": .1}
 
-with open(sys.argv[1], encoding="utf-8") as f:
-    rows = [json.loads(line) for line in f if line.strip()]
+rows = [json.loads(line) for line in sys.stdin if line.strip()]
 conditions = ["candidate"] + sorted({r["condition"] for r in rows} - {"candidate"})
 setups = {r["condition"]: r["setup"] for r in rows}
 
@@ -38,9 +39,23 @@ def pick(run, cond):
 
 
 def interval(stat, cases):
-    rng = random.Random(2282)
+    # A seeded generator, so that the published intervals can be recomputed; not for secrets.
+    rng = random.Random(2282)  # nosec B311 # noqa: S311
     draws = sorted(stat([rng.choice(cases) for _ in cases]) for _ in range(10000))
     return stat(cases), draws[250], draws[9750]
+
+
+def total(index, trials, cond, cases, value):
+    return sum(value(index[(c, t, cond)]) for c in cases for t in trials)
+
+
+def ratio(index, trials, first, other, value, cases):
+    return total(index, trials, first, cases, value) / total(index, trials, other, cases, value)
+
+
+def difference(index, trials, first, other, value, cases):
+    gap = total(index, trials, first, cases, value) - total(index, trials, other, cases, value)
+    return gap / (len(trials) * len(cases))
 
 
 def show(label, est, lo, hi, places=2, sign=True):
@@ -79,20 +94,14 @@ for run in ("cold", "warm"):
     trials = sorted({r["trial"] for r in rows if r["run"] == run})
     cases = sorted({r["case_id"] for r in rows if r["run"] == run})
     index = {(r["case_id"], r["trial"], r["condition"]): r for r in rows if r["run"] == run}
-
-    def total(cond, cs, value):
-        return sum(value(index[(c, t, cond)]) for c in cs for t in trials)
-
     for first, other in itertools.combinations(conditions, 2):
         print(f" {first} against {other}:")
-        for label, value in (("output tokens, ratio", lambda r: r["output_tokens"]),
-                             ("cost, ratio", lambda r: r["cost_usd"])):
-            show(label, *interval(lambda cs: total(first, cs, value) / total(other, cs, value), cases),
+        for label, value in (("output tokens, ratio", operator.itemgetter("output_tokens")),
+                             ("cost, ratio", operator.itemgetter("cost_usd"))):
+            show(label, *interval(functools.partial(ratio, index, trials, first, other, value), cases),
                  sign=False)
         if run == "cold":
-            n = len(trials)
             for label, value in (("weighted score, evals/rubric.md, difference", weighted),
                                  ("correctness, evals/rubric-correctness.md, difference",
                                   lambda r: r["correctness_only"]["correctness"])):
-                show(label, *interval(lambda cs: (total(first, cs, value) - total(other, cs, value))
-                                      / (n * len(cs)), cases))
+                show(label, *interval(functools.partial(difference, index, trials, first, other, value), cases))

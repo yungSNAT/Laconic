@@ -1,35 +1,22 @@
 """One row per rewrite, without the texts: factalign.py's units, preserve's verdict, lengths,
-cost and, for patina, its own --verify result.
+cost and, for patina, its own --verify result. Run in the work directory.
 
-Usage: python3 -I results.py <work dir> <laconic-check> > results.jsonl
-Reads pairs-<rewriter>.jsonl, units-<rewriter>.jsonl, run-<rewriter>.jsonl and
-patina-verify.jsonl from <work dir>.
+Usage: python3 -I results.py > results.jsonl
+Reads pairs-<rewriter>.jsonl, units-<rewriter>.jsonl, run-<rewriter>.jsonl, patina-verify.jsonl
+and preserve/<rewriter>-<id>/fails ('1' when `laconic-check preserve` failed).
 """
 import json
 import os
-import subprocess
-import sys
-import tempfile
+from pathlib import Path
 
-work, checker = sys.argv[1:3]
 REWRITERS = ("laconic", "humanizer", "avoid", "work", "plain", "patina")
 
 
 def read(name):
-    path = f"{work}/{name}"
-    if not os.path.exists(path):
+    if not os.path.exists(name):
         return []
-    with open(path, encoding="utf-8") as f:
+    with open(name, encoding="utf-8") as f:
         return [json.loads(line) for line in f if line.strip()]
-
-
-def preserve_fails(source, rewrite):
-    with tempfile.TemporaryDirectory() as d:
-        for name, text in (("original", source), ("edit", rewrite)):
-            with open(f"{d}/{name}", "w", encoding="utf-8", newline="\n") as f:
-                f.write(text)
-        done = subprocess.run([checker, "preserve", f"{d}/original", f"{d}/edit"], capture_output=True, check=False)
-        return done.returncode != 0
 
 
 verify = {r["id"]: r for r in read("patina-verify.jsonl")}
@@ -45,7 +32,7 @@ for s in REWRITERS:
             "units": len(units),
             "units_altered": sum(not x["kept"] for x in units),
             "altered_groups": sorted({x["group"] for x in units if not x["kept"]}),
-            "preserve_fails": preserve_fails(p["source"], p["rewrite"]),
+            "preserve_fails": Path(f"preserve/{s}-{sid}/fails").read_text(encoding="utf-8").strip() == "1",
             "source_words": len(p["source"].split()),
             "rewrite_words": len(p["rewrite"].split()),
         }

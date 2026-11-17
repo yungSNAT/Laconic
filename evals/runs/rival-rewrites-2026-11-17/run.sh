@@ -18,7 +18,7 @@ cd "$W"
 
 # get <file> <sha256> <url>
 get() {
-  [ -s "$1" ] || curl -fsSL --proto '=https' --tlsv1.2 -o "$1" "$3"
+  [[ -s "$1" ]] || curl -fsSL --proto '=https' --tlsv1.2 -o "$1" "$3"
   echo "$2  $1" | sha256sum -c --quiet
 }
 get aihb-2026-10.jsonl eafee32e4f584aebf73d9f4eb78b5a5a96a2b62093975d2148a44addd5da052f \
@@ -26,7 +26,7 @@ get aihb-2026-10.jsonl eafee32e4f584aebf73d9f4eb78b5a5a96a2b62093975d2148a44addd
 get factalign.py 632123df588f99adf95ba43228528603f4b68e0643fc7cedb0bd53e8eb653aca \
   https://raw.githubusercontent.com/zwang-devv/humanizer-fact-audit/e665dda0506a64c834886c94d8f328d447119a07/factalign.py
 fetch() { # <name> <url> <commit>
-  [ -d "$1" ] || git clone -q "$2" "$1"
+  [[ -d "$1" ]] || git clone -q "$2" "$1"
   git -C "$1" checkout -q "$3"
 }
 fetch humanizer https://github.com/blader/humanizer.git b48c832
@@ -80,19 +80,23 @@ for setup in laconic humanizer avoid work plain; do
 done
 # patina writes its own prompts and calls `claude -p`; it ran at high effort, isolated as above.
 mkdir -p patina-bin
+# shellcheck disable=SC2016 # ${1:-} and $@ belong to the stand-in being written.
 printf '#!/usr/bin/env bash\n[ "${1:-}" = -p ] || exec %q "$@"\nexec %q "$@" --setting-sources "" --no-session-persistence --disable-slash-commands --effort high\n' \
   "$(command -v claude)" "$(command -v claude)" > patina-bin/claude
 chmod +x patina-bin/claude
 for f in patina-in/*.md; do
   id=$(basename "$f" .md)
-  [ -s "patina-out/$id.json" ] || PATH="$W/patina-bin:$PATH" node patina/bin/patina.js --verify --lang en \
+  [[ -s "patina-out/$id.json" ]] || PATH="$W/patina-bin:$PATH" node patina/bin/patina.js --verify --lang en \
     --backend claude-cli --model claude-opus-5-5 --format json "$f" > "patina-out/$id.json" || true
 done
-python3 -I "$HERE/pairs.py" "$W"
+python3 -I "$HERE/pairs.py"
 for s in laconic humanizer avoid work plain patina; do
   uv run -q --python 3.12 --with spacy==3.8.7 --with click --with numpy \
     --with https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl \
     python -I factalign.py --in "pairs-$s.jsonl" --out "units-$s.jsonl"
 done
-python3 -I "$HERE/results.py" "$W" "$LC" > results.jsonl
-python3 -I "$HERE/summary.py" results.jsonl
+for pair in preserve/*/; do
+  if "$LC" preserve "$pair/original" "$pair/edit" > /dev/null; then echo 0; else echo 1; fi > "$pair/fails"
+done
+python3 -I "$HERE/results.py" > results.jsonl
+python3 -I "$HERE/summary.py" < results.jsonl

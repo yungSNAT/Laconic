@@ -1,14 +1,13 @@
 """The published figures, recomputed from results.jsonl.
 
-Usage: python3 -I summary.py <results.jsonl>
+Usage: python3 -I summary.py < results.jsonl
 """
 import collections
 import json
 import sys
 from decimal import ROUND_HALF_UP, Decimal
 
-with open(sys.argv[1], encoding="utf-8") as f:
-    rows = [json.loads(line) for line in f if line.strip()]
+rows = [json.loads(line) for line in sys.stdin if line.strip()]
 
 
 def fmt(x, places):
@@ -25,10 +24,11 @@ for s in dict.fromkeys(r["rewriter"] for r in rows):
         "units": sum(r["units"] for r in rs),
         "documents with a unit altered": len(altered),
         "units altered": sum(r["units_altered"] for r in rs),
-        "altered by group": dict(collections.Counter(g for r in altered for g in r["altered_groups"])),
+        "documents altered, by group": dict(collections.Counter(g for r in altered for g in r["altered_groups"])),
         "preserve fails, altered": f"{sum(r['preserve_fails'] for r in altered)} of {len(altered)}",
         "preserve fails, kept": f"{sum(r['preserve_fails'] for r in kept)} of {len(kept)}",
-        "mean length against source, in words": fmt(sum(r["rewrite_words"] / r["source_words"] for r in rs) / len(rs), 2),
+        "mean length against source, in words": fmt(
+            sum(r["rewrite_words"] / r["source_words"] for r in rs) / len(rs), 2),
         "altered": [r["sample_id"] for r in altered],
     }
     if any("cost_usd" in r for r in rs):

@@ -108,7 +108,9 @@ fn yaml_quotes_double_a_single_quote() {
 
 #[test]
 fn writing_reports_stale_rules_and_refuses_strays() {
-    let dir = std::env::temp_dir().join(format!("laconic-vale-{}", std::process::id()));
+    let dir = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("target")
+        .join(format!("laconic-vale-{}", std::process::id()));
     let style = dir.join(STYLE_DIR);
     assert!(run(&dir, true).unwrap_err().contains("differs"));
     assert!(run(&dir, false).unwrap().contains(": wrote "));

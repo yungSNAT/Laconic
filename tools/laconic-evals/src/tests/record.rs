@@ -71,7 +71,10 @@ fn style_steps_write_what_the_python_wrote() {
             answers += 1;
         }
     }
-    assert_eq!(fs::read_dir(dir.path().join("answers")).unwrap().count(), answers);
+    assert_eq!(
+        fs::read_dir(dir.path().join("answers")).unwrap().count(),
+        answers
+    );
     assert_eq!(
         record(&["style-results", &w]),
         expected("style-expected/results.jsonl")
@@ -92,12 +95,16 @@ fn rewrite_steps_write_what_the_python_wrote() {
     let pairs = files(&fixture("rewrites-expected/pairs"));
     for file in &pairs {
         let made = fs::read_to_string(dir.path().join(file)).unwrap();
-        assert_eq!(made, expected(&format!("rewrites-expected/pairs/{}", file.display())));
+        assert_eq!(
+            made,
+            expected(&format!("rewrites-expected/pairs/{}", file.display()))
+        );
     }
     // Each pair's texts, for `laconic-check preserve`.
     let mut preserve = BTreeSet::new();
     for file in pairs.iter().filter(|f| f.starts_with("pairs-")) {
-        let s = &file.to_str().unwrap()["pairs-".len()..file.to_str().unwrap().len() - ".jsonl".len()];
+        let s =
+            &file.to_str().unwrap()["pairs-".len()..file.to_str().unwrap().len() - ".jsonl".len()];
         for row in cases::read_jsonl(&dir.path().join(file)).unwrap() {
             let folder = PathBuf::from(format!("preserve/{s}-{}", row["id"].as_str().unwrap()));
             for (name, field) in [("original", "source"), ("edit", "rewrite")] {
@@ -123,7 +130,7 @@ fn rewrite_steps_write_what_the_python_wrote() {
 
 #[test]
 fn setups_write_what_the_python_wrote() {
-    for run in record::RUNS {
+    for run in crate::record::RUNS {
         let dir = tempfile::tempdir().unwrap();
         fs::create_dir(dir.path().join("patina-in")).unwrap();
         let texts = dir.path().join("aihb-2026-10.jsonl");
@@ -139,7 +146,11 @@ fn setups_write_what_the_python_wrote() {
         for file in written {
             let made = fs::read_to_string(dir.path().join(&file)).unwrap();
             let want = expected(&format!("{want}/{}", file.display()));
-            assert_eq!(made, want.replace("@W@", &path[1..path.len() - 1]), "{run} {file:?}");
+            assert_eq!(
+                made,
+                want.replace("@W@", &path[1..path.len() - 1]),
+                "{run} {file:?}"
+            );
         }
     }
     assert!(Cli::try_parse_from(["laconic-evals", "record", "setups", "other", "w"]).is_err());

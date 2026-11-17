@@ -60,11 +60,19 @@ fn sum_adds_as_cpython_does() {
         10_000_000_000.3
     );
     assert_eq!(
-        float(sum([Num::Float(1e100), Num::Float(1.0), Num::Float(-1e100)])),
+        float(sum([
+            Num::Float(1e100),
+            Num::Float(1.0),
+            Num::Float(-1e100)
+        ])),
         1.0
     );
     assert_eq!(
-        float(sum([Num::Float(1e308), Num::Float(1e308), Num::Float(-1e308)])),
+        float(sum([
+            Num::Float(1e308),
+            Num::Float(1e308),
+            Num::Float(-1e308)
+        ])),
         f64::INFINITY
     );
 }
@@ -130,7 +138,11 @@ fn an_unknown_run_or_a_path_that_is_not_text_is_refused() {
     {
         use std::os::unix::ffi::OsStrExt;
         let odd = dir.path().join(std::ffi::OsStr::from_bytes(b"\xff"));
-        assert!(setups(RUNS[0], &odd).unwrap_err().ends_with("not valid UTF-8"));
+        assert!(
+            setups(RUNS[0], &odd)
+                .unwrap_err()
+                .ends_with("not valid UTF-8")
+        );
     }
 }
 
@@ -177,10 +189,7 @@ fn rewrite_steps_refuse_malformed_input() {
         &w.join("run-laconic.jsonl"),
         &[json!({"case_id": "nodash", "response": "x"})],
     );
-    assert_eq!(
-        rewrite_pairs(w).unwrap_err(),
-        "case id 'nodash' has no '-'"
-    );
+    assert_eq!(rewrite_pairs(w).unwrap_err(), "case id 'nodash' has no '-'");
 
     write_rows(
         &w.join("units-laconic.jsonl"),

@@ -66,7 +66,10 @@ pub fn setups(run: &str, work: &Path) -> Result<(), String> {
     match run {
         "concise-style-2026-11-17" => {
             let none = prompt_file(format!("{w}/arm-none.md"));
-            let mut concise = vec!["--settings".to_owned(), r#"{"outputStyle":"Concise"}"#.into()];
+            let mut concise = vec![
+                "--settings".to_owned(),
+                r#"{"outputStyle":"Concise"}"#.into(),
+            ];
             concise.extend(none.clone());
             let setups = json!({
                 "claude": runner("claude", &none),
@@ -74,7 +77,10 @@ pub fn setups(run: &str, work: &Path) -> Result<(), String> {
                 "setup-concise": runner("claude", &concise),
                 "setup-terse": runner("claude", &prompt_file(format!("{w}/arm-terse.md"))),
             });
-            write(&work.join("setups.json"), &(py::dumps_pretty(&setups) + "\n"))
+            write(
+                &work.join("setups.json"),
+                &(py::dumps_pretty(&setups) + "\n"),
+            )
         }
         "token-cost-2026-11-17" => {
             let fixed = format!("{w}/claude-fixed-cwd");
@@ -127,7 +133,10 @@ fn rewrite_setups(w: &str, work: &Path) -> Result<(), String> {
         });
         lines.push_str(&py::dumps(&case, None, true));
         lines.push('\n');
-        write(&work.join(format!("patina-in/{id}.md")), &format!("{input}\n"))?;
+        write(
+            &work.join(format!("patina-in/{id}.md")),
+            &format!("{input}\n"),
+        )?;
     }
     write(&work.join("cases.jsonl"), &lines)
 }
@@ -267,7 +276,9 @@ pub fn style_results(work: &Path) -> Result<String, String> {
         if run == "cold" {
             let missing = |file: &str| format!("{file}: no score for {key}");
             let h = house.get(&key).ok_or_else(|| missing("scores.jsonl"))?;
-            let p = plain.get(&key).ok_or_else(|| missing("correctness.jsonl"))?;
+            let p = plain
+                .get(&key)
+                .ok_or_else(|| missing("correctness.jsonl"))?;
             let mut scores = Map::new();
             for d in DIMENSIONS.iter().chain(&["blocker"]) {
                 scores.insert((*d).to_owned(), py::field(h, d)?.clone());
@@ -336,7 +347,11 @@ fn half_up(x: Num, places: usize) -> Result<String, String> {
     };
     let (whole, fraction) = mantissa.split_once('.').unwrap_or((mantissa, ""));
     // The value is `digits` times 10 to the power `scale`.
-    let mut digits: Vec<u8> = whole.bytes().chain(fraction.bytes()).map(|b| b - b'0').collect();
+    let mut digits: Vec<u8> = whole
+        .bytes()
+        .chain(fraction.bytes())
+        .map(|b| b - b'0')
+        .collect();
     let scale = exponent - i64::try_from(fraction.len()).expect("short");
     let target = -i64::try_from(places).expect("few places");
     if scale >= target {
@@ -678,11 +693,7 @@ pub fn style_summary(rows: &[Value]) -> Result<String, String> {
         .iter()
         .map(|r| py::field(r, "condition").cloned())
         .collect::<Result<_, _>>()?;
-    conditions.extend(
-        sorted_set(all)?
-            .into_iter()
-            .filter(|c| *c != "candidate"),
-    );
+    conditions.extend(sorted_set(all)?.into_iter().filter(|c| *c != "candidate"));
     let mut setups = HashMap::new();
     for r in rows {
         setups.insert(
@@ -728,8 +739,10 @@ pub fn style_summary(rows: &[Value]) -> Result<String, String> {
             .map(|r| Ok((answer_key(r)?, *r)))
             .collect::<Result<HashMap<_, _>, String>>()?;
         let data = Run { index, trials };
-        let ratios: [(&str, Measure); 2] =
-            [("output tokens, ratio", output_tokens), ("cost, ratio", cost)];
+        let ratios: [(&str, Measure); 2] = [
+            ("output tokens, ratio", output_tokens),
+            ("cost, ratio", cost),
+        ];
         let differences: [(&str, Measure); 2] = [
             ("weighted score, evals/rubric.md, difference", weighted),
             (
@@ -799,7 +812,9 @@ pub fn rewrite_pairs(work: &Path) -> Result<(), String> {
         let mut rows = Vec::new();
         for r in read_jsonl(&work.join(format!("run-{s}.jsonl")))? {
             let sid = sample_id(&r)?;
-            rows.push(json!({"id": sid, "source": source(&sid)?, "rewrite": py::field(&r, "response")?}));
+            rows.push(
+                json!({"id": sid, "source": source(&sid)?, "rewrite": py::field(&r, "response")?}),
+            );
         }
         pairs.push((s, rows));
     }
@@ -811,7 +826,9 @@ pub fn rewrite_pairs(work: &Path) -> Result<(), String> {
             return Err(format!("patina-out/{sid}.json is not a JSON object"));
         }
         let output = py::get(&d, "output").filter(|o| py::truthy(o));
-        patina.push(json!({"id": sid, "source": text, "rewrite": output.cloned().unwrap_or(json!(""))}));
+        patina.push(
+            json!({"id": sid, "source": text, "rewrite": output.cloned().unwrap_or(json!(""))}),
+        );
         let mut row = Map::new();
         row.insert("id".into(), json!(sid));
         match py::get(&d, "verification").filter(|v| py::truthy(v)) {
@@ -842,7 +859,10 @@ pub fn rewrite_pairs(work: &Path) -> Result<(), String> {
 }
 
 /// Rows of `path` by `id`, the later of 2 with one id winning in the earlier one's place.
-fn by_id(rows: Vec<Value>, id: fn(&Value) -> Result<String, String>) -> Result<Map<String, Value>, String> {
+fn by_id(
+    rows: Vec<Value>,
+    id: fn(&Value) -> Result<String, String>,
+) -> Result<Map<String, Value>, String> {
     let mut map = Map::new();
     for row in rows {
         map.insert(id(&row)?, row);
@@ -881,7 +901,8 @@ pub fn rewrite_results(work: &Path) -> Result<String, String> {
                     groups.push(py::field(x, "group")?.clone());
                 }
             }
-            let words = |name| -> Result<usize, String> { Ok(py::words(py::text(p, name)?).count()) };
+            let words =
+                |name| -> Result<usize, String> { Ok(py::words(py::text(p, name)?).count()) };
             let mut row = json!({
                 "rewriter": s,
                 "sample_id": sid,

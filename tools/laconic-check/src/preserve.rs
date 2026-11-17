@@ -1786,7 +1786,7 @@ Priya said.",
 
     #[test]
     fn checks_many_names_in_linear_time() {
-        // Each name was looked for in the whole edit, so 16 times the names took about 330
+        // Each name was looked for in the whole edit, so 16 times the names took 240 to 360
         // times as long; a set of the edit's word runs gives 16 to 23 times on Linux and
         // once reached 35 on a macOS runner. The bound sits midway between linear and quadratic
         // on a log scale: 16 times 4, or 256 over 4.

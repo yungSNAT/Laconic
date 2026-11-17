@@ -80,6 +80,8 @@ laconic-evals run --runner-config setups.json --runner setup-laconic   --conditi
 
 Judge with `--conditions candidate comparator`, then score and measure with `--reference comparator`, which compares the candidate with the comparator in place of a baseline. Give every setup the same tools and the same reachable files, or the comparison measures access rather than instructions.
 
+A Claude Code output style is a setup too: add `--settings '{"outputStyle":"Concise"}'` to a runner's command (the name is case-sensitive), and check that the `init` event of one `--output-format stream-json --verbose` call reports it as `output_style`, as `--setting-sources ""` leaves `--settings` in force. `measure` refuses rows from more than one runner, so measure whole setups on a copy of the responses with the `runner` field set to one name. The README's comparison with the Concise style ran this way on 17 November 2026, with `--effort high` in every runner and the judge.
+
 ## Humanising benchmark
 
 `humanise-cases.jsonl` holds 20 AI-written texts to humanise for an Australian reader, each with regex checks for the facts that must survive and the patterns that must go. To compare humanisers, install each as a Claude Code plugin in its own runner (`--plugin-dir`, `--add-dir`, `--tools Skill,Read` and an `--append-system-prompt-file` naming the skill to use), run each with `--no-injection` as one of the 3 conditions, then judge all 3 together:

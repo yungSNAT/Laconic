@@ -240,6 +240,14 @@ cargo run --manifest-path tools/laconic-check/Cargo.toml -- lint README.md
 cargo run --manifest-path tools/laconic-check/Cargo.toml -- preserve original.md edited.md
 ```
 
+`lint` and `preserve` also run in a browser, compiled to WebAssembly (on `main`, not yet published). The page is one HTML file whose content security policy blocks every network request, so text pasted into it stays on the machine; `web/index.html` is its source and `tools/laconic-web` the WebAssembly crate. Build it with:
+
+```bash
+rustup target add wasm32-unknown-unknown
+cargo build --release --target wasm32-unknown-unknown --manifest-path tools/laconic-web/Cargo.toml
+cargo run --manifest-path tools/laconic-tools/Cargo.toml -- web-page tools/laconic-web/target/wasm32-unknown-unknown/release/laconic_web.wasm laconic.html
+```
+
 Prebuilt binaries for Linux (x86_64, static), Windows (x86_64) and macOS (Apple silicon) are attached to each `laconic-check-v*` release, with SHA-256 checksums; put the binary on the PATH. Building from source needs only Rust.
 
 For a project that already runs [Vale](https://vale.sh), `vale/Laconic` is a Vale style generated from `lint`'s rule table and attached to each release as the package `Laconic.zip` (on `main`, not yet in a release). It covers the rules a regular expression can express; [vale/README.md](vale/README.md) lists the 7 it cannot and how the rest differ from `lint`.

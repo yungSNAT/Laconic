@@ -5,3 +5,4 @@ evals/results/
 tools/laconic-check/target/
 tools/laconic-tools/target/
 tools/laconic-evals/target/
+tools/laconic-web/target/

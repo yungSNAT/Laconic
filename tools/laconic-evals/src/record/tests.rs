@@ -125,6 +125,49 @@ fn regex_checks_must_be_lists_of_strings() {
         regex_failed(&case(json!({"must_not_include": [1]})), "x").unwrap_err(),
         "must_not_include holds a non-string"
     );
+    // Python's re.search raises on a pattern it cannot compile, and `.get` on checks that
+    // are not a dict.
+    assert!(regex_failed(&case(json!({"must_not_include": ["["]})), "x").is_err());
+    assert_eq!(
+        regex_failed(&case(json!("invalid")), "x").unwrap_err(),
+        "checks is 'invalid'"
+    );
+}
+
+#[test]
+fn usage_that_is_not_a_dict_is_refused() {
+    // `(r.get("usage") or {}).get(...)`: falsy usage reads as no usage; any other non-dict raises.
+    assert_eq!(usage_field(Some(&json!("")), "output_tokens").unwrap(), 0);
+    assert_eq!(usage_field(None, "output_tokens").unwrap(), 0);
+    assert_eq!(
+        usage_field(Some(&json!({"output_tokens": 7})), "output_tokens").unwrap(),
+        7
+    );
+    assert_eq!(
+        usage_field(Some(&json!("invalid")), "output_tokens").unwrap_err(),
+        "usage is 'invalid'"
+    );
+}
+
+#[test]
+fn counts_refuse_values_json_would_write_as_one_key() {
+    // json.dumps writes None and 'null' as 2 keys spelt "null"; a JSON object cannot hold both.
+    assert!(counter([Value::Null, json!("null")]).is_err());
+    assert!(counter([json!(1), json!("1")]).is_err());
+    // 1 and 1.0 are one Counter key in Python.
+    assert_eq!(counter([json!(1), json!(1.0)]).unwrap(), json!({"1": 2}));
+}
+
+#[test]
+fn a_repeated_id_keeps_its_first_place_and_its_last_row() {
+    let rows = vec![
+        json!({"id": "a", "v": 1}),
+        json!({"id": "b"}),
+        json!({"id": "a", "v": 2}),
+    ];
+    let map = by_id(rows, id_field).unwrap();
+    assert_eq!(map.keys().collect::<Vec<_>>(), ["a", "b"]);
+    assert_eq!(map["a"]["v"], 2);
 }
 
 #[test]

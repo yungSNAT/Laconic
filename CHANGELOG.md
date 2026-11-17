@@ -90,7 +90,7 @@ The manifests other than Claude Code's still declare plugin 0.5.0, so a build fr
 
 ### laconic-check: security
 
-- The deprecated Node MCP server, `mcp/server.mjs`, looks for `laconic-check` only in PATH's absolute entries when `LACONIC_CHECK` is not set, and reports an error naming `LACONIC_CHECK` when none holds it. Before, Node on Windows looked in the server's working directory first, as it does through a relative PATH entry such as `.` on any system, so a `laconic-check` planted in the project the client ran in ran on each call.
+- The deprecated Node MCP server, `mcp/server.mjs`, looks for `laconic-check` only in PATH's fully qualified entries when `LACONIC_CHECK` is not set, and reports an error naming `LACONIC_CHECK` when none holds it. Before, Node on Windows looked in the server's working directory first, as it does through a relative PATH entry such as `.` on any system, so a `laconic-check` planted in the project the client ran in ran on each call.
 
 ## [laconic-check 0.5.0] - 2026-11-13
 

@@ -4,27 +4,36 @@
 
 // MCP server (stdio) exposing laconic-check as two tools: lint and preserve.
 // No dependencies: it speaks newline-delimited JSON-RPC 2.0 and runs the
-// laconic-check binary, found in PATH's absolute entries or through LACONIC_CHECK.
+// laconic-check binary named by LACONIC_CHECK, used as given, or else found in PATH's fully
+// qualified entries.
 //
 //   claude mcp add laconic-check -- node /path/to/tools/laconic-check/mcp/server.mjs
 
 import { spawnSync } from "node:child_process";
 import { accessSync, constants, mkdtempSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { basename, delimiter, extname, isAbsolute, join } from "node:path";
+import { join } from "node:path";
 import { createInterface } from "node:readline";
 
-const BINARY = process.env.LACONIC_CHECK || "laconic-check";
+const WINDOWS = process.platform === "win32";
 const MAX_INPUT = 200_000; // characters per text argument
 
-// A bare name is looked up in PATH's absolute entries only. Node on Windows looks in the working
-// directory (the project the client runs in) first, and a relative entry such as "." resolves
-// there, so either would run a laconic-check that the project planted.
-function resolve(name) {
-  if (basename(name) !== name) return name;
-  const names = process.platform === "win32" && !extname(name) ? [`${name}.com`, `${name}.exe`] : [name];
-  for (const dir of (process.env.PATH ?? "").split(delimiter).filter(isAbsolute)) {
-    for (const candidate of names.map((n) => join(dir, n))) {
+// PATH's entries: on Windows split at semicolons outside double quotes, which are then dropped.
+function pathEntries() {
+  const path = process.env.PATH ?? "";
+  if (!WINDOWS) return path.split(":");
+  return (path.match(/(?:"[^"]*"|[^;"])+/g) ?? []).map((entry) => entry.replaceAll('"', ""));
+}
+
+// Only fully qualified entries are searched. Node on Windows looks in the working directory (the
+// project the client runs in) first and a relative entry such as "." resolves there, so either
+// could run a laconic-check the project planted; on Windows "\bin" depends on that directory's drive.
+// On POSIX the name is appended without normalising, so "link/../bin" means what the system means.
+function findBinary() {
+  const qualified = WINDOWS ? /^(?:[A-Za-z]:[\\/]|[\\/]{2}[^\\/])/ : /^\//;
+  const names = WINDOWS ? ["laconic-check.com", "laconic-check.exe"] : ["laconic-check"];
+  for (const dir of pathEntries().filter((entry) => qualified.test(entry))) {
+    for (const candidate of names.map((name) => (WINDOWS ? join(dir, name) : `${dir}/${name}`))) {
       try {
         if (statSync(candidate).isFile()) {
           accessSync(candidate, constants.X_OK);
@@ -35,7 +44,7 @@ function resolve(name) {
       }
     }
   }
-  throw new Error(`could not find ${name} in PATH's absolute entries; set LACONIC_CHECK to its full path`);
+  throw new Error("could not find laconic-check in PATH's fully qualified entries; set LACONIC_CHECK to its full path");
 }
 
 const TOOLS = [
@@ -65,8 +74,9 @@ const TOOLS = [
 ];
 
 function run(args, input) {
-  const result = spawnSync(resolve(BINARY), args, { input, encoding: "utf8", timeout: 20_000, windowsHide: true });
-  if (result.error) throw new Error(`could not run ${BINARY}: ${result.error.message}`);
+  const binary = process.env.LACONIC_CHECK || findBinary();
+  const result = spawnSync(binary, args, { input, encoding: "utf8", timeout: 20_000, windowsHide: true });
+  if (result.error) throw new Error(`could not run ${binary}: ${result.error.message}`);
   if (result.status === 2) throw new Error(result.stderr.trim() || "laconic-check failed");
   return result.stdout.trim();
 }

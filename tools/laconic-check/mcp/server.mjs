@@ -4,18 +4,39 @@
 
 // MCP server (stdio) exposing laconic-check as two tools: lint and preserve.
 // No dependencies: it speaks newline-delimited JSON-RPC 2.0 and runs the
-// laconic-check binary, found on PATH or through LACONIC_CHECK.
+// laconic-check binary, found in PATH's absolute entries or through LACONIC_CHECK.
 //
 //   claude mcp add laconic-check -- node /path/to/tools/laconic-check/mcp/server.mjs
 
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { accessSync, constants, mkdtempSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { basename, delimiter, extname, isAbsolute, join } from "node:path";
 import { createInterface } from "node:readline";
 
 const BINARY = process.env.LACONIC_CHECK || "laconic-check";
 const MAX_INPUT = 200_000; // characters per text argument
+
+// A bare name is looked up in PATH's absolute entries only. Node on Windows looks in the working
+// directory (the project the client runs in) first, and a relative entry such as "." resolves
+// there, so either would run a laconic-check that the project planted.
+function resolve(name) {
+  if (basename(name) !== name) return name;
+  const names = process.platform === "win32" && !extname(name) ? [`${name}.com`, `${name}.exe`] : [name];
+  for (const dir of (process.env.PATH ?? "").split(delimiter).filter(isAbsolute)) {
+    for (const candidate of names.map((n) => join(dir, n))) {
+      try {
+        if (statSync(candidate).isFile()) {
+          accessSync(candidate, constants.X_OK);
+          return candidate;
+        }
+      } catch {
+        // missing or not executable: try the next one
+      }
+    }
+  }
+  throw new Error(`could not find ${name} in PATH's absolute entries; set LACONIC_CHECK to its full path`);
+}
 
 const TOOLS = [
   {
@@ -44,7 +65,7 @@ const TOOLS = [
 ];
 
 function run(args, input) {
-  const result = spawnSync(BINARY, args, { input, encoding: "utf8", timeout: 20_000, windowsHide: true });
+  const result = spawnSync(resolve(BINARY), args, { input, encoding: "utf8", timeout: 20_000, windowsHide: true });
   if (result.error) throw new Error(`could not run ${BINARY}: ${result.error.message}`);
   if (result.status === 2) throw new Error(result.stderr.trim() || "laconic-check failed");
   return result.stdout.trim();

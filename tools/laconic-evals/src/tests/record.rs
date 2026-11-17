@@ -102,9 +102,11 @@ fn rewrite_steps_write_what_the_python_wrote() {
     }
     // Each pair's texts, for `laconic-check preserve`.
     let mut preserve = BTreeSet::new();
-    for file in pairs.iter().filter(|f| f.starts_with("pairs-")) {
-        let s =
-            &file.to_str().unwrap()["pairs-".len()..file.to_str().unwrap().len() - ".jsonl".len()];
+    for file in &pairs {
+        let Some(s) = file.to_str().unwrap().strip_prefix("pairs-") else {
+            continue;
+        };
+        let s = s.strip_suffix(".jsonl").unwrap();
         for row in cases::read_jsonl(&dir.path().join(file)).unwrap() {
             let folder = PathBuf::from(format!("preserve/{s}-{}", row["id"].as_str().unwrap()));
             for (name, field) in [("original", "source"), ("edit", "rewrite")] {

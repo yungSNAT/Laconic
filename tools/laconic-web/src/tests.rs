@@ -5,19 +5,23 @@ use laconic_check::mcp::parse;
 
 use super::*;
 
-/// Writes `bytes` into `slot` as the page does.
+/// Writes `bytes` into `slot` as the page does: into the `bytes.len()` bytes `input` returns,
+/// which must be the slot's own buffer.
 fn write(slot: usize, bytes: &[u8]) {
     let space = input(slot, bytes.len());
     assert!(!space.is_null());
-    // SAFETY: `input` returned space for exactly `bytes.len()` bytes, as the page uses it.
-    unsafe { std::ptr::copy_nonoverlapping(bytes.as_ptr(), space, bytes.len()) };
+    INPUTS.with_borrow_mut(|inputs| {
+        assert_eq!(inputs[slot].as_mut_ptr(), space);
+        inputs[slot].copy_from_slice(bytes);
+    });
 }
 
 /// The report `len` bytes long that the last call left at `output`.
 fn read(len: usize) -> Json {
-    // SAFETY: `output` holds the last report, `len` bytes of UTF-8 JSON.
-    let bytes = unsafe { std::slice::from_raw_parts(output(), len) };
-    parse(std::str::from_utf8(bytes).unwrap()).unwrap()
+    OUTPUT.with_borrow(|report| {
+        assert_eq!((report.as_ptr(), report.len()), (output(), len));
+        parse(report).unwrap()
+    })
 }
 
 #[test]

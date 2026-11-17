@@ -14,8 +14,8 @@ The run behind the README's [Token cost against caveman and Chisle](../../../REA
 ## Files
 
 - `run.sh <work dir>`: the whole run, from cloning the rivals to the summary. It calls the model 614 times; this run cost about US$18.
-- `results.py`: run in the work directory. `results.py answers` writes each answer to `answers/` for `run.sh` to lint; without an argument it prints one row per answer, without the answer text.
+- [`results.py`](../concise-style-2026-11-17/results.py), shared with the Concise run: run in the work directory. `results.py answers` writes each answer to `answers/` for `run.sh` to lint; without an argument it prints one row per answer, without the answer text.
 - `results.jsonl`: those rows for this run: `run` is `cold` or `warm` (cached); scores under both rubrics for cold calls, token counts with cache writes and reads, cost, length, whether `laconic-check lint` found anything and which regex checks failed.
-- `summary.py < results.jsonl`: every figure in the README section, recomputed. Means are rounded once from the computed value. Each interval resamples the cases (10,000 resamples, a fresh `random.Random(2282)` for each).
+- `summary.py < results.jsonl`, with the Concise run's [`summary.py`](../concise-style-2026-11-17/summary.py): every figure in the README section, recomputed. Means are rounded once from the computed value. Each interval resamples the cases (10,000 resamples, a fresh `random.Random(2282)` for each).
 
 The answers themselves are not stored.

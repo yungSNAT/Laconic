@@ -8,6 +8,8 @@
 # and release builds of tools/laconic-evals and tools/laconic-check from this checkout.
 set -euo pipefail
 HERE=$(cd "$(dirname "$0")" && pwd)
+# results.py and summary.py are shared with the Concise run.
+SCRIPTS=$HERE/../concise-style-2026-11-17
 REPO=$(cd "$HERE/../../.." && pwd)
 mkdir -p "$1"
 W=$(cd "$1" && pwd)
@@ -61,11 +63,11 @@ for rubric in rubric:scores rubric-correctness:correctness; do
     --responses responses.jsonl --output "${rubric#*:}.jsonl"
 done
 cp "$CASES" cases.jsonl
-python3 -I "$HERE/results.py" answers
+python3 -I "$SCRIPTS/results.py" answers
 mkdir -p lint
 for answer in answers/*.txt; do
   if "$LC" lint --json - < "$answer" | grep -qF '{"findings":[]'; then echo 1; else echo 0; fi \
     > "lint/$(basename "$answer" .txt)"
 done
-python3 -I "$HERE/results.py" > results.jsonl
-python3 -I "$HERE/summary.py" < results.jsonl
+python3 -I "$SCRIPTS/results.py" > results.jsonl
+python3 -I "$SCRIPTS/summary.py" < results.jsonl

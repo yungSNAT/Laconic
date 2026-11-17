@@ -12,8 +12,8 @@ The run behind the README's [Against Claude Code's Concise style](../../../READM
 ## Files
 
 - `run.sh <work dir>`: the whole run, from the arm files to the summary. It calls the model 160 times; this run cost about US$4.
-- `results.py`: one row per answer from a work directory, without the answer text.
+- `results.py`: run in the work directory. `results.py answers` writes each answer to `answers/` for `run.sh` to lint; without an argument it prints one row per answer, without the answer text.
 - `results.jsonl`: those rows for this run: scores under both rubrics, token counts, cost, length, whether `laconic-check lint` found anything and which regex checks failed.
-- `summary.py results.jsonl`: every figure in the README section, recomputed. Means are rounded once from the computed value. Each interval resamples the cases (10,000 resamples, a fresh `random.Random(2282)` for each).
+- `summary.py < results.jsonl`: every figure in the README section, recomputed. Means are rounded once from the computed value. Each interval resamples the cases (10,000 resamples, a fresh `random.Random(2282)` for each).
 
 The answers themselves are not stored.

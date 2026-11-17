@@ -5,6 +5,7 @@
 //! set: only in PATH's absolute entries, never in its working directory (which Node on Windows
 //! searches first) or through a relative entry such as `.`. Tested only where `node` runs.
 
+use std::ffi::{OsStr, OsString};
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
@@ -40,14 +41,24 @@ fn planted(name: &str) -> PathBuf {
     dir
 }
 
+/// PATH holding `dirs` in order.
+fn path(dirs: &[&Path]) -> OsString {
+    std::env::join_paths(dirs).unwrap()
+}
+
+/// The folder holding the `laconic-check` this test runs.
+fn binary_dir() -> &'static Path {
+    Path::new(env!("CARGO_BIN_EXE_laconic-check")).parent().unwrap()
+}
+
 /// Runs the server in `dir` with `LACONIC_CHECK` unset and PATH set to `path`, sends one `lint`
 /// call and returns its reply.
-fn lint_reply(node: &Path, dir: &Path, path: &[&Path]) -> String {
+fn lint_reply(node: &Path, dir: &Path, path: &OsStr) -> String {
     let mut child = Command::new(node)
         .arg(SERVER)
         .current_dir(dir)
         .env_remove("LACONIC_CHECK")
-        .env("PATH", std::env::join_paths(path).unwrap())
+        .env("PATH", path)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -69,8 +80,7 @@ fn lint_reply(node: &Path, dir: &Path, path: &[&Path]) -> String {
 fn bare_name_runs_the_binary_on_an_absolute_path_entry() {
     let Some(node) = node() else { return };
     let dir = planted("path-search");
-    let binary = Path::new(env!("CARGO_BIN_EXE_laconic-check"));
-    let reply = lint_reply(&node, &dir, &[Path::new("."), binary.parent().unwrap()]);
+    let reply = lint_reply(&node, &dir, &path(&[Path::new("."), binary_dir()]));
     assert!(reply.contains("line 3:"), "{reply}");
     assert!(!reply.contains("isError"), "{reply}");
 }
@@ -79,8 +89,64 @@ fn bare_name_runs_the_binary_on_an_absolute_path_entry() {
 fn bare_name_found_only_through_a_relative_entry_is_an_error() {
     let Some(node) = node() else { return };
     let dir = planted("path-relative");
-    let reply = lint_reply(&node, &dir, &[Path::new(".")]);
+    let reply = lint_reply(&node, &dir, &path(&[Path::new(".")]));
     assert!(reply.contains("\"isError\":true"), "{reply}");
     assert!(reply.contains("LACONIC_CHECK"), "{reply}");
     assert!(!reply.contains("planted"), "{reply}");
+}
+
+#[cfg(unix)]
+#[test]
+fn a_candidate_that_cannot_run_is_skipped() {
+    use std::os::unix::fs::PermissionsExt;
+    let Some(node) = node() else { return };
+    let dir = planted("path-not-executable");
+    let file = dir.join("laconic-check");
+    std::fs::set_permissions(&file, std::fs::Permissions::from_mode(0o644)).unwrap();
+    let reply = lint_reply(&node, &dir, &path(&[&dir, binary_dir()]));
+    assert!(reply.contains("line 3:"), "{reply}");
+}
+
+/// `link/../bin` is the `bin` beside the folder `link` points to, as the system resolves it.
+#[cfg(unix)]
+#[test]
+fn a_path_entry_resolves_dot_dot_after_its_links() {
+    let Some(node) = node() else { return };
+    let dir = planted("path-dot-dot");
+    let real = dir.join("real");
+    std::fs::create_dir_all(real.join("pkg")).unwrap();
+    std::fs::create_dir_all(real.join("bin")).unwrap();
+    let _ = std::fs::remove_file(real.join("bin/laconic-check"));
+    std::os::unix::fs::symlink(env!("CARGO_BIN_EXE_laconic-check"), real.join("bin/laconic-check"))
+        .unwrap();
+    std::fs::create_dir_all(dir.join("bin")).unwrap();
+    std::fs::rename(dir.join("laconic-check"), dir.join("bin/laconic-check")).unwrap();
+    let _ = std::fs::remove_file(dir.join("link"));
+    std::os::unix::fs::symlink(real.join("pkg"), dir.join("link")).unwrap();
+    let reply = lint_reply(&node, &dir, dir.join("link/../bin").as_os_str());
+    assert!(reply.contains("line 3:"), "{reply}");
+    assert!(!reply.contains("planted"), "{reply}");
+}
+
+/// `\folder` names a folder on the working directory's drive.
+#[cfg(windows)]
+#[test]
+fn a_drive_relative_entry_is_not_searched() {
+    let Some(node) = node() else { return };
+    let dir = planted("path-drive-relative");
+    let full = dir.to_str().unwrap();
+    assert_eq!(full.as_bytes()[1], b':', "{full}");
+    let reply = lint_reply(&node, &dir, OsStr::new(&full[2..]));
+    assert!(reply.contains("\"isError\":true"), "{reply}");
+    assert!(reply.contains("LACONIC_CHECK"), "{reply}");
+}
+
+#[cfg(windows)]
+#[test]
+fn a_quoted_entry_is_searched() {
+    let Some(node) = node() else { return };
+    let dir = planted("path-quoted");
+    let quoted = format!("\"{}\"", binary_dir().display());
+    let reply = lint_reply(&node, &dir, OsStr::new(&quoted));
+    assert!(reply.contains("line 3:"), "{reply}");
 }

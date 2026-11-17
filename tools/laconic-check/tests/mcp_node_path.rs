@@ -26,10 +26,11 @@ fn node() -> Option<PathBuf> {
     out.map(|out| PathBuf::from(String::from_utf8(out.stdout).unwrap().trim()))
 }
 
-/// A fresh directory holding a planted `laconic-check`: a script that prints 'planted' on Unix
-/// and a file that cannot run on Windows, so a server that runs it does not lint.
+/// A directory under this build's own temporary folder holding a planted `laconic-check`: a
+/// script that prints 'planted' on Unix and a file that cannot run on Windows, so a server that
+/// runs it does not lint.
 fn planted(name: &str) -> PathBuf {
-    let dir = std::env::temp_dir().join(format!("laconic-check-{}-{name}", std::process::id()));
+    let dir = Path::new(env!("CARGO_TARGET_TMPDIR")).join(format!("node-path-{name}"));
     std::fs::create_dir_all(&dir).unwrap();
     let file = dir.join(format!("laconic-check{}", std::env::consts::EXE_SUFFIX));
     std::fs::write(&file, "#!/bin/sh\necho planted\n").unwrap();

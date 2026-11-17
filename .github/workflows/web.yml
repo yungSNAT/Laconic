@@ -68,14 +68,22 @@ jobs:
           set -euo pipefail
           browser=$(command -v chromium || command -v chromium-browser || command -v google-chrome)
           # expect <page> <text>...: fails unless the page, as Chromium renders it, shows each text.
+          # The checker loads asynchronously, and on a slow runner Chromium can dump the page
+          # before it has run, with both statuses still empty; such a dump is taken again, up to
+          # 3 times. Any other result is checked as it stands.
           expect() {
             page=$1
             shift
-            "$browser" --headless=new --disable-gpu --no-sandbox --virtual-time-budget=10000 \
-              --dump-dom "file://$page" > "$page.dom"
+            for attempt in 1 2 3; do
+              "$browser" --headless=new --disable-gpu --no-sandbox --virtual-time-budget=10000 \
+                --dump-dom "file://$page" > "$page.dom"
+              grep -qF '<p id="lint-status"></p>' "$page.dom" || break
+              echo "::warning::$(basename "$page") had not run its checks by dump $attempt"
+            done
             for wanted in "$@"; do
               grep -qF "$wanted" "$page.dom" || {
-                echo "::error::$(basename "$page") did not show '$wanted'"
+                echo "::error::$(basename "$page") did not show '$wanted'; it showed:"
+                grep -o '<p id="[a-z]*-status"[^<]*</p>' "$page.dom" || true
                 exit 1
               }
             done

@@ -723,21 +723,15 @@ pub fn style_summary(rows: &[Value]) -> Result<String, String> {
                 py::dumps(&Value::Object(line), None, true)
             );
         }
-        let column = |name| -> Result<Vec<Value>, String> {
-            sorted_set(
-                in_run
-                    .iter()
-                    .map(|r| py::field(r, name).cloned())
-                    .collect::<Result<_, _>>()?,
-            )
-        };
-        let trials = column("trial")?;
-        let cases = column("case_id")?;
-        let cases: Vec<&Value> = cases.iter().collect();
+        // answer_key refuses a row without a case, trial or condition, so the columns are there.
         let index = in_run
             .iter()
             .map(|r| Ok((answer_key(r)?, *r)))
             .collect::<Result<HashMap<_, _>, String>>()?;
+        let column = |name| sorted_set(in_run.iter().map(|r| r[name].clone()).collect());
+        let trials = column("trial")?;
+        let cases = column("case_id")?;
+        let cases: Vec<&Value> = cases.iter().collect();
         let data = Run { index, trials };
         let ratios: [(&str, Measure); 2] = [
             ("output tokens, ratio", output_tokens),

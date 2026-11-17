@@ -164,6 +164,77 @@ fn style_rows_need_their_case_and_scores() {
 }
 
 #[test]
+fn answers_and_style_rows_refuse_what_they_cannot_read_or_write() {
+    let dir = tempfile::tempdir().unwrap();
+    let w = dir.path();
+    let answer = json!({"case_id": "c1", "trial": 1, "condition": "candidate", "runner": "r", "response": "x"});
+    write_rows(&w.join("responses.jsonl"), &[answer.clone()]);
+    // A folder where the answer file goes.
+    fs::create_dir_all(w.join("answers/cold-0.txt")).unwrap();
+    assert!(write_answers(w).unwrap_err().contains("cold-0.txt"));
+
+    write_rows(&w.join("cases.jsonl"), &[json!({"name": "c1"})]);
+    assert_eq!(style_results(w).unwrap_err(), "a row has no 'id'");
+    write_rows(&w.join("cases.jsonl"), &[json!({"id": "c1"})]);
+    fs::create_dir_all(w.join("lint")).unwrap();
+    fs::write(w.join("lint/cold-0"), "1").unwrap();
+    let mut score = answer;
+    for d in DIMENSIONS.iter().chain(&["blocker"]) {
+        score[*d] = json!(1);
+    }
+    write_rows(&w.join("scores.jsonl"), &[score]);
+    assert_eq!(
+        style_results(w).unwrap_err(),
+        r#"correctness.jsonl: no score for ["c1",1,"candidate"]"#
+    );
+}
+
+/// A cold row of the Concise run with every field the summary reads.
+fn style_row(case: &str, condition: &str) -> Value {
+    json!({"run": "cold", "case_id": case, "trial": 1, "condition": condition, "setup": "s",
+        "input_tokens": 1, "cache_write_tokens": 0, "cache_read_tokens": 0.5, "output_tokens": 2,
+        "cost_usd": 0.1, "characters": 3, "lint_clean": true, "regex_failed": null,
+        "house": {"correctness": 4, "autonomy": 4, "actionability": 4, "safety": 4,
+            "concision": 4, "blocker": false},
+        "correctness_only": {"correctness": 4, "blocker": false}})
+}
+
+#[test]
+fn the_style_summary_refuses_rows_it_cannot_total() {
+    assert_eq!(style_summary(&[]).unwrap(), "");
+    let mut no_trial = style_row("c1", "candidate");
+    no_trial.as_object_mut().unwrap().remove("trial");
+    assert_eq!(style_summary(&[no_trial]).unwrap_err(), "a row has no 'trial'");
+    // The other condition has no row for c2.
+    let rows = [
+        style_row("c1", "candidate"),
+        style_row("c2", "candidate"),
+        style_row("c1", "other"),
+    ];
+    assert_eq!(
+        style_summary(&rows).unwrap_err(),
+        r#"no row for ["c2",1,"other"]"#
+    );
+    let mut no_condition = style_row("c1", "candidate");
+    no_condition.as_object_mut().unwrap().remove("condition");
+    assert_eq!(
+        style_summary(&[no_condition]).unwrap_err(),
+        "a row has no 'condition'"
+    );
+    let empty = json!({});
+    assert_eq!(weighted(&empty).unwrap_err(), "a row has no 'house'");
+    assert_eq!(
+        total_of(&[&empty], lint_clean).unwrap_err(),
+        "a row has no 'lint_clean'"
+    );
+    assert_eq!(
+        mean_of(&[&empty], cost, 2).unwrap_err(),
+        "a row has no 'cost_usd'"
+    );
+    assert!(matches!(add(Num::Int(1), Num::Float(0.5)), Num::Float(f) if f == 1.5));
+}
+
+#[test]
 fn rewrite_steps_refuse_malformed_input() {
     let dir = tempfile::tempdir().unwrap();
     let w = dir.path();
@@ -190,6 +261,11 @@ fn rewrite_steps_refuse_malformed_input() {
         &[json!({"case_id": "nodash", "response": "x"})],
     );
     assert_eq!(rewrite_pairs(w).unwrap_err(), "case id 'nodash' has no '-'");
+    write_rows(
+        &w.join("run-laconic.jsonl"),
+        &[json!({"case_id": "aihb-2026-10-2", "response": "x"})],
+    );
+    assert_eq!(rewrite_pairs(w).unwrap_err(), "no source text '2'");
 
     write_rows(
         &w.join("units-laconic.jsonl"),
@@ -201,6 +277,50 @@ fn rewrite_steps_refuse_malformed_input() {
     assert_eq!(
         rewrite_results(w).unwrap_err(),
         "pairs-laconic.jsonl has no '1'"
+    );
+    write_rows(&w.join("units-laconic.jsonl"), &[]);
+    write_rows(&w.join("units-patina.jsonl"), &[json!({"item_id": "1"})]);
+    write_rows(
+        &w.join("pairs-patina.jsonl"),
+        &[json!({"id": "1", "source": "a b", "rewrite": "a"})],
+    );
+    fs::create_dir_all(w.join("preserve/patina-1")).unwrap();
+    fs::write(w.join("preserve/patina-1/fails"), "0").unwrap();
+    write_rows(&w.join("patina-verify.jsonl"), &[]);
+    assert_eq!(
+        rewrite_results(w).unwrap_err(),
+        "patina-verify.jsonl has no '1'"
+    );
+}
+
+#[test]
+fn rewrite_summary_refuses_rows_it_cannot_total() {
+    let row = json!({"rewriter": "patina", "sample_id": "1", "units": 1, "units_altered": 0,
+        "altered_groups": [], "preserve_fails": false, "source_words": 2, "rewrite_words": 1});
+    let with = |field: &str, value: Value| {
+        let mut r = row.clone();
+        r[field] = value;
+        r
+    };
+    assert_eq!(
+        rewrite_summary(&[with("source_words", json!(0))]).unwrap_err(),
+        "division by zero"
+    );
+    let mut altered = with("units_altered", json!(1));
+    altered.as_object_mut().unwrap().remove("sample_id");
+    assert_eq!(
+        rewrite_summary(&[altered]).unwrap_err(),
+        "a row has no 'sample_id'"
+    );
+    assert_eq!(
+        rewrite_summary(&[with("cost_usd", json!("x"))]).unwrap_err(),
+        "unsupported operand: 'x' is not a number"
+    );
+    // A cost of 0 or none counts as 0; patina's rows then need their --verify result.
+    assert_eq!(
+        rewrite_summary(&[with("cost_usd", json!(0.5)), with("cost_usd", Value::Null)])
+            .unwrap_err(),
+        "a row has no 'patina_verify'"
     );
 }
 

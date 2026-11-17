@@ -58,7 +58,7 @@ Restart the agent, then type `/laconic`. It stays on for the session until you s
 
 ## When to choose something else
 
-- **Token cost comes first:** [caveman](https://github.com/JuliusBrussee/caveman) is built for that and also compresses what the agent reads. Laconic is not built for it: session mode cost about 27% more per task than its compact rules. The 2 have not been compared on token cost.
+- **Token cost comes first:** [caveman](https://github.com/JuliusBrussee/caveman) is built for that and also compresses what the agent reads, and [Chisle](https://github.com/JayPokale/Chisle) writes fewer output tokens still. On Laconic's 47 cases ([token cost](#token-cost-against-caveman-and-chisle), 17 November 2026), Laconic's compact rules wrote 14% more output tokens than caveman and 44% more than Chisle. With the rules read from the prompt cache, as in a session, an answer cost 17% more than with caveman and 45% more than with Chisle; in single cold calls that each wrote the rules to the cache, it cost 11% less than with caveman (whose rules are longer) and 5% more than with Chisle. Session mode cost about 27% more per task than the compact rules.
 - **You need another variety of English:** Laconic writes Australian English only. [LanguageTool](https://github.com/languagetool-org/languagetool) checks grammar and style in Australian, British, Canadian, New Zealand, South African and US English, after the text is written.
 - **You accept a rewrite that adds detail:** [humanizer](https://github.com/blader/humanizer) 4.0.0 (10 November 2026) tells the model, where a text is generic, to 'add a specific detail you know to be true'. Laconic adds no facts, and `laconic-check preserve --strict` fails an edit that adds a figure, URL, quotation or other item it protects.
 - **You want only the writing guidance:** [No AI Slop](https://github.com/petergyang/no-ai-slop), which Laconic's writing guidance builds on, has it without the response rules or Australian English.
@@ -188,6 +188,33 @@ On 17 November 2026, 3 setups answered the 10 held-out cases, 3 trials each, gen
 Laconic's own rubric scores Australian English and the house mechanics, which only Laconic asks for, and the judge applied them to correctness and blocking findings as well as to the weighted score, so of the judged rows only the first 3 are neutral on style. Judged for correctness alone, Laconic scored 0.53 higher than the Concise style, but on 10 cases the interval reaches no difference, so this is not a clear lead; Laconic had no blocking finding against its 4. The first judging's notes record that the Concise style gave the wrong weekday for 26 or 28 November 2026 in 2 of 3 payroll emails and buried the deadline in the third, claimed test coverage the task did not establish in 2 of 3 reviewer notes and misquoted the audited text once; 'Answer concisely.' made similar slips. Laconic wrote 46% more output tokens than the Concise style and cost 18% more per answer. All 3 setups kept the Style Manual's en dash in '2026–27', where Laconic's rules ask for the house hyphen, so each failed that case's regex check.
 
 Limits: 30 answers per setup from one model, which also judged them, on cases Laconic's author wrote; the style-excluded judging had no calibration set. Each interval resamples the 10 cases (10,000 resamples, seed 2282). Each call wrote its prompt to the prompt cache, so the cost rows are for single cold calls; with the rules cached, as in a session, Laconic's extra output would probably weigh more, though this run did not measure it. Claude Code and its Concise style are built for software engineering sessions, and most of these cases are writing and advice tasks. The run script, the per-answer scores, token counts and costs, and the script that recomputes this table are in [`evals/runs/concise-style-2026-11-17`](evals/runs/concise-style-2026-11-17/); the answers are not stored.
+
+### Token cost against caveman and Chisle
+
+On 17 November 2026, 3 rule sets answered all 47 cases in `evals/cases.jsonl`, generated and judged by Claude Opus 5.5 (`claude-opus-5-5`, high effort) in Claude Code 2.1.325 with no tools: Laconic's compact rules, [caveman](https://github.com/JuliusBrussee/caveman) 4.1.0's `skills/caveman/SKILL.md` and [Chisle](https://github.com/JayPokale/Chisle) 3.12.1's `skills/chisle/SKILL.md`, each appended to the system prompt without its front matter. Cold calls (2 trials) each ran from a fresh working directory and so wrote the rules to the prompt cache; cached calls (1 trial, not judged) ran from one directory after a priming call and so read them from it, as calls in one session do. The judge saw a case's 3 cold answers together under shuffled letters, and its prompt named no rule set, though it could see their style and 3 of Laconic's 94 answers mentioned Laconic, 2 by quoting a working directory and 1 by naming its skill. It judged them twice: for correctness alone, against `evals/rubric-correctness.md`, which tells it not to score style; and against Laconic's own rubric, `evals/rubric.md`.
+
+| Measure | Laconic | caveman | Chisle |
+| --- | --- | --- | --- |
+| Mean output tokens, thinking included, cold calls | 745 | 655 | 516 |
+| Laconic's output tokens against it (95% interval) | | 1.14 times (1.04 to 1.27) | 1.44 times (1.27 to 1.68) |
+| Mean input tokens, cold calls | 3,218 | 4,285 | 3,861 |
+| Mean output tokens, thinking included, cached calls | 780 | 637 | 492 |
+| Mean cost per answer, rules read from the cache | US$0.018 | US$0.016 | US$0.013 |
+| Laconic's cost against it, rules read from the cache (95% interval) | | 1.17 times (1.05 to 1.29) | 1.45 times (1.25 to 1.61) |
+| Mean cost per answer, one cold call, cache write included | US$0.028 | US$0.031 | US$0.026 |
+| Laconic's cost against it, cold calls (95% interval) | | 0.89 times (0.83 to 0.94) | 1.05 times (0.96 to 1.15) |
+| Mean answer length (characters), cold calls | 1,297 | 1,198 | 977 |
+| Correctness, style excluded (1 to 5) | 4.68 | 4.44 | 4.38 |
+| Laconic's difference (95% interval) | | +0.24 (+0.06 to +0.45) | +0.30 (+0.10 to +0.53) |
+| Blocking findings, style excluded | 2 | 5 | 7 |
+| Weighted score, Laconic's own rubric (1 to 5) | 4.63 | 4.11 | 4.11 |
+| Blocking findings, Laconic's own rubric | 8 | 43 | 44 |
+| Regex checks passed, cold calls | 18 of 18 | 16 of 18 | 16 of 18 |
+| Answers with no `laconic-check` 0.5.0 findings, cold calls | 70 of 94 | 36 of 94 | 39 of 94 |
+
+Laconic wrote the most: 14% more output tokens than caveman and 44% more than Chisle. In cold calls caveman's longer rules cost more to write to the cache than Laconic's extra output, so an answer cost 11% less with Laconic; with the rules read from the cache, as in a session, Laconic's extra output made an answer 17% dearer than with caveman and 45% dearer than with Chisle. Judged for correctness alone, Laconic led caveman by 0.24 and Chisle by 0.30; its 2 style-excluded blocking findings were an arithmetic error and a misquoted RFC 7636 test value. Laconic's own rubric also scored Australian English and the house mechanics, which neither rival asks for, under correctness and as blocking findings, and most of the rivals' blocking findings under it are on those: serial commas, double quotation marks, numbers written as words and US spelling. In that judging both rivals gave typical timeframes in both answers to the case that forbids them, where Laconic gave none; Laconic's blocking findings include an answer that, told it had no tools, would not edit a file the task said it could reach (as did one of Chisle's), one with a material arithmetic error and 2 that added a limits disclaimer the task forbade.
+
+Limits: one model, which also judged the answers, on cases that also guided Laconic's rule wording; the style-excluded judging had no calibration set. Token and cost figures are Claude Code's reports for each call. caveman's own evaluation replaces the system prompt with its skill, where this run appended it. Neither rival's compression of what the agent reads was exercised, and both publish figures from their own prompts and models, which this run does not reproduce. The intervals resample the 47 cases (10,000 resamples, seed 2282). The run script, the per-answer scores, token counts and costs, and the script that recomputes this table are in [`evals/runs/token-cost-2026-11-17`](evals/runs/token-cost-2026-11-17/); the answers are not stored.
 
 ### Against other humanisers
 

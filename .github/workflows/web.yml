@@ -144,7 +144,7 @@ jobs:
     timeout-minutes: 10
     permissions:
       pages: write
-      id-token: write
+      id-token: write # deploy-pages proves the run with an OIDC token; no stored token.
     environment:
       name: github-pages
       url: ${{ steps.deploy.outputs.page_url }}

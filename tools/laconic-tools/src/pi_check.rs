@@ -773,13 +773,20 @@ mod tests {
         assert!(work.remove().unwrap_err().starts_with("cannot remove"));
     }
 
-    /// An agent script for `Rpc::start`, which passes `--mode rpc` that `sh` ignores here.
+    /// An agent script for `Rpc::start`, which passes `--mode rpc` that `sh` ignores here. A child
+    /// process writes it: had this process opened it for writing, a child another test thread
+    /// forked meanwhile would hold it open until that child ran its own program, and starting the
+    /// script then would fail with 'text file busy'.
     #[cfg(unix)]
     fn agent(work: &TempDir, script: &str) -> Rpc {
-        use std::os::unix::fs::PermissionsExt;
         let path = work.0.join("agent.sh");
-        fs::write(&path, format!("#!/bin/sh\n{script}\n")).unwrap();
-        fs::set_permissions(&path, fs::Permissions::from_mode(0o755)).unwrap();
+        let written = Command::new("/bin/sh")
+            .args(["-c", r#"printf '#!/bin/sh\n%s\n' "$1" > "$2" && chmod 755 "$2""#])
+            .args(["sh", script])
+            .arg(&path)
+            .status()
+            .unwrap();
+        assert!(written.success(), "{written}");
         Rpc::start(&path, &work.0, &[], work.0.join("stderr"), &[]).unwrap()
     }
 

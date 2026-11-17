@@ -152,7 +152,7 @@ fn style_rows_need_their_case_and_scores() {
     let w = dir.path();
     let answer = json!({"case_id": "c1", "trial": 1, "condition": "candidate", "runner": "r", "response": "x"});
     write_rows(&w.join("cases.jsonl"), &[json!({"id": "c2"})]);
-    write_rows(&w.join("responses.jsonl"), &[answer.clone()]);
+    write_rows(&w.join("responses.jsonl"), &[answer]);
     fs::create_dir_all(w.join("lint")).unwrap();
     fs::write(w.join("lint/cold-0"), "1").unwrap();
     assert_eq!(style_results(w).unwrap_err(), "no case 'c1'");

@@ -78,3 +78,23 @@ fn text_that_is_not_utf8_is_an_error_and_a_third_slot_does_not_exist() {
     );
     assert!(input(2, 4).is_null());
 }
+
+#[test]
+fn lint_reads_only_its_own_slot() {
+    write(0, b"We analyzed it.");
+    write(1, &[0xff]);
+    let Json::Object(report) = read(lint()) else {
+        panic!("not an object");
+    };
+    assert_eq!(report[0].0, "findings");
+}
+
+#[test]
+fn space_the_memory_cannot_hold_is_null_and_the_slot_stays_usable() {
+    assert!(input(0, isize::MAX as usize + 1).is_null());
+    write(0, b"We analyzed it.");
+    let Json::Object(report) = read(lint()) else {
+        panic!("not an object");
+    };
+    assert_eq!(report[0].0, "findings");
+}

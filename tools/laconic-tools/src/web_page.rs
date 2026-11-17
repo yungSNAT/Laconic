@@ -12,9 +12,10 @@ use std::path::Path;
 /// The page, from the repository root.
 pub const TEMPLATE: &str = "web/index.html";
 
-/// The page with `wasm` in it and its policy's hashes filled in.
+/// The page with `wasm` in it and its policy's hashes filled in. Line endings become LF, as
+/// a browser reads them, so the hashes match the script and style it runs.
 pub fn build(template: &str, wasm: &[u8]) -> Result<String, String> {
-    let page = replace_once(template, "{{WASM}}", &base64(wasm))?;
+    let page = replace_once(&template.replace("\r\n", "\n"), "{{WASM}}", &base64(wasm))?;
     let script = hash(between(&page, "<script>", "</script>")?);
     let style = hash(between(&page, "<style>", "</style>")?);
     let page = replace_once(&page, "{{SCRIPT_HASH}}", &script)?;

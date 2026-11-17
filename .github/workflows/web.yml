@@ -9,20 +9,20 @@ on:
   pull_request:
     paths:
       - .github/workflows/web.yml
+      - rust-toolchain.toml
       - web/**
       - tools/laconic-web/**
-      - tools/laconic-check/src/**
-      - tools/laconic-tools/src/web_page.rs
-      - tools/laconic-tools/src/web_page/**
+      - tools/laconic-check/**
+      - tools/laconic-tools/**
   push:
     branches: [main]
     paths:
       - .github/workflows/web.yml
+      - rust-toolchain.toml
       - web/**
       - tools/laconic-web/**
-      - tools/laconic-check/src/**
-      - tools/laconic-tools/src/web_page.rs
-      - tools/laconic-tools/src/web_page/**
+      - tools/laconic-check/**
+      - tools/laconic-tools/**
   workflow_dispatch:
 
 permissions:
@@ -50,6 +50,8 @@ jobs:
           cargo fmt --check
           cargo clippy --locked --all-targets -- -D warnings
           cargo test --locked
+      - name: Test the page builder
+        run: cargo test --locked --manifest-path tools/laconic-tools/Cargo.toml web_page
       - name: Build the page
         run: |
           set -euo pipefail
@@ -60,24 +62,31 @@ jobs:
             tools/laconic-web/target/wasm32-unknown-unknown/release/laconic_web.wasm \
             "$RUNNER_TEMP/site/index.html"
       # The page runs its sample texts on load; a blocked script or a WebAssembly that fails to
-      # load leaves the findings empty.
+      # load leaves the findings empty. Each check reads what the page rendered, not its script.
       - name: Open the page in headless Chromium
         run: |
           set -euo pipefail
           browser=$(command -v chromium || command -v chromium-browser || command -v google-chrome)
           "$browser" --headless=new --disable-gpu --no-sandbox --virtual-time-budget=10000 \
             --dump-dom "file://$RUNNER_TEMP/site/index.html" > "$RUNNER_TEMP/dom.html"
-          for wanted in '4 findings' 'us-spelling' 'number-word' 'Fails: the edit changed a protected item.'; do
+          for wanted in \
+            '<p id="lint-status" class="status fail">4 findings</p>' \
+            '<span class="rule">us-spelling</span>' \
+            '<span class="rule">number-word</span>' \
+            '<p id="preserve-status" class="status fail">Fails: the edit changed a protected item.</p>' \
+            '<li><span>dropped number: 5%</span></li>'; do
             grep -qF "$wanted" "$RUNNER_TEMP/dom.html" || {
               echo "::error::The page did not show '$wanted'"
               exit 1
             }
           done
-      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+      - if: github.event_name != 'pull_request'
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
           path: ${{ runner.temp }}/site
 
-  # Whether GitHub Pages is on; turning it on is a repository setting.
+  # Whether GitHub Pages is on with GitHub Actions as its source; turning it on is a
+  # repository setting.
   pages-enabled:
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
@@ -91,10 +100,11 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          if gh api "repos/${GITHUB_REPOSITORY}/pages" > /dev/null; then
+          source=$(gh api "repos/${GITHUB_REPOSITORY}/pages" --jq .build_type 2> /dev/null || true)
+          if [ "$source" = workflow ]; then
             echo "enabled=true" >> "$GITHUB_OUTPUT"
           else
-            echo "::notice::GitHub Pages is off, so the page is built and tested but not published."
+            echo "::notice::GitHub Pages is off or not set to GitHub Actions, so the page is built and tested but not published."
             echo "enabled=false" >> "$GITHUB_OUTPUT"
           fi
 

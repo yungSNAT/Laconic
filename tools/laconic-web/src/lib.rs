@@ -19,12 +19,16 @@ thread_local! {
 }
 
 /// Space for `len` bytes of text in `slot`, for the page to fill before its next call; null
-/// for a slot that does not exist.
+/// for a slot that does not exist or space the memory cannot hold, which leaves the slot
+/// empty.
 #[unsafe(no_mangle)]
 pub extern "C" fn input(slot: usize, len: usize) -> *mut u8 {
     INPUTS.with_borrow_mut(|inputs| match inputs.get_mut(slot) {
         Some(text) => {
-            text.clear();
+            *text = Vec::new();
+            if text.try_reserve_exact(len).is_err() {
+                return std::ptr::null_mut();
+            }
             text.resize(len, 0);
             text.as_mut_ptr()
         }
@@ -35,14 +39,14 @@ pub extern "C" fn input(slot: usize, len: usize) -> *mut u8 {
 /// Lints slot 0. Returns the report's length in bytes.
 #[unsafe(no_mangle)]
 pub extern "C" fn lint() -> usize {
-    respond(|[text, _]| lint_report(text))
+    respond(1, |texts| lint_report(texts[0]))
 }
 
 /// Checks the edit in slot 1 against the original in slot 0, as `preserve`, with `--loose`
 /// when `loose` is true. Returns the report's length in bytes.
 #[unsafe(no_mangle)]
 pub extern "C" fn preserve(loose: bool) -> usize {
-    respond(|[original, edited]| preserve_report(original, edited, loose))
+    respond(2, |texts| preserve_report(texts[0], texts[1], loose))
 }
 
 /// The last report.
@@ -51,13 +55,17 @@ pub extern "C" fn output() -> *const u8 {
     OUTPUT.with_borrow(|report| report.as_ptr())
 }
 
-/// Runs `check` on the 2 slots' texts and keeps its report, or an error when a slot is not
-/// UTF-8.
-fn respond(check: impl FnOnce([&str; 2]) -> Json) -> usize {
-    let report = INPUTS.with_borrow(|[first, second]| {
-        match (std::str::from_utf8(first), std::str::from_utf8(second)) {
-            (Ok(first), Ok(second)) => check([first, second]),
-            _ => Json::Object(vec![(
+/// Runs `check` on the texts of the first `slots` slots and keeps its report, or an error
+/// when one of them is not UTF-8.
+fn respond(slots: usize, check: impl FnOnce(&[&str]) -> Json) -> usize {
+    let report = INPUTS.with_borrow(|inputs| {
+        match inputs[..slots]
+            .iter()
+            .map(|bytes| std::str::from_utf8(bytes))
+            .collect::<Result<Vec<_>, _>>()
+        {
+            Ok(texts) => check(&texts),
+            Err(_) => Json::Object(vec![(
                 "error".into(),
                 Json::String("the text is not UTF-8".into()),
             )]),

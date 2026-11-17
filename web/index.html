@@ -57,17 +57,30 @@ li { margin: 0.25rem 0; }
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
 const byId = (id) => document.getElementById(id);
+let module;
 let wasm;
 
-// Writes each text into its slot, runs the check and parses its JSON report.
+// Writes each text into its slot, runs the check and parses its JSON report. A null slot
+// means the memory cannot hold the text.
 function call(texts, run) {
-  texts.forEach((text, slot) => {
+  for (const [slot, text] of texts.entries()) {
     const bytes = encoder.encode(text);
     const at = wasm.input(slot, bytes.length);
+    if (at === 0) return { error: "The text is too long for the checker's memory." };
     new Uint8Array(wasm.memory.buffer, at, bytes.length).set(bytes);
-  });
+  }
   const length = run();
   return JSON.parse(decoder.decode(new Uint8Array(wasm.memory.buffer, wasm.output(), length)));
+}
+
+// Runs a check; if the checker stops, says so and starts a fresh one for the next check.
+function guarded(statusId, check) {
+  try {
+    check();
+  } catch (error) {
+    show(statusId, false, "The checker stopped on this text: " + error.message);
+    WebAssembly.instantiate(module).then((instance) => { wasm = instance.exports; });
+  }
 }
 
 function show(statusId, passed, text) {
@@ -111,12 +124,15 @@ function preserve() {
 }
 
 WebAssembly.instantiate(Uint8Array.from(atob("{{WASM}}"), (c) => c.charCodeAt(0))).then(
-  ({ instance }) => {
-    wasm = instance.exports;
-    byId("lint-run").addEventListener("click", lint);
-    byId("preserve-run").addEventListener("click", preserve);
-    lint();
-    preserve();
+  (loaded) => {
+    module = loaded.module;
+    wasm = loaded.instance.exports;
+    const runLint = () => guarded("lint-status", lint);
+    const runPreserve = () => guarded("preserve-status", preserve);
+    byId("lint-run").addEventListener("click", runLint);
+    byId("preserve-run").addEventListener("click", runPreserve);
+    runLint();
+    runPreserve();
   },
   (error) => show("lint-status", false, "The checker did not load: " + error),
 );

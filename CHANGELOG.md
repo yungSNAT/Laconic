@@ -38,6 +38,7 @@ The manifests other than Claude Code's still declare plugin 0.5.0, so a build fr
 
 ### Plugin: fixed
 
+- The prose skill asks for each quotation to be kept word for word, sample sentences and examples included, and each name and term the draft uses, and for both to be compared with the draft before it finishes. It has not been measured again. In the rewrites of the AI Humanizer Benchmark's 2026-10 texts (#171) it had changed words inside sample sentences set in quotation marks and dropped a programme name; its 3 new regression cases come from those edits.
 - The always-on banner names 'normal mode' beside 'stop laconic', as the skill turns off on either, and INSTALL.md shows how to run the shell and PowerShell versions of the hook where Node is missing.
 - Claude Code installs follow each commit: `.claude-plugin/plugin.json` no longer declares a version, so `claude plugin update` stops skipping changes made since 0.5.0.
 - Validate eval inputs and record requested model metadata (#20).
@@ -87,6 +88,10 @@ The manifests other than Claude Code's still declare plugin 0.5.0, so a build fr
 - The Action lints a large repository in several `laconic-check` calls, so the Windows command-line limit no longer stops it. It counts the failing findings of all the calls against `--max-findings`, taken from `args` or the project file as `lint` takes it, so no call has to hold every file with a failing finding. A path named twice in `files` is linted once.
 - `preserve` reads 'dollars', 'euros' and 'yen' after a number, or after both bounds of a range, as its currency, so '$30 billion' to '30 billion dollars' and '$5-10' to '5-10 dollars' no longer fail, and reads every mark in the Unicode Currency Symbols block, so '₹500' to '₩500' now fails. 'Pounds' after a number is money when either text writes '£' with that number, so '£5' to '5 pounds' no longer fails or lists an added '5 lb'. Report lines change with it: a dropped '30 dollars' is now 'dropped number: $30'.
 - `preserve` reads both bounds of a range in its unit, whether written with a hyphen, an en dash, 'to', 'and' or 'or', so '45 to 60 minutes' to '45-60 minutes' or '45–60 minutes' no longer reports 'dropped quantity: 60 minute', '30 to 60 grams' to '30-60 grams' no longer reports '60 g', and '5-10 kg' to '5 to 10 g' now fails.
+
+### laconic-check: security
+
+- The deprecated Node MCP server, `mcp/server.mjs`, looks for `laconic-check` only in PATH's fully qualified entries when `LACONIC_CHECK` is not set, and reports an error naming `LACONIC_CHECK` when none holds it. Before, Node on Windows looked in the server's working directory first, as it does through a relative PATH entry such as `.` on any system, so a `laconic-check` planted in the project the client ran in ran on each call.
 
 ## [laconic-check 0.5.0] - 2026-11-13
 

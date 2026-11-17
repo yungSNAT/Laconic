@@ -497,7 +497,8 @@ fn ize_word(word: &str) -> bool {
 fn stray(dir: &Path, names: &[String], top: bool) -> Option<String> {
     for entry in fs::read_dir(dir).ok()?.flatten() {
         let path = entry.path();
-        if path.is_dir() {
+        // The entry's own type, so a symbolic link to a folder is not followed.
+        if entry.file_type().is_ok_and(|t| t.is_dir()) {
             if let Some(found) = stray(&path, names, false) {
                 return Some(found);
             }

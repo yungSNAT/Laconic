@@ -69,3 +69,5 @@ The hidden text 󠁁󠁂 is here.
 The office opens on 19th october 2026.
 
 The review is on October   19 at the office.
+
+The `oaicite` name sits in code, but this oaicite marker does not.

@@ -342,7 +342,7 @@ fn half_up(x: Num, places: usize) -> Result<String, String> {
         .strip_prefix('-')
         .map_or((false, text.as_str()), |t| (true, t));
     let (mantissa, exponent) = match text.split_once('e') {
-        Some((m, e)) => (m, e.parse::<i64>().map_err(|e| e.to_string())?),
+        Some((m, e)) => (m, e.parse::<i64>().expect("repr writes an integer exponent")),
         None => (text, 0),
     };
     let (whole, fraction) = mantissa.split_once('.').unwrap_or((mantissa, ""));

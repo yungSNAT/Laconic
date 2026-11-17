@@ -168,8 +168,11 @@ fn answers_and_style_rows_refuse_what_they_cannot_read_or_write() {
     let dir = tempfile::tempdir().unwrap();
     let w = dir.path();
     let answer = json!({"case_id": "c1", "trial": 1, "condition": "candidate", "runner": "r", "response": "x"});
-    write_rows(&w.join("responses.jsonl"), &[answer.clone()]);
-    // A folder where the answer file goes.
+    write_rows(&w.join("responses.jsonl"), std::slice::from_ref(&answer));
+    // A file where the answers folder goes, then a folder where the answer file goes.
+    fs::write(w.join("answers"), "").unwrap();
+    assert!(write_answers(w).unwrap_err().contains("answers"));
+    fs::remove_file(w.join("answers")).unwrap();
     fs::create_dir_all(w.join("answers/cold-0.txt")).unwrap();
     assert!(write_answers(w).unwrap_err().contains("cold-0.txt"));
 
@@ -204,7 +207,10 @@ fn the_style_summary_refuses_rows_it_cannot_total() {
     assert_eq!(style_summary(&[]).unwrap(), "");
     let mut no_trial = style_row("c1", "candidate");
     no_trial.as_object_mut().unwrap().remove("trial");
-    assert_eq!(style_summary(&[no_trial]).unwrap_err(), "a row has no 'trial'");
+    assert_eq!(
+        style_summary(&[no_trial]).unwrap_err(),
+        "a row has no 'trial'"
+    );
     // The other condition has no row for c2.
     let rows = [
         style_row("c1", "candidate"),
@@ -266,6 +272,12 @@ fn rewrite_steps_refuse_malformed_input() {
         &[json!({"case_id": "aihb-2026-10-2", "response": "x"})],
     );
     assert_eq!(rewrite_pairs(w).unwrap_err(), "no source text '2'");
+    // Valid input, but a file where the preserve folders go.
+    write_rows(&w.join("run-laconic.jsonl"), &[]);
+    fs::write(w.join("patina-out/1.json"), "{}").unwrap();
+    fs::write(w.join("preserve"), "").unwrap();
+    assert!(rewrite_pairs(w).unwrap_err().contains("patina-1"));
+    fs::remove_file(w.join("preserve")).unwrap();
 
     write_rows(
         &w.join("units-laconic.jsonl"),

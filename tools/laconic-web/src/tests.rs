@@ -1,0 +1,104 @@
+// Copyright 2026 Ryan Duguid
+// SPDX-License-Identifier: FSL-1.1-ALv2
+
+use laconic_check::mcp::parse;
+
+use super::*;
+
+/// Writes `bytes` into `slot` as the page does: into the `bytes.len()` bytes `input` returns,
+/// which must be the slot's own buffer.
+fn write(slot: usize, bytes: &[u8]) {
+    let space = input(slot, bytes.len());
+    assert!(!space.is_null());
+    INPUTS.with_borrow_mut(|inputs| {
+        assert_eq!(inputs[slot].as_mut_ptr(), space);
+        inputs[slot].copy_from_slice(bytes);
+    });
+}
+
+/// The report `len` bytes long that the last call left at `output`.
+fn read(len: usize) -> Json {
+    OUTPUT.with_borrow(|report| {
+        assert_eq!((report.as_ptr(), report.len()), (output(), len));
+        parse(report).unwrap()
+    })
+}
+
+#[test]
+fn lint_reports_what_laconic_check_lint_finds() {
+    let text = "We analyzed the color \u{2014} it\u{2019}s three days.\n";
+    write(0, text.as_bytes());
+    let report = read(lint());
+    let wanted: Vec<Json> = laconic_check::lint::lint(text)
+        .into_iter()
+        .map(|f| {
+            Json::Object(vec![
+                ("line".into(), Json::Number(f.line.to_string())),
+                ("column".into(), Json::Number(f.column.to_string())),
+                ("rule".into(), Json::String(f.rule.to_string())),
+                ("message".into(), Json::String(f.message)),
+            ])
+        })
+        .collect();
+    assert_eq!(wanted.len(), 4);
+    assert_eq!(
+        report,
+        Json::Object(vec![("findings".into(), Json::Array(wanted))])
+    );
+}
+
+#[test]
+fn preserve_reports_a_dropped_and_an_added_item() {
+    write(0, b"Revenue rose 5% to $47.3 million.");
+    write(1, b"Revenue rose to $47.3 billion.");
+    let Json::Object(report) = read(preserve(false)) else {
+        panic!("not an object");
+    };
+    let get = |key: &str| &report.iter().find(|(k, _)| k == key).unwrap().1;
+    assert_eq!(get("dropped"), &Json::Bool(true));
+    assert_eq!(get("added"), &Json::Bool(true));
+    let lines = laconic_check::preserve::report(
+        "Revenue rose 5% to $47.3 million.",
+        "Revenue rose to $47.3 billion.",
+        false,
+    )
+    .lines;
+    assert_eq!(
+        get("lines"),
+        &Json::Array(lines.into_iter().map(Json::String).collect())
+    );
+}
+
+#[test]
+fn text_that_is_not_utf8_is_an_error_and_a_third_slot_does_not_exist() {
+    write(0, &[0xff, 0xfe]);
+    write(1, b"");
+    assert_eq!(
+        read(lint()),
+        Json::Object(vec![(
+            "error".into(),
+            Json::String("the text is not UTF-8".into())
+        )])
+    );
+    assert!(input(2, 4).is_null());
+}
+
+#[test]
+fn lint_reads_only_its_own_slot() {
+    write(0, b"We analyzed it.");
+    write(1, &[0xff]);
+    let Json::Object(report) = read(lint()) else {
+        panic!("not an object");
+    };
+    assert_eq!(report[0].0, "findings");
+}
+
+#[test]
+fn space_the_memory_cannot_hold_is_null_and_the_slot_stays_usable() {
+    assert!(input(0, isize::MAX as usize + 1).is_null());
+    write(0, b"We analyzed it.");
+    let Json::Object(report) = read(lint()) else {
+        panic!("not an object");
+    };
+    assert_eq!(report[0].0, "findings");
+}

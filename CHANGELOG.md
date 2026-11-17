@@ -8,7 +8,7 @@ The manifests other than Claude Code's still declare plugin 0.5.0, so a build fr
 
 ### Plugin: added
 
-- Compare Laconic's compact rules with Claude Code's Concise output style and 'Answer concisely.' on the 10 held-out cases (17 November 2026), with the results in the README and the method in `evals/README.md`.
+- Compare Laconic's compact rules with Claude Code's Concise output style and 'Answer concisely.' on the 10 held-out cases (17 November 2026), judged for correctness alone with the new `evals/rubric-correctness.md` and against Laconic's own rubric, with the results in the README, the method in `evals/README.md` and the run's script and per-answer results in `evals/runs/concise-style-2026-11-17`.
 - A skills-only edition for the Claude plugin directory: `laconic-tools build-plugin-dist` builds it from `main` without the hooks, tools or MCP server, refuses any file the directory would refuse from an unverified organisation, and a workflow validates it on pull requests and publishes it to the `claude-plugin` branch at each release, when the version in `package.json` rises.
 - A listing icon for the Claude plugin directory, `.claude-plugin/icon.png`, cut from the banner's helmet: the directory build ships it and refuses any other image, or an icon that is not a complete square PNG of 512 to 2048 px under 2 MB.
 - Warn when always-on mode cannot locate the plugin (#18).

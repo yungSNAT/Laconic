@@ -803,7 +803,7 @@ mod tests {
         thread::scope(|scope| {
             scope.spawn(|| {
                 while !stop.load(Ordering::Relaxed) {
-                    Command::new("/bin/true").status().unwrap();
+                    Command::new("/bin/sh").args(["-c", ":"]).status().unwrap();
                 }
             });
             let started = std::panic::catch_unwind(|| {

@@ -363,3 +363,28 @@ fn file_uris_become_local_paths_and_others_none() {
         assert_eq!(path(uri, windows), None, "{uri}");
     }
 }
+
+#[test]
+fn a_project_rule_is_a_warning_with_its_name_and_no_reference_link() {
+    // Under the crate's target folder: scratch that only this test writes.
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("target")
+        .join(format!("lsp-rules-{}", std::process::id()));
+    fs::create_dir_all(&root).unwrap();
+    fs::write(root.join(PROJECT_FILE), "[rules]\nplain: utilise = use\n").unwrap();
+    let init = format!(
+        r#"{{"jsonrpc":"2.0","id":1,"method":"initialize","params":{{"rootUri":"{}","capabilities":{{}}}}}}"#,
+        file_uri(&root)
+    );
+    let (replies, _) = session(&[
+        &init,
+        &open(&file_uri(&root.join("a.md")), "markdown", "We utilise it."),
+    ]);
+    fs::remove_dir_all(&root).unwrap();
+    assert_eq!(published(&replies[1]), [row("project/plain", 0, 3, 4, 2)]);
+    let diagnostic = at(&replies[1], "params.diagnostics.0");
+    assert!(
+        diagnostic.get("codeDescription").is_none(),
+        "{diagnostic:?}"
+    );
+}

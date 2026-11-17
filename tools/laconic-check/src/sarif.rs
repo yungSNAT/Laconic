@@ -6,13 +6,15 @@
 
 use std::path::Path;
 
-use crate::lint::{self, Finding, RULES, RULES_URL};
+use std::rc::Rc;
+
+use crate::lint::{Finding, ProjectRule, RULES, RULES_URL, RuleRef};
 use crate::mcp::{Json, object, text};
 
 /// A rule's level: advisory findings are notes and the rest warnings, since a finding is a
 /// reason to look, not proof of a defect; `lint`'s exit status is the gate.
-fn level(rule: &lint::Rule) -> Json {
-    text(if rule.advisory { "note" } else { "warning" })
+fn level(advisory: bool) -> Json {
+    text(if advisory { "note" } else { "warning" })
 }
 
 fn message(s: &str) -> Json {
@@ -30,16 +32,26 @@ pub(crate) fn span(line: &str, column: usize, width: fn(char) -> usize) -> (usiz
 
 /// One finding in the file at `uri`, whose text on the finding's line is `line`, as a region
 /// of the character at the finding. SARIF counts columns in UTF-16 code units by default;
-/// `lint` counts characters.
-pub fn result(uri: &str, finding: Finding, line: &str) -> Json {
-    let rule = finding.rule.rule();
+/// `lint` counts characters. `project` is the project file's rules, which `log` lists after
+/// the house rules.
+pub fn result(uri: &str, finding: Finding, line: &str, project: &[Rc<ProjectRule>]) -> Json {
+    let index = match &finding.rule {
+        RuleRef::Builtin(id) => *id as usize,
+        RuleRef::Project(rule) => {
+            RULES.len()
+                + project
+                    .iter()
+                    .position(|r| r.name == rule.name)
+                    .unwrap_or(0)
+        }
+    };
     let (start, end) = span(line, finding.column, char::len_utf16);
     let (start, end) = (start + 1, end + 1);
     let number = |n: usize| Json::Number(n.to_string());
     object(vec![
-        ("ruleId", text(rule.name)),
-        ("ruleIndex", number(finding.rule as usize)),
-        ("level", level(rule)),
+        ("ruleId", text(finding.rule.name())),
+        ("ruleIndex", number(index)),
+        ("level", level(finding.rule.advisory())),
         ("message", message(&finding.message)),
         (
             "locations",
@@ -62,23 +74,37 @@ pub fn result(uri: &str, finding: Finding, line: &str) -> Json {
     ])
 }
 
-/// The log of one `lint` run: every rule, then `results`. `complete` is false when a file
-/// could not be read.
-pub fn log(results: Vec<Json>, complete: bool) -> Json {
-    let rules = RULES
-        .iter()
-        .map(|rule| {
-            let url = format!("{RULES_URL}#{}", rule.name);
-            object(vec![
-                ("id", text(rule.name)),
-                ("shortDescription", message(rule.checks)),
-                ("fullDescription", message(rule.checks)),
-                ("help", message(&format!("{} See {url}", rule.checks))),
-                ("helpUri", text(&url)),
-                ("defaultConfiguration", object(vec![("level", level(rule))])),
-            ])
-        })
-        .collect();
+/// The log of one `lint` run: every house rule and project rule, then `results`. `complete`
+/// is false when a file could not be read.
+pub fn log(results: Vec<Json>, complete: bool, project: &[Rc<ProjectRule>]) -> Json {
+    let house = RULES.iter().map(|rule| {
+        let url = format!("{RULES_URL}#{}", rule.name);
+        object(vec![
+            ("id", text(rule.name)),
+            ("shortDescription", message(rule.checks)),
+            ("fullDescription", message(rule.checks)),
+            ("help", message(&format!("{} See {url}", rule.checks))),
+            ("helpUri", text(&url)),
+            (
+                "defaultConfiguration",
+                object(vec![("level", level(rule.advisory))]),
+            ),
+        ])
+    });
+    let own = project.iter().map(|rule| {
+        let description = rule.description();
+        object(vec![
+            ("id", text(&rule.name)),
+            ("shortDescription", message(&description)),
+            ("fullDescription", message(&description)),
+            ("help", message(&description)),
+            (
+                "defaultConfiguration",
+                object(vec![("level", level(false))]),
+            ),
+        ])
+    });
+    let rules = house.chain(own).collect();
     object(vec![
         (
             "$schema",

@@ -206,9 +206,9 @@ On 14 November 2026, Laconic's prose skill and [humanizer](https://github.com/bl
 
 Under Opus 5.5 Laconic lost units in more rewrites than `humanizer` (18 against 10) and lost more units in every group: numbers and dates 9 of 440 against 5, names 12 of 164 against 9 and quotations 5 of 70 against 0. Under `gpt-6.1-sol` the 2 skills tied. Neither interval excludes 0, so neither round shows a clear difference. Laconic's rewrites were shorter in both rounds: 0.94 and 0.90 of the source's words, against 1.01 and 0.93.
 
-On the 33 texts of the 2026-10 cycle, rewritten once each by Claude Opus 5.5 on 17 November 2026, Laconic's skill altered a unit in 4 of the 20 documents that hold one, against 1 for avoid-ai-writing and for `work-humanizer`, 0 for patina with `--verify`, 5 for `humanizer` and 8 for the request alone; the 11 commercial humanisers altered 7 to 13 ([by humaniser](evals/README.md#by-humaniser)).
-
 Limits: the checker matches units and can flag a harmless paraphrase of a quotation; it does not see changed conditions, negations or invented claims, so this is not a full test of factual fidelity. Of the 99 texts, 32 have no unit it can check, so the rates cover 134 rewrites per skill. Each round used one model to rewrite, 3 texts to a fresh context; the instructions were supplied as text, not as installed plugins. The Opus round was added after the Codex round, with the method unchanged. Laconic's author chose the rival, wrote the method and ran both rounds. [evals/README.md](evals/README.md#public-set-fact-check) gives the pinned revisions.
+
+On the 33 texts of the 2026-10 cycle, rewritten once each, one text a call, by Claude Opus 5.5 on 17 November 2026, Laconic's skill altered a unit in 5 of the 20 documents that hold one, as did `humanizer`, against 1 for avoid-ai-writing and for `work-humanizer`, 0 for patina with `--verify` and 8 for the request alone; the 11 commercial humanisers altered 7 to 13. One rewrite per text is too few to show a difference between the skills ([by humaniser](evals/README.md#by-humaniser)).
 
 ## Checker
 

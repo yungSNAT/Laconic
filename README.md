@@ -58,7 +58,7 @@ Restart the agent, then type `/laconic`. It stays on for the session until you s
 
 ## When to choose something else
 
-- **Token cost comes first:** [caveman](https://github.com/JuliusBrussee/caveman) is built for that and also compresses what the agent reads. Laconic is not built for it: session mode cost about 27% more per task than its compact rules. The 2 have not been compared on token cost.
+- **Token cost comes first:** [caveman](https://github.com/JuliusBrussee/caveman) is built for that and also compresses what the agent reads, and [Chisle](https://github.com/JayPokale/Chisle) writes fewer output tokens still. On Laconic's 47 cases ([token cost](#token-cost-against-caveman-and-chisle), 17 November 2026), Laconic's compact rules wrote 14% more output tokens than caveman and 45% more than Chisle; an answer cost 11% less than with caveman (whose rules are longer to read) and about the same as with Chisle. Session mode cost about 27% more per task than the compact rules.
 - **You need another variety of English:** Laconic writes Australian English only. [LanguageTool](https://github.com/languagetool-org/languagetool) checks grammar and style in Australian, British, Canadian, New Zealand, South African and US English, after the text is written.
 - **You accept a rewrite that adds detail:** [humanizer](https://github.com/blader/humanizer) 4.0.0 (10 November 2026) tells the model, where a text is generic, to 'add a specific detail you know to be true'. Laconic adds no facts, and `laconic-check preserve --strict` fails an edit that adds a figure, URL, quotation or other item it protects.
 - **You want only the writing guidance:** [No AI Slop](https://github.com/petergyang/no-ai-slop), which Laconic's writing guidance builds on, has it without the response rules or Australian English.
@@ -165,6 +165,28 @@ Laconic beats the plain instruction by 0.56 weighted. The changes are neutral on
 </details>
 
 Limits: 18 to 90 answers per setup from one generating model; the cases are in `evals/cases.jsonl` and the rubric in `evals/rubric.md`. These cases also guided the rule wording, so the scores are not a held-out test; the next public comparison will use the 10 frozen cases in `evals/holdout-cases.jsonl`, written on 1 November 2026 and not used to tune the rules. Serial commas remain the most common slip.
+
+### Token cost against caveman and Chisle
+
+On 17 November 2026, 3 rule sets answered all 47 cases in `evals/cases.jsonl`, 2 trials each, generated and blind-judged together by Claude Opus 5.5 (`claude-opus-5-5`, high effort) in Claude Code 2.1.325 with no tools: Laconic's compact rules, [caveman](https://github.com/JuliusBrussee/caveman) 4.1.0's `skills/caveman/SKILL.md` and [Chisle](https://github.com/JayPokale/Chisle) 3.12.1's `skills/chisle/SKILL.md`, each appended to the system prompt without its front matter.
+
+| Measure | Laconic | caveman | Chisle |
+| --- | --- | --- | --- |
+| Mean output tokens, thinking included | 745 | 655 | 516 |
+| Laconic's output tokens against it (95% interval) | | 1.14 times (1.05 to 1.27) | 1.45 times (1.27 to 1.68) |
+| Mean input tokens | 3,218 | 4,285 | 3,862 |
+| Mean cost per answer, as Claude Code reports it | US$0.028 | US$0.031 | US$0.026 |
+| Laconic's cost against it (95% interval) | | 0.89 times (0.83 to 0.94) | 1.05 times (0.96 to 1.15) |
+| Mean answer length (characters) | 1,297 | 1,198 | 977 |
+| Weighted score, house rubric (1 to 5) | 4.63 | 4.11 | 4.11 |
+| Correctness (1 to 5) | 4.64 | 3.50 | 3.43 |
+| Blocking findings | 8 | 43 | 44 |
+| Regex checks passed | 18 of 18 | 16 of 18 | 16 of 18 |
+| Answers with no `laconic-check` findings | 70 of 94 | 36 of 94 | 39 of 94 |
+
+Laconic wrote the most: 14% more output tokens than caveman and 45% more than Chisle. Its rules are shorter to read, so an answer cost 11% less than with caveman and about the same as with Chisle. Neither rival asks for Australian English or the house mechanics the rubric scores, and most of their blocking findings are on those: serial commas, double quotation marks, numbers written as words and US spelling. On substance, both rivals gave typical timeframes in both answers to the case that forbids them, where Laconic gave none; Laconic's own blocking findings include an answer that would not edit a file it was told it could reach and 2 that added a limits disclaimer the task forbade.
+
+Limits: one model, judged by the same model family against Laconic's rubric, on cases that also guided Laconic's rule wording. Token and cost figures are Claude Code's reports for each call, and cost depends on each call's prompt cache. caveman and Chisle publish figures from their own prompts and models, which this run does not reproduce. The intervals resample the 47 cases (10,000 resamples, seed 2282). The responses, scores and run scripts are kept by Laconic's author and are not stored here.
 
 ### Against other humanisers
 

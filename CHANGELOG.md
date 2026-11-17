@@ -8,6 +8,7 @@ The manifests other than Claude Code's still declare plugin 0.5.0, so a build fr
 
 ### Plugin: added
 
+- Compare the token cost and judged quality of Laconic's compact rules with caveman 4.1.0 and Chisle 3.12.1 on the 47 evaluation cases (17 November 2026), in the README.
 - A skills-only edition for the Claude plugin directory: `laconic-tools build-plugin-dist` builds it from `main` without the hooks, tools or MCP server, refuses any file the directory would refuse from an unverified organisation, and a workflow validates it on pull requests and publishes it to the `claude-plugin` branch at each release, when the version in `package.json` rises.
 - A listing icon for the Claude plugin directory, `.claude-plugin/icon.png`, cut from the banner's helmet: the directory build ships it and refuses any other image, or an icon that is not a complete square PNG of 512 to 2048 px under 2 MB.
 - Warn when always-on mode cannot locate the plugin (#18).

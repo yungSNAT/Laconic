@@ -164,7 +164,30 @@ Laconic beats the plain instruction by 0.56 weighted. The changes are neutral on
 
 </details>
 
-Limits: 18 to 90 answers per setup from one generating model; the cases are in `evals/cases.jsonl` and the rubric in `evals/rubric.md`. These cases also guided the rule wording, so the scores are not a held-out test; the next public comparison will use the 10 frozen cases in `evals/holdout-cases.jsonl`, written on 1 November 2026 and not used to tune the rules. Serial commas remain the most common slip.
+Limits: 18 to 90 answers per setup from one generating model; the cases are in `evals/cases.jsonl` and the rubric in `evals/rubric.md`. These cases also guided the rule wording, so the scores are not a held-out test; the comparison with Claude Code's Concise style below uses the 10 frozen cases in `evals/holdout-cases.jsonl`, written on 1 November 2026 and not used to tune the rules. Serial commas remain the most common slip.
+
+### Against Claude Code's Concise style
+
+On 17 November 2026, 3 setups answered the 10 held-out cases, 3 trials each, generated and judged by Claude Opus 5.5 (`claude-opus-5-5`, high effort) in Claude Code 2.1.325 with no tools: Laconic's compact rules, Claude Code's built-in Concise output style (`"outputStyle": "Concise"`) and the plain instruction 'Answer concisely.'. The judge saw a case's 3 answers together under shuffled letters, blind to the setups' names though not to their style. It judged them twice: for correctness alone, against `evals/rubric-correctness.md`, which tells it not to score style; and against Laconic's own rubric, `evals/rubric.md`, after agreeing with all 10 of its hand-labelled calibration answers.
+
+| Measure | Laconic | Concise style | 'Answer concisely.' |
+| --- | --- | --- | --- |
+| Correctness, style excluded (1 to 5) | 4.80 | 4.27 | 4.47 |
+| Difference from the Concise style (95% interval) | +0.53 (0.00 to +1.17) | | +0.20 (−0.13 to +0.53) |
+| Blocking findings, style excluded | 0 | 4 | 1 |
+| Weighted score, Laconic's own rubric (1 to 5) | 4.69 | 4.06 | 4.11 |
+| Difference from the Concise style (95% interval) | +0.63 (+0.29 to +1.00) | | +0.05 (−0.10 to +0.22) |
+| Blocking findings, Laconic's own rubric | 1 | 13 | 10 |
+| Answers with no `laconic-check` 0.5.0 findings | 24 of 30 | 16 of 30 | 13 of 30 |
+| Regex checks passed | 9 of 12 | 9 of 12 | 9 of 12 |
+| Mean answer length (characters) | 782 | 614 | 627 |
+| Mean output tokens, thinking included | 475 | 327 | 298 |
+| Mean cost per answer, one cold call, as Claude Code reports it | US$0.022 | US$0.019 | US$0.016 |
+| Laconic's cost against it (95% interval) | | 1.18 times (1.07 to 1.29) | 1.39 times (1.30 to 1.50) |
+
+Laconic's own rubric scores Australian English and the house mechanics, which only Laconic asks for, and the judge applied them to correctness and blocking findings as well as to the weighted score, so of the judged rows only the first 3 are neutral on style. Judged for correctness alone, Laconic scored 0.53 higher than the Concise style, but on 10 cases the interval reaches no difference, so this is not a clear lead; Laconic had no blocking finding against its 4. The first judging's notes record that the Concise style gave the wrong weekday for 26 or 28 November 2026 in 2 of 3 payroll emails and buried the deadline in the third, claimed test coverage the task did not establish in 2 of 3 reviewer notes and misquoted the audited text once; 'Answer concisely.' made similar slips. Laconic wrote 46% more output tokens than the Concise style and cost 18% more per answer. All 3 setups kept the Style Manual's en dash in '2026–27', where Laconic's rules ask for the house hyphen, so each failed that case's regex check.
+
+Limits: 30 answers per setup from one model, which also judged them, on cases Laconic's author wrote; the style-excluded judging had no calibration set. Each interval resamples the 10 cases (10,000 resamples, seed 2282). Each call wrote its prompt to the prompt cache, so the cost rows are for single cold calls; with the rules cached, as in a session, Laconic's extra output would probably weigh more, though this run did not measure it. Claude Code and its Concise style are built for software engineering sessions, and most of these cases are writing and advice tasks. The run script, the per-answer scores, token counts and costs, and the script that recomputes this table are in [`evals/runs/concise-style-2026-11-17`](evals/runs/concise-style-2026-11-17/); the answers are not stored.
 
 ### Against other humanisers
 

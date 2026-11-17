@@ -40,7 +40,7 @@ def pick(run, cond):
 
 def interval(stat, cases):
     # A seeded generator, so that the published intervals can be recomputed; not for secrets.
-    rng = random.Random(2282)  # nosec B311 # noqa: S311
+    rng = random.Random(2282)  # nosec B311
     draws = sorted(stat([rng.choice(cases) for _ in cases]) for _ in range(10000))
     return stat(cases), draws[250], draws[9750]
 

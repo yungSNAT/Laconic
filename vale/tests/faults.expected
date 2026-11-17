@@ -1,0 +1,36 @@
+faults.md:3:23:Laconic.us-spelling:Australian form: write 'colour', not 'color'.
+faults.md:5:16:Laconic.us-spelling:Australian form: write 'centre', not 'center'.
+faults.md:7:5:Laconic.us-spelling:Australian form: write 'catalogue', not 'catalog'.
+faults.md:9:10:Laconic.us-spelling:Australian form: write 'organised', not 'organized'.
+faults.md:11:10:Laconic.us-spelling:Australian form: write 'analysed', not 'analyzed'.
+faults.md:13:5:Laconic.us-spelling:Australian form: write 'sceptical', not 'skeptical'.
+faults.md:15:16:Laconic.us-spelling:Australian form: write 'per cent', not 'percent'.
+faults.md:17:36:Laconic.word-choice:The house style prefers 'whilst' to 'while'.
+faults.md:19:16:Laconic.word-choice:The house style prefers 'amongst' to 'among'.
+faults.md:21:10:Laconic.double-quotes:Double quotation marks in prose: use single marks.
+faults.md:23:22:Laconic.symbol-space:No space between a figure and its symbol: write 12% and $27.99.
+faults.md:25:20:Laconic.symbol-space:No space between a figure and its symbol: write 12% and $27.99.
+faults.md:27:28:Laconic.em-dash:Em dash in original prose.
+faults.md:29:12:Laconic.hyphen:Write 'open source', not 'open-source'.
+faults.md:31:4:Laconic.hyphen:Write 'emailed', not 'e-mailed'.
+faults.md:33:20:Laconic.number-word:'three': use the numeral; words only at the start of a sentence.
+faults.md:35:26:Laconic.date:Write dates as 19 October 2026, and decades as 1980s.
+faults.md:37:24:Laconic.date:Write dates as 19 October 2026, and decades as 1980s.
+faults.md:39:21:Laconic.date:Write dates as 19 October 2026, and decades as 1980s.
+faults.md:41:34:Laconic.date:Write dates as 19 October 2026, and decades as 1980s.
+faults.md:43:22:Laconic.date:Write dates as 19 October 2026, and decades as 1980s.
+faults.md:45:21:Laconic.time:Write times as 9:30 am or 9 am.
+faults.md:47:26:Laconic.time:Write times as 9:30 am or 9 am.
+faults.md:49:16:Laconic.latin:Latin abbreviation: write 'for example' or 'that is'.
+faults.md:51:19:Laconic.closer:Chatbot phrase 'Hope this helps'.
+faults.md:53:19:Laconic.stock-phrase:Stock phrase 'Bottom line:': state the point directly.
+faults.md:55:11:Laconic.stacked-hedge:Stacked hedge 'could potentially': keep one qualifier at the confidence the source supports.
+faults.md:57:1:Laconic.staged-contrast:Staged contrast ('not X, it's Y'): state what it is.
+faults.md:59:17:Laconic.staged-contrast:Staged contrast ('not X, it's Y'): state what it is.
+faults.md:61:1:Laconic.reveal-question:Question-and-answer reveal: state the answer directly.
+faults.md:63:18:Laconic.residue:Chat-tool residue or a hidden character.
+faults.md:65:43:Laconic.residue:Chat-tool residue or a hidden character.
+faults.md:67:17:Laconic.residue:Chat-tool residue or a hidden character.
+faults.md:69:26:Laconic.date:Write dates as 19 October 2026, and decades as 1980s.
+faults.md:71:18:Laconic.date:Write dates as 19 October 2026, and decades as 1980s.
+faults.md:73:43:Laconic.residue:Chat-tool residue or a hidden character.

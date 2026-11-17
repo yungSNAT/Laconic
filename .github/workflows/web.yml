@@ -1,0 +1,153 @@
+name: web
+
+# Builds the browser checker: tools/laconic-web (lint and preserve) as WebAssembly, put into
+# web/index.html as one file whose content security policy blocks every request. Tests the
+# crate, then opens the page in headless Chromium and checks that it lints and checks its
+# sample texts and recovers when the checker stops. On main, publishes the page with GitHub Pages once Pages is turned on with
+# GitHub Actions as its source; until then the publish job is skipped.
+on:
+  pull_request:
+    paths:
+      - .github/workflows/web.yml
+      - rust-toolchain.toml
+      - web/**
+      - tools/laconic-web/**
+      - tools/laconic-check/**
+      - tools/laconic-tools/**
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/web.yml
+      - rust-toolchain.toml
+      - web/**
+      - tools/laconic-web/**
+      - tools/laconic-check/**
+      - tools/laconic-tools/**
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install the Rust toolchain rust-toolchain.toml pins
+        run: |
+          rustup toolchain install
+          rustup target add wasm32-unknown-unknown
+      - name: Format, lint and test laconic-web
+        working-directory: tools/laconic-web
+        run: |
+          cargo fmt --check
+          cargo clippy --locked --all-targets -- -D warnings
+          cargo test --locked
+      - name: Test the page builder
+        run: cargo test --locked --manifest-path tools/laconic-tools/Cargo.toml web_page
+      - name: Build the page
+        run: |
+          set -euo pipefail
+          cargo build --locked --release --target wasm32-unknown-unknown \
+            --manifest-path tools/laconic-web/Cargo.toml
+          mkdir -p "$RUNNER_TEMP/site"
+          cargo run --locked --quiet --manifest-path tools/laconic-tools/Cargo.toml -- web-page \
+            tools/laconic-web/target/wasm32-unknown-unknown/release/laconic_web.wasm \
+            "$RUNNER_TEMP/site/index.html"
+      # The page runs its sample texts on load; a blocked script or a WebAssembly that fails to
+      # load leaves the findings empty. Each check reads what the page rendered, not its script.
+      - name: Open the page in headless Chromium
+        run: |
+          set -euo pipefail
+          browser=$(command -v chromium || command -v chromium-browser || command -v google-chrome)
+          # expect <page> <text>...: fails unless the page, as Chromium renders it, shows each text.
+          expect() {
+            page=$1
+            shift
+            "$browser" --headless=new --disable-gpu --no-sandbox --virtual-time-budget=10000 \
+              --dump-dom "file://$page" > "$page.dom"
+            for wanted in "$@"; do
+              grep -qF "$wanted" "$page.dom" || {
+                echo "::error::$(basename "$page") did not show '$wanted'"
+                exit 1
+              }
+            done
+          }
+          expect "$RUNNER_TEMP/site/index.html" \
+            '<p id="lint-status" class="status fail">4 findings</p>' \
+            '<span class="rule">us-spelling</span>' \
+            '<span class="rule">number-word</span>' \
+            '<p id="preserve-status" class="status fail">Fails: the edit changed a protected item.</p>' \
+            '<li><span>dropped number: 5%</span></li>'
+          # variant <name> <sed script>: the page built from web/index.html with a lint that
+          # throws, as a trap in the checker would.
+          variant() {
+            sed -e "$2" "$RUNNER_TEMP/template.html" > web/index.html
+            cargo run --locked --quiet --manifest-path tools/laconic-tools/Cargo.toml -- web-page \
+              tools/laconic-web/target/wasm32-unknown-unknown/release/laconic_web.wasm \
+              "$RUNNER_TEMP/$1.html"
+          }
+          cp web/index.html "$RUNNER_TEMP/template.html"
+          # The startup lint throws: the startup preserve must run on a fresh instance.
+          variant restart '/^function lint() {$/a if (!window.first) { window.first = wasm; throw new Error("injected"); }
+          /^function preserve() {$/a document.title = wasm === window.first ? "old instance" : "new instance";'
+          # A second lint throws: the first lint's findings must go.
+          variant clear '/^function lint() {$/a if ((window.lints = (window.lints || 0) + 1) === 2) throw new Error("injected");
+          /^    runPreserve();$/a runLint();'
+          cp "$RUNNER_TEMP/template.html" web/index.html
+          expect "$RUNNER_TEMP/restart.html" \
+            '<title>new instance</title>' \
+            '<p id="lint-status" class="status fail">The checker stopped on this text: injected</p>' \
+            '<p id="preserve-status" class="status fail">Fails: the edit changed a protected item.</p>'
+          expect "$RUNNER_TEMP/clear.html" \
+            '<p id="lint-status" class="status fail">The checker stopped on this text: injected</p>' \
+            '<ol id="lint-findings"></ol>'
+      - if: github.event_name != 'pull_request'
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: ${{ runner.temp }}/site
+
+  # Whether GitHub Pages is on with GitHub Actions as its source; turning it on is a
+  # repository setting.
+  pages-enabled:
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      pages: read
+    outputs:
+      enabled: ${{ steps.check.outputs.enabled }}
+    steps:
+      - id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          source=$(gh api "repos/${GITHUB_REPOSITORY}/pages" --jq .build_type 2> /dev/null || true)
+          if [ "$source" = workflow ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::GitHub Pages is off or not set to GitHub Actions, so the page is built and tested but not published."
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  publish:
+    needs: [build, pages-enabled]
+    if: needs.pages-enabled.outputs.enabled == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      pages: write
+      id-token: write # deploy-pages proves the run with an OIDC token; no stored token.
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - id: deploy
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1

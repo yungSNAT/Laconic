@@ -452,7 +452,7 @@ The Codecov badge measures `laconic-evals`, the evaluation harness in `tools/lac
 cargo test --manifest-path tools/laconic-tools/Cargo.toml
 cargo test --manifest-path tools/laconic-evals/Cargo.toml
 cargo run --quiet --locked --manifest-path tools/laconic-evals/Cargo.toml -- validate
-python3 -m unittest discover -s tests -v
+cargo test --manifest-path tools/laconic-check/Cargo.toml
 ```
 
 [CONTRIBUTING.md](CONTRIBUTING.md) covers verification, evaluations and the release gate.

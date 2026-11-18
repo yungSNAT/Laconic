@@ -1,8 +1,8 @@
 name: tests
 
 # Runs the repository contract tests in laconic-tools, laconic-check's tests and
-# its lint of Laconic's own prose, laconic-evals' tests with their line coverage, and
-# the Python suite; and checks the .cursor copy of the skills. The other workflows each
+# its lint of Laconic's own prose, and laconic-evals' tests with their line coverage;
+# and checks the .cursor copy of the skills. The other workflows each
 # cover one layer; this catches the rest (OpenCode plugin, manifests, skills, CI
 # guards, the evaluation harness, judge and benchmarks in laconic-evals).
 on:
@@ -27,9 +27,6 @@ jobs:
           persist-credentials: false
       - name: Install the Rust toolchain rust-toolchain.toml pins
         run: rustup toolchain install
-      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
-        with:
-          python-version: "3.x"
       # unittest is the only required check, so laconic-check's format, lints, tests and prose
       # lint, and the .cursor copy check, block here.
       - name: Format, lint and test laconic-check
@@ -45,7 +42,7 @@ jobs:
           cargo fmt --check
           cargo clippy --locked --all-targets -- -D warnings
           cargo test --locked
-      # Without the binary, tests/test_mcp_server.py would skip.
+      # laconic-evals' lint test runs this build.
       - name: Build laconic-check
         run: cargo build --locked --manifest-path tools/laconic-check/Cargo.toml
       - name: Format and lint laconic-evals
@@ -88,8 +85,6 @@ jobs:
             echo "::error::.cursor copy is out of sync. Run: rm -rf .cursor/skills && cp -R skills .cursor/skills"
             exit 1
           }
-      - name: Unit tests
-        run: python -m unittest discover -s tests -v
 
   # Whether a pull request changes tools/ or this workflow, from the merge commit's first parent.
   changes:

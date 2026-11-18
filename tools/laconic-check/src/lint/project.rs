@@ -1,5 +1,5 @@
 // Copyright 2026 Ryan Duguid
-// SPDX-License-Identifier: FSL-1.1-ALv2
+// SPDX-License-Identifier: Apache-2.0
 
 //! A project's own rules, from the `[rules]` section of its `.laconic-check` file: phrases it
 //! wants replaced or never used. They run on the same masked paragraphs as the house rules,

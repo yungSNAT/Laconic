@@ -1,5 +1,5 @@
 // Copyright 2026 Ryan Duguid
-// SPDX-License-Identifier: FSL-1.1-ALv2
+// SPDX-License-Identifier: Apache-2.0
 
 //! Package manifests for a laconic-check release, written from the release's SHA-256 files:
 //! a Scoop manifest, a Homebrew formula, the 3 winget manifest files, the MCP bundle's
@@ -11,7 +11,7 @@ use std::fs;
 use std::path::Path;
 
 const REPO: &str = "https://github.com/yungSNAT/Laconic";
-const LICENSE: &str = "FSL-1.1-ALv2";
+const LICENSE: &str = "Apache-2.0";
 /// Homebrew allows 80 characters and the registry 100.
 const SUMMARY: &str = "Flags Australian English and house-style candidates in Markdown prose";
 const _: () = assert!(SUMMARY.len() <= 80);

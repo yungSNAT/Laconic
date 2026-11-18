@@ -1,5 +1,5 @@
 // Copyright 2026 Ryan Duguid
-// SPDX-License-Identifier: FSL-1.1-ALv2
+// SPDX-License-Identifier: Apache-2.0
 
 //! Top-level options: `--version` and `--help` succeed on standard output; anything else
 //! unknown is a usage error on standard error. Also `lsp`'s and `hook`'s exit statuses.

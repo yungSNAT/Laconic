@@ -2,7 +2,7 @@ laconic-check calibration corpus
 
 These files are human-written Australian Government prose that
 src/seeded_faults.rs lints to measure false findings. They are test data, not
-part of the Laconic skills, and neither FSL-1.1-ALv2 nor the MIT License
+part of the Laconic skills, and neither Apache-2.0 nor the MIT License
 applies to them.
 
 Each file is based on a Productivity Commission report, copyright

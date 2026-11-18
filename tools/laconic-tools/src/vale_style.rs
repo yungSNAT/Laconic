@@ -1,5 +1,5 @@
 // Copyright 2026 Ryan Duguid
-// SPDX-License-Identifier: FSL-1.1-ALv2
+// SPDX-License-Identifier: Apache-2.0
 
 //! `laconic-tools vale-style [--check]`: writes `vale/Laconic/`, a Vale style generated from
 //! `laconic-check`'s rule table and word lists, so a Vale user gets the rules a regular

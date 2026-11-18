@@ -1,5 +1,5 @@
 // Copyright 2026 Ryan Duguid
-// SPDX-License-Identifier: FSL-1.1-ALv2
+// SPDX-License-Identifier: Apache-2.0
 
 //! Offline guards for third-party CLI installation in load checks, pinned actions, Dependabot
 //! coverage and the absence of pip installs. Replaces `tests/test_ci_installs.py`, with its

@@ -1,5 +1,5 @@
 // Copyright 2026 Ryan Duguid
-// SPDX-License-Identifier: FSL-1.1-ALv2
+// SPDX-License-Identifier: Apache-2.0
 
 //! `lint`'s project settings, the `.laconic-check` file, which the command line, the MCP
 //! server and the language server all apply.

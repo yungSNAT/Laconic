@@ -1,5 +1,5 @@
 // Copyright 2026 Ryan Duguid
-// SPDX-License-Identifier: FSL-1.1-ALv2
+// SPDX-License-Identifier: Apache-2.0
 
 //! Protected items an edit must keep: numbers, quantities, dated months, day names, inline code,
 //! URLs, quotations and the words that carry negation, modality, certainty, condition, order and

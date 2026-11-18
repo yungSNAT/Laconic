@@ -2,7 +2,7 @@
 name: laconic
 description: 'Concise, answer-first output in correct Australian English. Leads with the answer, then justifies it; marks unverified claims as unverified; cuts preamble, recaps, closers and AI writing patterns without losing substance. Also writes, edits and audits prose. Invoke with /laconic; stays on until you say ''stop laconic''.'
 disable-model-invocation: true
-license: FSL-1.1-ALv2 AND MIT
+license: Apache-2.0 AND MIT
 allowed-tools:
   - Bash(laconic-check lint --warn -)
   - mcp__laconic-check__lint

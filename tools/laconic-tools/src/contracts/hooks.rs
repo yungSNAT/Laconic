@@ -1,5 +1,5 @@
 // Copyright 2026 Ryan Duguid
-// SPDX-License-Identifier: FSL-1.1-ALv2
+// SPDX-License-Identifier: Apache-2.0
 
 //! The always-on hooks in `hooks/`: each runtime stays silent without the opt-in flag, strips
 //! frontmatter the same way, and the shared Claude and Codex launcher runs the Node hook.

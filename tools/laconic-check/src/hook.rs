@@ -1,5 +1,5 @@
 // Copyright 2026 Ryan Duguid
-// SPDX-License-Identifier: FSL-1.1-ALv2
+// SPDX-License-Identifier: Apache-2.0
 
 //! `laconic-check hook`: a Stop hook for Claude Code and Codex. When the agent is about to end
 //! its turn, it lints the repository's uncommitted Markdown and, if `lint` would fail, asks the

@@ -1,5 +1,5 @@
 // Copyright 2026 Ryan Duguid
-// SPDX-License-Identifier: FSL-1.1-ALv2
+// SPDX-License-Identifier: Apache-2.0
 
 //! `laconic-tools calibrate`: lints the human-written articles of an outside corpus and writes
 //! each rule's counts to `tools/laconic-check/tests/outside-corpus.tsv`, which the rule reference

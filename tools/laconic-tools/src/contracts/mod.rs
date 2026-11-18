@@ -1,5 +1,5 @@
 // Copyright 2026 Ryan Duguid
-// SPDX-License-Identifier: FSL-1.1-ALv2
+// SPDX-License-Identifier: Apache-2.0
 
 //! Repository contract tests: hooks, OpenCode plugin, manifests, skills, install docs and
 //! CI supply-chain guards. Ported from the Python `tests/test_*.py` files with the same

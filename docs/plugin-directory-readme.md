@@ -15,6 +15,6 @@ The full plugin on GitHub adds the `laconic-check` checker and an always-on mode
 
 ## Licence
 
-Ryan Duguid's work is licensed under FSL-1.1-ALv2; see `LICENSE`. Portions derive from i-have-adhd and the other MIT-licensed projects listed in `NOTICE`, and remain under the MIT License. Each skill folder carries its own `LICENSE` and `NOTICE`.
+Ryan Duguid's work is licensed under Apache-2.0; see `LICENSE`. Portions derive from i-have-adhd and the other MIT-licensed projects listed in `NOTICE`, and remain under the MIT License. Each skill folder carries its own `LICENSE` and `NOTICE`.
 
 Report security problems as [SECURITY.md](https://github.com/yungSNAT/Laconic/blob/main/SECURITY.md) describes.

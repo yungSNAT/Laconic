@@ -8,6 +8,6 @@
   "bin": "laconic-check.exe",
   "description": "Flags Australian English and house-style candidates in Markdown prose, and checks that an edit kept numbers, code, URLs and negations.",
   "homepage": "https://github.com/yungSNAT/Laconic",
-  "license": "FSL-1.1-ALv2",
+  "license": "Apache-2.0",
   "version": "1.2.3"
 }

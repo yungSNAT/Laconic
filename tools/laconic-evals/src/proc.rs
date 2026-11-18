@@ -1,5 +1,5 @@
 // Copyright 2026 Ryan Duguid
-// SPDX-License-Identifier: FSL-1.1-ALv2
+// SPDX-License-Identifier: Apache-2.0
 
 //! Child processes as Python's `subprocess.run` ran them: an argument list with no shell,
 //! captured output, an optional working directory and timeout, and a choice of what the child

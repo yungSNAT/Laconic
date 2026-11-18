@@ -1,21 +1,16 @@
 Laconic
 Copyright 2026 Ryan Duguid (https://github.com/ryanduguid)
 
-Ryan Duguid's contributions are licensed under the Functional Source
-License, Version 1.1, ALv2 Future License (FSL-1.1-ALv2); see LICENSE.
-Retained third-party material remains under its own licence, as stated below.
-
-For each version licensed under FSL-1.1-ALv2, an additional licence under the
-Apache License, Version 2.0 becomes effective on the second anniversary of the
-date that version was made available.
+Ryan Duguid's contributions are licensed under the Apache License,
+Version 2.0; see LICENSE. Retained third-party material remains under its
+own licence, as stated below.
 
 Versions made available before this change remain available under the
-licences they were released with.
-
-Redistribution under FSL-1.1-ALv2 requires including its terms or a link to
-them and keeping the copyright notices supplied with the software.
-Redistribution under another applicable licence follows that licence's
-conditions.
+licences they were released with: Ryan Duguid's contributions to them under
+the Functional Source License, Version 1.1, ALv2 Future License
+(FSL-1.1-ALv2), each with an additional Apache License, Version 2.0 licence
+that becomes effective on the second anniversary of the date that version
+was made available.
 
 This skill is part of Laconic (https://github.com/yungSNAT/laconic). Keep this
 file and LICENSE with the skill.

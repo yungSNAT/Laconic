@@ -1,5 +1,5 @@
 // Copyright 2026 Ryan Duguid
-// SPDX-License-Identifier: FSL-1.1-ALv2
+// SPDX-License-Identifier: Apache-2.0
 
 //! `laconic-tools web-page <wasm> <out>`: builds the browser checker, one HTML file with no
 //! other files to fetch. It puts the WebAssembly build of `tools/laconic-web` into the page

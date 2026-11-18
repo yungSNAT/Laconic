@@ -1,5 +1,5 @@
 // Copyright 2026 Ryan Duguid
-// SPDX-License-Identifier: FSL-1.1-ALv2
+// SPDX-License-Identifier: Apache-2.0
 
 //! A possible reversal: a sentence of the original negates a claim ('is not cast') and a
 //! sentence of the edit states it without a negation ('is cast'). Dropping the negated half of

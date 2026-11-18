@@ -1,5 +1,5 @@
 // Copyright 2026 Ryan Duguid
-// SPDX-License-Identifier: FSL-1.1-ALv2
+// SPDX-License-Identifier: Apache-2.0
 
 //! laconic-check's `lint` and `preserve` for the browser page in `web/`, compiled to
 //! WebAssembly with no dependencies and no generated bindings. The page writes each text as

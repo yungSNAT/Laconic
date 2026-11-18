@@ -1,0 +1,3 @@
+{"runner": "work", "condition": "candidate", "case_id": "aihb-2026-10-103", "trial": 1, "response": "Sites closed.", "usage": {"output_tokens": 53}, "cost_usd": 0.052000000000000005}
+{"runner": "work", "condition": "candidate", "case_id": "aihb-2026-10-101", "trial": 1, "response": "Reopening 2027.", "usage": {"output_tokens": 63}, "cost_usd": 0.083}
+{"runner": "work", "condition": "candidate", "case_id": "aihb-2026-10-102", "trial": 1, "response": "Gaps.", "usage": {"output_tokens": 73}, "cost_usd": 0.114}

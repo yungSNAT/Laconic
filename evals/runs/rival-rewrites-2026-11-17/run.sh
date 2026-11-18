@@ -3,7 +3,7 @@
 # a one-line request with no skill and patina 9.1.0 with --verify, each judged against its
 # source by the paper's factalign.py and by laconic-check preserve; then results.jsonl and the
 # summary. Usage: run.sh <work dir>. Needs git, curl, node, npm, uv, Claude Code signed in or
-# ANTHROPIC_API_KEY set, python3, and release builds of tools/laconic-evals and
+# ANTHROPIC_API_KEY set, and release builds of tools/laconic-evals and
 # tools/laconic-check from this checkout.
 set -euo pipefail
 HERE=$(cd "$(dirname "$0")" && pwd)
@@ -53,26 +53,7 @@ H=work-humanizer/skills/work-humanizer
 printf '%s\n' "$NO_TOOLS" > arms/plain.md
 printf '#!/usr/bin/env bash\ncd %q && exec claude "$@"\n' "$W/fixed-cwd" > claude-fixed-cwd
 chmod +x claude-fixed-cwd
-python3 - "$W" <<'PY'
-import json, sys
-w = sys.argv[1]
-base = [f"{w}/claude-fixed-cwd", "--disable-slash-commands", "--print", "--output-format", "json",
-        "--no-session-persistence", "--strict-mcp-config", "--setting-sources", "",
-        "--model", "claude-opus-5-5", "--effort", "high", "--tools", ""]
-with open(f"{w}/setups.json", "w") as f:
-    json.dump({n: {"command": base + ["--append-system-prompt-file", f"{w}/arms/{n}.md"],
-                   "response_format": "claude-json", "budget_flag": "--max-budget-usd"}
-               for n in ("laconic", "humanizer", "avoid", "work", "plain")}, f, indent=2)
-ask = "Rewrite this text so it reads as if a person wrote it. Reply with the rewritten text only."
-with open(f"{w}/cases.jsonl", "w") as out:
-    for line in open(f"{w}/aihb-2026-10.jsonl"):
-        r = json.loads(line)
-        out.write(json.dumps({"id": f"aihb-2026-10-{r['sample_id']}", "category": "rewrite",
-                              "risk": "low", "prompt": f"{ask}\n\n{r['input']}",
-                              "criteria": ["Keeps every fact of the source."]}) + "\n")
-        with open(f"{w}/patina-in/{r['sample_id']}.md", "w") as p:
-            p.write(r["input"] + "\n")
-PY
+"$EV" record setups rival-rewrites-2026-11-17 "$W"
 "$EV" validate --cases cases.jsonl
 for setup in laconic humanizer avoid work plain; do
   "$EV" run --cases cases.jsonl --runner-config setups.json --runner $setup --condition candidate \
@@ -89,7 +70,7 @@ for f in patina-in/*.md; do
   [[ -s "patina-out/$id.json" ]] || PATH="$W/patina-bin:$PATH" node patina/bin/patina.js --verify --lang en \
     --backend claude-cli --model claude-opus-5-5 --format json "$f" > "patina-out/$id.json" || true
 done
-python3 -I "$HERE/pairs.py"
+"$EV" record rewrite-pairs "$W"
 for s in laconic humanizer avoid work plain patina; do
   uv run -q --python 3.12 --with spacy==3.8.7 --with click --with numpy \
     --with https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl \
@@ -98,5 +79,5 @@ done
 for pair in preserve/*/; do
   if "$LC" preserve "$pair/original" "$pair/edit" > /dev/null; then echo 0; else echo 1; fi > "$pair/fails"
 done
-python3 -I "$HERE/results.py" > results.jsonl
-python3 -I "$HERE/summary.py" < results.jsonl
+"$EV" record rewrite-results "$W" > results.jsonl
+"$EV" record rewrite-summary results.jsonl

@@ -1,0 +1,2 @@
+{"runner": "avoid", "condition": "candidate", "case_id": "aihb-2026-10-103", "trial": 1, "response": "3 sites closed 4 May; revenue up 12%.", "usage": {"output_tokens": 52}, "cost_usd": 0.045}
+{"runner": "avoid", "condition": "candidate", "case_id": "aihb-2026-10-101", "trial": 1, "response": "Ms Rossi said \"we will reopen\" in 2027.", "usage": {"output_tokens": 62}, "cost_usd": 0.076}

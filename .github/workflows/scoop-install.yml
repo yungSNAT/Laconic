@@ -3,12 +3,20 @@ name: scoop install
 # Runs the README's Scoop command on a Windows runner, in a Scoop root made for the run: the
 # manifest installs, the shim reports the manifest's version, a clean file passes and a seeded
 # fault fails. A manual run tests the latest release, or the release its input names; a PR that
-# changes this workflow tests the latest release.
+# changes this workflow tests the latest release; the release workflow calls it for the release
+# it has just published.
 on:
   workflow_dispatch:
     inputs:
       version:
         description: The laconic-check release to install, such as 0.5.0; empty for the latest.
+        required: false
+        default: ""
+  workflow_call:
+    inputs:
+      version:
+        description: The laconic-check release to install, such as 0.5.0; empty for the latest.
+        type: string
         required: false
         default: ""
   pull_request:
@@ -53,7 +61,7 @@ jobs:
           scoop install $manifest
           if ($LASTEXITCODE -ne 0) { throw "scoop install exited $LASTEXITCODE" }
           $installed = (Get-Command laconic-check).Source
-          if (-not $installed.StartsWith($env:SCOOP)) { throw "laconic-check resolves to $installed, outside $env:SCOOP" }
+          if (-not $installed.StartsWith($env:SCOOP + [IO.Path]::DirectorySeparatorChar)) { throw "laconic-check resolves to $installed, outside $env:SCOOP" }
           $reported = laconic-check --version
           if ($reported -ne $expected) { throw "laconic-check --version printed '$reported', not '$expected'" }
           "Installed $reported from $manifest at $installed"

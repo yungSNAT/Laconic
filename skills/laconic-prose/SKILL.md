@@ -1,6 +1,6 @@
 ---
 name: laconic-prose
-license: FSL-1.1-ALv2 AND MIT
+license: Apache-2.0 AND MIT
 allowed-tools:
   - Bash(laconic-check lint --warn -)
   - mcp__laconic-check__lint
@@ -111,4 +111,4 @@ When changing this skill, read [references/regression-cases.md](references/regre
 
 ## Licence
 
-FSL-1.1-ALv2 for Laconic's own work, with each version available under Apache-2.0 2 years after it is made available; the third-party portions below remain under the MIT License. Preserve [LICENSE](LICENSE), [NOTICE](NOTICE) and the attribution notices below. Based on No AI Slop by Peter Yang and Stop Slop by Hardik Pandya, as customised for Laconic. Pattern, draft mode, quick pass, venue and editor constraint guidance is adapted from [humanizer](https://github.com/blader/humanizer) (MIT, Siqi Chen) and its MIT forks by jooray and sbfnk, [avoid-ai-writing](https://github.com/conorbronsdon/avoid-ai-writing) (MIT, Conor Bronsdon) and [Sepia](https://github.com/Nanako0129/sepia) (MIT, Nanako Tsai). The Australian English rules are restated in Laconic's own words from the [Australian Government Style Manual](https://www.stylemanual.gov.au/), copyright Commonwealth of Australia, which is not published under an open licence; Laconic includes no copy of it.
+Apache-2.0 for Laconic's own work; the third-party portions below remain under the MIT License. Versions made available before this change keep the licences they were released with; where that is FSL-1.1-ALv2, each also becomes available under Apache-2.0 2 years after it was made available. Preserve [LICENSE](LICENSE), [NOTICE](NOTICE) and the attribution notices below. Based on No AI Slop by Peter Yang and Stop Slop by Hardik Pandya, as customised for Laconic. Pattern, draft mode, quick pass, venue and editor constraint guidance is adapted from [humanizer](https://github.com/blader/humanizer) (MIT, Siqi Chen) and its MIT forks by jooray and sbfnk, [avoid-ai-writing](https://github.com/conorbronsdon/avoid-ai-writing) (MIT, Conor Bronsdon) and [Sepia](https://github.com/Nanako0129/sepia) (MIT, Nanako Tsai). The Australian English rules are restated in Laconic's own words from the [Australian Government Style Manual](https://www.stylemanual.gov.au/), copyright Commonwealth of Australia, which is not published under an open licence; Laconic includes no copy of it.

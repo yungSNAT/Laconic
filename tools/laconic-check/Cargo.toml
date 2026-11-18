@@ -3,7 +3,7 @@ name = "laconic-check"
 version = "0.5.0"
 edition = "2024"
 rust-version = "1.100"
-license = "FSL-1.1-ALv2"
+license = "Apache-2.0"
 description = "Flags Australian English and house-style candidates in Markdown prose, and checks that an edit kept numbers, code, URLs and negations."
 publish = false
 

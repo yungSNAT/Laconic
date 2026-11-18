@@ -1,5 +1,5 @@
 // Copyright 2026 Ryan Duguid
-// SPDX-License-Identifier: FSL-1.1-ALv2
+// SPDX-License-Identifier: Apache-2.0
 
 //! Validates, runs and scores paired response-quality evaluations: `validate`, `plan`, `run`,
 //! `checks`, `score` and `measure`.

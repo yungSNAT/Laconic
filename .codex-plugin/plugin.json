@@ -8,7 +8,7 @@
   },
   "homepage": "https://github.com/yungSNAT/laconic",
   "repository": "https://github.com/yungSNAT/laconic",
-  "license": "FSL-1.1-ALv2 AND MIT",
+  "license": "Apache-2.0 AND MIT",
   "keywords": [
     "concise",
     "output-style",

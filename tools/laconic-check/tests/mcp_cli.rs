@@ -1,5 +1,5 @@
 // Copyright 2026 Ryan Duguid
-// SPDX-License-Identifier: FSL-1.1-ALv2
+// SPDX-License-Identifier: Apache-2.0
 
 //! The MCP servers over stdio: `laconic-check mcp` and the deprecated Node `mcp/server.mjs`,
 //! which runs the binary once a call. The Node server is tested only where `node` runs.

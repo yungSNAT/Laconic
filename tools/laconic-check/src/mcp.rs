@@ -1,5 +1,5 @@
 // Copyright 2026 Ryan Duguid
-// SPDX-License-Identifier: FSL-1.1-ALv2
+// SPDX-License-Identifier: Apache-2.0
 
 //! `laconic-check mcp`: an MCP server on standard input and output that exposes `lint` and
 //! `preserve` as tools. It speaks newline-delimited JSON-RPC 2.0 through the small JSON

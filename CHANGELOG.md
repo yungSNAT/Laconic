@@ -25,6 +25,7 @@ The manifests other than Claude Code's still declare plugin 0.5.0, so a build fr
 
 ### Plugin: changed
 
+- Relicense Ryan Duguid's work under Apache-2.0 instead of FSL-1.1-ALv2; the MIT portions stay MIT. Earlier commits keep the licence their LICENSE file named.
 - The GitHub prose reference keeps session IDs, local paths, private host names and internal IDs out of posted text, and points the reader to the public artefact instead.
 - Make Laconic a full replacement for stop-slop and No AI Slop.
 - Forbid typical-range estimates in place of evidence.
@@ -67,6 +68,7 @@ The manifests other than Claude Code's still declare plugin 0.5.0, so a build fr
 
 ### laconic-check: changed
 
+- Relicense under Apache-2.0 instead of FSL-1.1-ALv2. Releases 0.2.0 to 0.5.0 keep FSL-1.1-ALv2 (0.1.0 was MIT), each turning Apache-2.0 2 years after it was made available.
 - Builds need Rust 1.100 or later: `rust-toolchain.toml` pins 1.100.0 for every crate in the repository, and each crate declares `rust-version = "1.100"`.
 - Release builds use link-time optimisation and one codegen unit, so the Linux binary is about a fifth smaller and starts slightly faster (#119).
 - The Action's `args` input documents that it splits at spaces, tabs and new lines and keeps quotation marks as written, so an option's value cannot contain a space, and that a project file whose path has one can go in the working directory as `.laconic-check`.

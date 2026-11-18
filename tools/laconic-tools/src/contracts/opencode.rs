@@ -1,5 +1,5 @@
 // Copyright 2026 Ryan Duguid
-// SPDX-License-Identifier: FSL-1.1-ALv2
+// SPDX-License-Identifier: Apache-2.0
 
 //! The OpenCode server plugin, mirroring the hook tests: the always-on flag gates injection,
 //! and frontmatter stripping matches the hooks. V2 registers through `ctx.skill.transform` and

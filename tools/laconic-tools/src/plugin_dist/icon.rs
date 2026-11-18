@@ -1,5 +1,5 @@
 // Copyright 2026 Ryan Duguid
-// SPDX-License-Identifier: FSL-1.1-ALv2
+// SPDX-License-Identifier: Apache-2.0
 
 //! The listing icon rule of the plugin directory build: the icon must be a
 //! complete, square PNG within the directory's limits.

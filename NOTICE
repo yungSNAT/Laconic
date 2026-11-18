@@ -1,21 +1,15 @@
 Laconic
 Copyright 2026 Ryan Duguid (https://github.com/ryanduguid)
 
-Ryan Duguid's contributions are licensed under the Functional Source
-License, Version 1.1, ALv2 Future License (FSL-1.1-ALv2); see LICENSE.
-Retained third-party material remains under its own licence, as stated below.
-
-For each version licensed under FSL-1.1-ALv2, an additional licence under the
-Apache License, Version 2.0 becomes effective on the second anniversary of the
-date that version was made available.
+Ryan Duguid's contributions are licensed under the Apache License,
+Version 2.0; see LICENSE. Retained third-party material remains under its
+own licence, as stated below.
 
 Versions made available before this change remain available under the
-licences they were released with.
-
-Redistribution under FSL-1.1-ALv2 requires including its terms or a link to
-them and keeping the copyright notices supplied with the software.
-Redistribution under another applicable licence follows that licence's
-conditions.
+licences they were released with. Where that is the Functional Source
+License, Version 1.1, ALv2 Future License (FSL-1.1-ALv2), each such version
+also becomes available under the Apache License, Version 2.0 on the second
+anniversary of the date it was made available.
 
 Third-party MIT material: portions of Laconic derive from i-have-adhd
 (https://github.com/ayghri/i-have-adhd) by Ayoub Ghriss, No AI Slop by Peter
@@ -66,4 +60,4 @@ Productivity Commission reports, copyright Commonwealth of Australia,
 licensed under the Creative Commons Attribution 3.0 Australia licence
 (https://creativecommons.org/licenses/by/3.0/au/). It is used only to test
 laconic-check; its NOTICE gives the sources and the changes made. Neither
-FSL-1.1-ALv2 nor the MIT License applies to that material.
+Apache-2.0 nor the MIT License applies to that material.

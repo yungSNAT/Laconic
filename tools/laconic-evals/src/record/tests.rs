@@ -1,5 +1,5 @@
 // Copyright 2026 Ryan Duguid
-// SPDX-License-Identifier: FSL-1.1-ALv2
+// SPDX-License-Identifier: Apache-2.0
 
 //! The arithmetic and the refusals of the record steps. `src/tests/record.rs` checks their
 //! output against what the Python they replace printed.

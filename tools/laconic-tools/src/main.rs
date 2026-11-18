@@ -1,5 +1,5 @@
 // Copyright 2026 Ryan Duguid
-// SPDX-License-Identifier: FSL-1.1-ALv2
+// SPDX-License-Identifier: Apache-2.0
 
 //! Maintainer tooling for Laconic. Only maintainers and CI run it, so it stays
 //! apart from the shipped `laconic-check` binary.

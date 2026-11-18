@@ -1,5 +1,5 @@
 // Copyright 2026 Ryan Duguid
-// SPDX-License-Identifier: FSL-1.1-ALv2
+// SPDX-License-Identifier: Apache-2.0
 
 //! Build the plugin as the Claude plugin directory reads it. From an
 //! organisation it has not verified, the directory accepts skills only under

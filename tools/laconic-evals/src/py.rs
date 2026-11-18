@@ -1,5 +1,5 @@
 // Copyright 2026 Ryan Duguid
-// SPDX-License-Identifier: FSL-1.1-ALv2
+// SPDX-License-Identifier: Apache-2.0
 
 //! The parts of Python's behaviour the evaluation outputs depend on, so the port writes the
 //! same bytes as the Python scripts did: `json.dumps`, `repr`, `str.split` and `splitlines`,

@@ -1,5 +1,5 @@
 // Copyright 2026 Ryan Duguid
-// SPDX-License-Identifier: FSL-1.1-ALv2
+// SPDX-License-Identifier: Apache-2.0
 
 /// Python's `random.Random(seed)` for a non-negative seed below 2**32: MT19937 seeded by
 /// `init_by_array([seed])`, with `getrandbits`, `choice` and `shuffle` as CPython draws them.

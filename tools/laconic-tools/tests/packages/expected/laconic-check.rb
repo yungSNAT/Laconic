@@ -2,7 +2,7 @@ class LaconicCheck < Formula
   desc "Flags Australian English and house-style candidates in Markdown prose"
   homepage "https://github.com/yungSNAT/Laconic"
   version "1.2.3"
-  license "FSL-1.1-ALv2"
+  license "Apache-2.0"
 
   on_macos do
     on_arm do

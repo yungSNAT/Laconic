@@ -1,5 +1,5 @@
 // Copyright 2026 Ryan Duguid
-// SPDX-License-Identifier: FSL-1.1-ALv2
+// SPDX-License-Identifier: Apache-2.0
 
 //! The steps of the dated benchmark runs in `evals/runs/`, which each run's `run.sh` calls:
 //! the runner configurations, the answer files, one row per answer or rewrite, and the

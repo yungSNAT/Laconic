@@ -7,7 +7,7 @@ Publisher: yungSNAT
 PublisherUrl: https://github.com/yungSNAT
 PackageName: laconic-check
 PackageUrl: https://github.com/yungSNAT/Laconic
-License: FSL-1.1-ALv2
+License: Apache-2.0
 LicenseUrl: https://github.com/yungSNAT/Laconic/blob/main/LICENSE
 ShortDescription: Flags Australian English and house-style candidates in Markdown prose, and checks that an edit kept numbers, code, URLs and negations.
 Tags:

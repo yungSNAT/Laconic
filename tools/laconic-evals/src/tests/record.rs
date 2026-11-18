@@ -1,5 +1,5 @@
 // Copyright 2026 Ryan Duguid
-// SPDX-License-Identifier: FSL-1.1-ALv2
+// SPDX-License-Identifier: Apache-2.0
 
 //! The `record` steps on the fixtures in `src/record/fixtures`. Each `*-expected` file there is
 //! what the Python these steps replace (main at 1aa3a3a: the runs' `results.py`, `summary.py`,

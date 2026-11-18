@@ -1,5 +1,5 @@
 // Copyright 2026 Ryan Duguid
-// SPDX-License-Identifier: FSL-1.1-ALv2
+// SPDX-License-Identifier: Apache-2.0
 
 //! `laconic-check lsp`: a language server on standard input and output that publishes `lint`'s
 //! findings as diagnostics for open Markdown documents. Messages use the Language Server

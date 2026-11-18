@@ -1,5 +1,5 @@
 // Copyright 2026 Ryan Duguid
-// SPDX-License-Identifier: FSL-1.1-ALv2
+// SPDX-License-Identifier: Apache-2.0
 
 //! Where the deprecated Node `mcp/server.mjs` finds `laconic-check` when `LACONIC_CHECK` is not
 //! set: only in PATH's absolute entries, never in its working directory (which Node on Windows

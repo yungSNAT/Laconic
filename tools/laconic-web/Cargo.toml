@@ -3,7 +3,7 @@ name = "laconic-web"
 version = "0.1.0"
 edition = "2024"
 rust-version = "1.100"
-license = "FSL-1.1-ALv2"
+license = "Apache-2.0"
 description = "laconic-check's lint and preserve compiled to WebAssembly for the browser page in web/."
 publish = false
 

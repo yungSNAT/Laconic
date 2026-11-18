@@ -11,7 +11,7 @@
 
 [![tests](https://github.com/yungSNAT/Laconic/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/yungSNAT/Laconic/actions/workflows/tests.yml) [![Codecov](https://codecov.io/gh/yungSNAT/Laconic/graph/badge.svg)](https://codecov.io/gh/yungSNAT/Laconic) [![CodeQL](https://github.com/yungSNAT/Laconic/actions/workflows/codeql.yml/badge.svg?branch=main)](https://github.com/yungSNAT/Laconic/actions/workflows/codeql.yml) [![OSV-Scanner](https://github.com/yungSNAT/Laconic/actions/workflows/osv-scanner.yml/badge.svg?branch=main)](https://github.com/yungSNAT/Laconic/actions/workflows/osv-scanner.yml) [![SonarCloud](https://sonarcloud.io/api/project_badges/measure?project=EquityBot_Laconic&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=EquityBot_Laconic) [![Codacy code quality](https://app.codacy.com/project/badge/Grade/623f5ab312d4497c9e8161e547c95f44)](https://app.codacy.com/gh/yungSNAT/Laconic/dashboard)<br>
 [![OpenSSF Scorecard](https://raw.githubusercontent.com/ryanduguid/.github/badges/EquityBot/Laconic.svg)](https://scorecard.dev/viewer/?uri=github.com/yungSNAT/Laconic)<br>
-[![release](https://img.shields.io/github/v/release/yungSNAT/Laconic?filter=laconic-check-v*&color=66023C&labelColor=000000&style=flat)](https://github.com/yungSNAT/Laconic/releases?q=laconic-check-v&expanded=true) [![licence: FSL-1.1-ALv2](.github/assets/badges/licence.svg)](LICENSE) [![fork of: i-have-adhd](.github/assets/badges/fork-of.svg)](https://github.com/ayghri/i-have-adhd)
+[![release](https://img.shields.io/github/v/release/yungSNAT/Laconic?filter=laconic-check-v*&color=66023C&labelColor=000000&style=flat)](https://github.com/yungSNAT/Laconic/releases?q=laconic-check-v&expanded=true) [![licence: Apache-2.0](.github/assets/badges/licence.svg)](LICENSE) [![fork of: i-have-adhd](.github/assets/badges/fork-of.svg)](https://github.com/ayghri/i-have-adhd)
 
 [Install](#install) · [Use](#use) · [What changes](#what-changes) · [Evaluation](#evaluation) · [Checker](#checker) · [Always on](#always-on) · [Development](#development) · [Credits](#credits) · [Licence](#licence)
 
@@ -64,7 +64,6 @@ Restart the agent, then type `/laconic`. It stays on for the session until you s
 - **You want only the writing guidance:** [No AI Slop](https://github.com/petergyang/no-ai-slop), which Laconic's writing guidance builds on, has it without the response rules or Australian English.
 - **You edit in Microsoft Word:** [PerfectIt](https://www.perfectit.com/) checks consistency in Word against a style sheet, including one for Australian Government Style. Laconic works in agents, chat assistants and CI, not in Word.
 - **You want your own house style checked in CI:** [Vale](https://github.com/vale-cli/vale) lints prose against rules you configure, with regular expressions, rule types and packages; `laconic-check` adds a project's own word substitutions and banned phrases to Laconic's rules, and nothing more.
-- **You need an open source licence:** Laconic is under FSL-1.1-ALv2 (see [Licence](#licence)). [humanizer](https://github.com/blader/humanizer), [avoid-ai-writing](https://github.com/conorbronsdon/avoid-ai-writing), No AI Slop and Vale are MIT; LanguageTool is LGPL-2.1; caveman is Apache-2.0.
 
 ## What changes
 
@@ -465,7 +464,9 @@ The banner's lettering and emblem are drawn from Cascadia Mono and Besley glyphs
 
 ## Licence
 
-Licensed under the Functional Source License, Version 1.1, ALv2 Future License (FSL-1.1-ALv2). You may use, modify and redistribute it for any purpose except a Competing Use as defined in LICENSE (making it available to others in a competing commercial product or service), and each version becomes available under Apache-2.0 2 years after it is made available. Portions from i-have-adhd and the other sources in Credits remain under the MIT License, and the `laconic-check` test corpus remains under CC BY 3.0 AU. See [LICENSE](LICENSE) and [NOTICE](NOTICE).
+Apache-2.0; see [LICENSE](LICENSE). If you redistribute this work or build on it, keep the attribution in [NOTICE](NOTICE). Portions from i-have-adhd and the other sources in Credits remain under the MIT License, and the `laconic-check` test corpus remains under CC BY 3.0 AU. See [LICENSE](LICENSE) and [NOTICE](NOTICE).
+
+Earlier versions stay under the licence they were released with: laconic-check 0.1.0 under MIT, and laconic-check 0.2.0 to 0.5.0 under FSL-1.1-ALv2 for Ryan Duguid's work, each becoming available under Apache-2.0 2 years after it was made available. Earlier commits keep the licence their LICENSE file named.
 
 ---
 

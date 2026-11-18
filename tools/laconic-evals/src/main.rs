@@ -1,5 +1,5 @@
 // Copyright 2026 Ryan Duguid
-// SPDX-License-Identifier: FSL-1.1-ALv2
+// SPDX-License-Identifier: Apache-2.0
 
 //! Laconic's evaluation harness: one subcommand per former Python entry point, with the same
 //! flags, defaults, outputs and exit statuses.

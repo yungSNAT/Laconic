@@ -1,5 +1,5 @@
 // Copyright 2026 Ryan Duguid
-// SPDX-License-Identifier: FSL-1.1-ALv2
+// SPDX-License-Identifier: Apache-2.0
 
 //! `check-pi`: smoke-tests the Pi or OMP package over the agent's RPC mode, without a model
 //! request. CI runs it after installing Pi from `ci/pi`.

@@ -1,5 +1,5 @@
 // Copyright 2026 Ryan Duguid
-// SPDX-License-Identifier: FSL-1.1-ALv2
+// SPDX-License-Identifier: Apache-2.0
 
 //! Evaluation cases and JSON Lines files: reading them, validating the case catalogue and
 //! a case's regular-expression checks.

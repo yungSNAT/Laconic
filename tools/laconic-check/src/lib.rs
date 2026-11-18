@@ -1,5 +1,5 @@
 // Copyright 2026 Ryan Duguid
-// SPDX-License-Identifier: FSL-1.1-ALv2
+// SPDX-License-Identifier: Apache-2.0
 
 //! laconic-check's rules as a library, so the fuzz targets in `fuzz/` can call them. The
 //! `laconic-check` binary is the supported interface.

@@ -8,7 +8,7 @@ use crate::py::{Num, Random};
 use std::fmt::Write as _;
 
 /// evals/rubric.md's weights.
-pub(super) const WEIGHTS: [(&str, f64); 5] = [
+const WEIGHTS: [(&str, f64); 5] = [
     ("correctness", 0.35),
     ("autonomy", 0.25),
     ("actionability", 0.2),
@@ -25,7 +25,7 @@ pub(super) fn weighted(row: &Value) -> Result<Num, String> {
     Ok(sum(terms))
 }
 
-pub(super) fn output_tokens(row: &Value) -> Result<Num, String> {
+fn output_tokens(row: &Value) -> Result<Num, String> {
     num_at(row, &["output_tokens"])
 }
 
@@ -33,7 +33,7 @@ pub(super) fn cost(row: &Value) -> Result<Num, String> {
     num_at(row, &["cost_usd"])
 }
 
-pub(super) fn input_tokens(row: &Value) -> Result<Num, String> {
+fn input_tokens(row: &Value) -> Result<Num, String> {
     let part = |name| num_at(row, &[name]);
     Ok(add(
         add(part("input_tokens")?, part("cache_write_tokens")?),
@@ -41,40 +41,35 @@ pub(super) fn input_tokens(row: &Value) -> Result<Num, String> {
     ))
 }
 
-pub(super) fn cache_write(row: &Value) -> Result<Num, String> {
+fn cache_write(row: &Value) -> Result<Num, String> {
     num_at(row, &["cache_write_tokens"])
 }
 
-pub(super) fn cache_read(row: &Value) -> Result<Num, String> {
+fn cache_read(row: &Value) -> Result<Num, String> {
     num_at(row, &["cache_read_tokens"])
 }
 
-pub(super) fn characters(row: &Value) -> Result<Num, String> {
+fn characters(row: &Value) -> Result<Num, String> {
     num_at(row, &["characters"])
 }
 
-pub(super) fn house_correctness(row: &Value) -> Result<Num, String> {
+fn house_correctness(row: &Value) -> Result<Num, String> {
     num_at(row, &["house", "correctness"])
 }
 
-pub(super) fn correctness_only(row: &Value) -> Result<Num, String> {
+fn correctness_only(row: &Value) -> Result<Num, String> {
     num_at(row, &["correctness_only", "correctness"])
 }
 
 /// One run's rows by case, trial and condition, and its trials in order.
-pub(super) struct Run<'a> {
-    pub(super) index: HashMap<String, &'a Value>,
-    pub(super) trials: Vec<Value>,
+struct Run<'a> {
+    index: HashMap<String, &'a Value>,
+    trials: Vec<Value>,
 }
 
 impl Run<'_> {
     /// The sum of `value` over `cases` and the trials for `condition`, cases outermost.
-    pub(super) fn total(
-        &self,
-        condition: &str,
-        cases: &[&Value],
-        value: Measure,
-    ) -> Result<Num, String> {
+    fn total(&self, condition: &str, cases: &[&Value], value: Measure) -> Result<Num, String> {
         let mut values = Vec::new();
         for case in cases {
             for trial in &self.trials {
@@ -89,19 +84,14 @@ impl Run<'_> {
         Ok(sum(values))
     }
 
-    pub(super) fn ratio(
-        &self,
-        pair: (&str, &str),
-        value: Measure,
-        cases: &[&Value],
-    ) -> Result<f64, String> {
+    fn ratio(&self, pair: (&str, &str), value: Measure, cases: &[&Value]) -> Result<f64, String> {
         divide(
             self.total(pair.0, cases, value)?,
             self.total(pair.1, cases, value)?,
         )
     }
 
-    pub(super) fn difference(
+    fn difference(
         &self,
         pair: (&str, &str),
         value: Measure,
@@ -119,11 +109,11 @@ impl Run<'_> {
     }
 }
 
-pub(super) type Statistic<'a> = &'a dyn Fn(&[&Value]) -> Result<f64, String>;
+type Statistic<'a> = &'a dyn Fn(&[&Value]) -> Result<f64, String>;
 
 /// The statistic on `cases`, then the 251st and 9,751st of 10,000 sorted values on cases
 /// drawn with replacement by a fresh `random.Random(2282)`.
-pub(super) fn interval(stat: Statistic, cases: &[&Value]) -> Result<[f64; 3], String> {
+fn interval(stat: Statistic, cases: &[&Value]) -> Result<[f64; 3], String> {
     let mut rng = Random::new(2282);
     let mut draws = Vec::with_capacity(10_000);
     for _ in 0..10_000 {
@@ -136,12 +126,7 @@ pub(super) fn interval(stat: Statistic, cases: &[&Value]) -> Result<[f64; 3], St
 }
 
 /// One interval line: the estimate and its interval to 2 places, signed for a difference.
-pub(super) fn show(
-    out: &mut String,
-    label: &str,
-    values: [f64; 3],
-    sign: bool,
-) -> Result<(), String> {
+fn show(out: &mut String, label: &str, values: [f64; 3], sign: bool) -> Result<(), String> {
     let mut texts = Vec::new();
     for x in values {
         let text = half_up(Num::Float(x), 2)?;
@@ -163,16 +148,16 @@ pub(super) fn lint_clean(row: &Value) -> Result<Num, String> {
     num_at(row, &["lint_clean"])
 }
 
-pub(super) fn house_blocker(row: &Value) -> Result<Num, String> {
+fn house_blocker(row: &Value) -> Result<Num, String> {
     num_at(row, &["house", "blocker"])
 }
 
-pub(super) fn correctness_blocker(row: &Value) -> Result<Num, String> {
+fn correctness_blocker(row: &Value) -> Result<Num, String> {
     num_at(row, &["correctness_only", "blocker"])
 }
 
 /// One condition's line of figures for one run.
-pub(super) fn condition_line(rs: &[&Value], cold: bool) -> Result<Map<String, Value>, String> {
+fn condition_line(rs: &[&Value], cold: bool) -> Result<Map<String, Value>, String> {
     let mut line = Map::new();
     line.insert("answers".into(), json!(rs.len()));
     let means: [(&str, Measure, usize); 6] = [

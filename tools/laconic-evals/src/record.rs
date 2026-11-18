@@ -19,8 +19,6 @@ mod style;
 use arith::*;
 pub use rewrite::{rewrite_pairs, rewrite_results, rewrite_summary};
 pub use style::style_summary;
-#[cfg(test)]
-use {rewrite::*, style::*};
 
 /// The run folders `record setups` writes configurations for.
 pub const RUNS: [&str; 3] = [

@@ -4,6 +4,8 @@
 //! The arithmetic and the refusals of the record steps. `src/tests/record.rs` checks their
 //! output against what the Python they replace printed.
 
+use super::rewrite::*;
+use super::style::*;
 use super::*;
 use crate::py::Num;
 use crate::testing::write_rows;

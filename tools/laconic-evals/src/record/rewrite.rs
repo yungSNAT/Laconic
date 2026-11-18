@@ -11,7 +11,7 @@ use std::fmt::Write as _;
 pub(super) const MODEL_REWRITERS: [&str; 5] = ["laconic", "humanizer", "avoid", "work", "plain"];
 
 /// The sample id at the end of a rewrite case id, `aihb-2026-10-<id>`.
-pub(super) fn sample_id(row: &Value) -> Result<String, String> {
+fn sample_id(row: &Value) -> Result<String, String> {
     let id = py::text(row, "case_id")?;
     id.rsplit_once('-')
         .map(|(_, sid)| sid.to_owned())
@@ -19,7 +19,7 @@ pub(super) fn sample_id(row: &Value) -> Result<String, String> {
 }
 
 /// JSON Lines text, one row a line, as `json.dumps(row) + "\n"` writes it.
-pub(super) fn jsonl(rows: &[Value]) -> String {
+fn jsonl(rows: &[Value]) -> String {
     rows.iter()
         .map(|r| py::dumps(r, None, true) + "\n")
         .collect()

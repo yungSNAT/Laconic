@@ -5,6 +5,7 @@
 //! output against what the Python they replace printed.
 
 use super::*;
+use crate::py::Num;
 use crate::testing::write_rows;
 
 #[test]

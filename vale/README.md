@@ -6,7 +6,7 @@ Vale finds fewer faults than `lint`: a regular expression cannot see clauses, pa
 
 ## Use
 
-Each `laconic-check` release after 0.5.0 attaches the style as `Laconic.zip`, with its SHA-256 checksum (on `main`, not yet in a release). In `.vale.ini`, with the release's version:
+Each `laconic-check` release after 0.5.0 attaches the style as `Laconic.zip`, with its SHA-256 checksum. In `.vale.ini`, with the release's version:
 
 ```ini
 StylesPath = styles

@@ -1786,8 +1786,10 @@ Priya said.",
 
     #[test]
     fn checks_many_names_in_linear_time() {
-        // Each name was looked for in the whole edit, so 16 times the names took about 256
-        // times as long; a set of the edit's word runs gives about 16 to 20 times.
+        // Each name was looked for in the whole edit, so 16 times the names took 240 to 360
+        // times as long; a set of the edit's word runs gives 16 to 23 times on Linux and
+        // once reached 35 on a macOS runner. The bound sits midway between linear and quadratic
+        // on a log scale: 16 times 4, or 256 over 4.
         let fastest = |items: usize| {
             let text: String = (0..items).map(|n| format!("Alpha{n} Beta{n}. ")).collect();
             (0..3)
@@ -1801,7 +1803,7 @@ Priya said.",
         };
         let (small, large) = (fastest(2_000), fastest(32_000));
         assert!(
-            large < small * 32,
+            large < small * 64,
             "16 times the names took {:.1} times as long ({small:?} to {large:?})",
             large.as_secs_f64() / small.as_secs_f64()
         );

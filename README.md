@@ -268,7 +268,7 @@ cargo run --manifest-path tools/laconic-check/Cargo.toml -- lint README.md
 cargo run --manifest-path tools/laconic-check/Cargo.toml -- preserve original.md edited.md
 ```
 
-`lint` and `preserve` also run in a browser, compiled to WebAssembly (on `main`, not yet published). The page is one HTML file whose content security policy blocks every network request, so text pasted into it stays on the machine; `web/index.html` is its source and `tools/laconic-web` the WebAssembly crate. Build it with:
+`lint` and `preserve` also run in a browser, compiled to WebAssembly, at [yungsnat.github.io/Laconic](https://yungsnat.github.io/Laconic/), built from `main`. The page is one HTML file whose content security policy blocks every network request, so text pasted into it stays on the machine; `web/index.html` is its source and `tools/laconic-web` the WebAssembly crate. Build it with:
 
 ```bash
 rustup target add wasm32-unknown-unknown

@@ -68,18 +68,27 @@ jobs:
           rustup target add ${{ matrix.target }}
           cargo test --locked
           cargo build --locked --release --target ${{ matrix.target }}
+      # Each archive carries the licence and notices beside the binary.
       - name: Package
         run: |
           name=laconic-check-${{ matrix.target }}
           mkdir -p dist
-          cp target/${{ matrix.target }}/release/${{ matrix.binary }} dist/
+          cp target/${{ matrix.target }}/release/${{ matrix.binary }} ../../LICENSE ../../NOTICE dist/
           cd dist
           if [ "${{ runner.os }}" = "Windows" ]; then
-            7z a "../$name.zip" ${{ matrix.binary }} > /dev/null
+            7z a "../$name.zip" ${{ matrix.binary }} LICENSE NOTICE > /dev/null
             cd .. && sha256sum "$name.zip" > "$name.zip.sha256"
+            members=$(7z l -ba -slt "$name.zip" | tr -d '\r' | sed -n 's/^Path = //p' | sort)
           else
-            tar -czf "../$name.tar.gz" ${{ matrix.binary }}
+            tar -czf "../$name.tar.gz" ${{ matrix.binary }} LICENSE NOTICE
             cd .. && shasum -a 256 "$name.tar.gz" > "$name.tar.gz.sha256"
+            members=$(tar -tzf "$name.tar.gz" | sort)
+          fi
+          expected=$(printf '%s\n' LICENSE NOTICE ${{ matrix.binary }} | sort)
+          if [ "$members" != "$expected" ]; then
+            echo "::error::$name must hold exactly LICENSE, NOTICE and ${{ matrix.binary }}; it holds:"
+            echo "$members"
+            exit 1
           fi
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:

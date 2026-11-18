@@ -623,6 +623,9 @@ fn correctness_blocker(row: &Value) -> Result<Num, String> {
 
 /// `sorted(set(values))`, as Python orders and compares them.
 fn sorted_set(mut values: Vec<Value>) -> Result<Vec<Value>, String> {
+    if let Some(v) = values.iter().find(|v| v.is_array() || v.is_object()) {
+        return Err(format!("unhashable: {}", py::repr(v)));
+    }
     let mut error = None;
     values.sort_by(|a, b| {
         py::compare(a, b).unwrap_or_else(|e| {
@@ -707,6 +710,8 @@ pub fn style_summary(rows: &[Value]) -> Result<String, String> {
     conditions.extend(sorted_set(all)?.into_iter().filter(|c| *c != "candidate"));
     let mut setups = HashMap::new();
     for r in rows {
+        // Python reads every row's run, so a row without one raises rather than drops out.
+        py::field(r, "run")?;
         setups.insert(
             py::key(py::field(r, "condition")?),
             py::to_str(py::field(r, "setup")?),

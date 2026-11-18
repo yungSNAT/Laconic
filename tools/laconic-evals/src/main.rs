@@ -14,6 +14,7 @@ mod humanise;
 mod judge;
 mod proc;
 mod py;
+mod record;
 mod run_evals;
 mod scenario;
 #[cfg(test)]
@@ -434,9 +435,25 @@ fn run(cli: Cli, out: &mut dyn Write, tools: &Tools) -> Result<u8, Stop> {
             )?;
             String::new()
         }
+        Command::Record { command } => record_step(command)?,
     };
     out.write_all(printed.as_bytes())?;
     Ok(0)
+}
+
+/// Runs one `record` step and returns what it prints.
+fn record_step(command: Record) -> Result<String, String> {
+    match command {
+        Record::Setups { run, work } => record::setups(&run, &work).map(|()| String::new()),
+        Record::Answers { work } => record::write_answers(&work).map(|()| String::new()),
+        Record::StyleResults { work } => record::style_results(&work),
+        Record::StyleSummary { results } => record::style_summary(&cases::read_jsonl(&results)?),
+        Record::RewritePairs { work } => record::rewrite_pairs(&work).map(|()| String::new()),
+        Record::RewriteResults { work } => record::rewrite_results(&work),
+        Record::RewriteSummary { results } => {
+            record::rewrite_summary(&cases::read_jsonl(&results)?)
+        }
+    }
 }
 
 fn main() -> ExitCode {

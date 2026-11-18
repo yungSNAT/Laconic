@@ -12,9 +12,9 @@ The run behind [By humaniser](../../README.md#by-humaniser) in `evals/README.md`
 ## Files
 
 - `run.sh <work dir>`: the whole run, from the downloads to the summary. It makes 165 rewrite calls and 3 patina calls a text; the published rewrites cost about US$11 and patina's about US$5.
-- `pairs.py`: run in the work directory; writes the source and rewrite pairs for `factalign.py` and for `laconic-check preserve`.
-- `results.py`: run in the work directory; prints one row per rewrite, without the texts: units, units altered and their groups, whether `preserve` fails, lengths in words, cost, and patina's own `--verify` result.
+- `laconic-evals record rewrite-pairs <work dir>` writes the source and rewrite pairs for `factalign.py` and for `laconic-check preserve`.
+- `laconic-evals record rewrite-results <work dir>` prints one row per rewrite, without the texts: units, units altered and their groups, whether `preserve` fails, lengths in words, cost, and patina's own `--verify` result.
 - `results.jsonl`: those rows for this run.
-- `summary.py < results.jsonl`: every figure in the table, recomputed.
+- `laconic-evals record rewrite-summary results.jsonl`: every figure in the table, recomputed.
 
 The rewrites themselves are not stored.

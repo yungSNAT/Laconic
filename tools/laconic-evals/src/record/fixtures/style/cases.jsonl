@@ -1,0 +1,4 @@
+{"id": "c1", "prompt": "p", "checks": {"must_include": ["\\bfix\\b"], "must_not_include": ["sorry"]}}
+{"id": "c2", "prompt": "p"}
+{"id": "c3", "prompt": "p", "checks": {"must_include": ["ok", "it's"]}}
+{"id": "c4", "prompt": "p", "checks": {}}

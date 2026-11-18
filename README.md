@@ -466,7 +466,7 @@ The banner's lettering and emblem are drawn from Cascadia Mono and Besley glyphs
 
 Apache-2.0; see [LICENSE](LICENSE). If you redistribute this work or build on it, keep the attribution in [NOTICE](NOTICE). Portions from i-have-adhd and the other sources in Credits remain under the MIT License, and the `laconic-check` test corpus remains under CC BY 3.0 AU. See [LICENSE](LICENSE) and [NOTICE](NOTICE).
 
-Earlier versions stay under the licence they were released with: laconic-check 0.1.0 under MIT, and laconic-check 0.2.0 to 0.5.0 and earlier commits of the plugin under FSL-1.1-ALv2 for Ryan Duguid's work, each becoming available under Apache-2.0 2 years after it was made available.
+Earlier versions stay under the licence they were released with: laconic-check 0.1.0 under MIT, and laconic-check 0.2.0 to 0.5.0 under FSL-1.1-ALv2 for Ryan Duguid's work, each becoming available under Apache-2.0 2 years after it was made available. Earlier commits keep the licence their LICENSE file named.
 
 ---
 

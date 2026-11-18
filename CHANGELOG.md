@@ -25,7 +25,7 @@ The manifests other than Claude Code's still declare plugin 0.5.0, so a build fr
 
 ### Plugin: changed
 
-- Relicense Ryan Duguid's work under Apache-2.0 instead of FSL-1.1-ALv2; the MIT portions stay MIT. Earlier commits keep FSL-1.1-ALv2, each turning Apache-2.0 2 years after it was made available.
+- Relicense Ryan Duguid's work under Apache-2.0 instead of FSL-1.1-ALv2; the MIT portions stay MIT. Earlier commits keep the licence their LICENSE file named.
 - The GitHub prose reference keeps session IDs, local paths, private host names and internal IDs out of posted text, and points the reader to the public artefact instead.
 - Make Laconic a full replacement for stop-slop and No AI Slop.
 - Forbid typical-range estimates in place of evidence.

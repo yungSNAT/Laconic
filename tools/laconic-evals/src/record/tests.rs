@@ -108,6 +108,9 @@ fn dict_keys_and_counts_follow_json_dumps() {
 #[test]
 fn sorting_refuses_values_python_cannot_compare() {
     assert!(sorted_set(vec![json!(1), json!("a")]).is_err());
+    // set() raises on a list or dict, even alone.
+    assert_eq!(sorted_set(vec![json!([])]).unwrap_err(), "unhashable: []");
+    assert_eq!(sorted_set(vec![json!({})]).unwrap_err(), "unhashable: {}");
     assert_eq!(
         sorted_set(vec![json!("b"), json!("a"), json!("b")]).unwrap(),
         vec![json!("a"), json!("b")]
@@ -266,6 +269,13 @@ fn the_style_summary_refuses_rows_it_cannot_total() {
     assert_eq!(
         style_summary(&rows).unwrap_err(),
         r#"no row for ["c2",1,"other"]"#
+    );
+    // Python's r["run"] raises; a row without one is not left out.
+    let mut no_run = style_row("c2", "candidate");
+    no_run.as_object_mut().unwrap().remove("run");
+    assert_eq!(
+        style_summary(&[style_row("c1", "candidate"), no_run]).unwrap_err(),
+        "a row has no 'run'"
     );
     let mut no_condition = style_row("c1", "candidate");
     no_condition.as_object_mut().unwrap().remove("condition");

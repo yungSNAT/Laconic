@@ -75,7 +75,7 @@ The manifests other than Claude Code's still declare plugin 0.5.0, so a build fr
 
 ### laconic-check: fixed
 
-- Each release archive carries `LICENSE` and `NOTICE` beside the binary, and the release workflow fails if an archive holds anything else; the archives of 0.1.0 to 0.5.0 held only the binary.
+- Each `laconic-check` binary archive carries `LICENSE` and `NOTICE` beside the binary, and the release workflow fails if an archive holds anything else; the archives of 0.1.0 to 0.5.0 held only the binary.
 - The `web` workflow takes the browser page's snapshot again, up to 3 times, when Chromium took it before the checker had run (this failed one run on `main`). When a check fails, it shows the page's statuses.
 - `preserve` no longer reports '00' as dropped when an edit writes a time on the hour without its minutes, such as '5:00 p.m.' as '5pm'. A colon number is a time only after a word such as 'at' or 'until', before 'am' or 'pm', or after 'to' or 'and' that follows a time, so a ratio such as '5:30' stays 2 numbers.
 - `lint` reads back only the few words that could spell a parenthesised acronym, not the whole paragraph before it, so many definitions in one paragraph take linear time: 4,000 in a debug build took 8.1 seconds and now take about as long as 8 times 500.
@@ -196,7 +196,7 @@ The manifests other than Claude Code's still declare plugin 0.5.0, so a build fr
 
 - The stale translations, upstream eval results and logo.
 
-For versions before 0.5.0, see the history up to commit `0904dda`, which released the i-have-adhd fork's 0.4.1.
+For versions before 0.5.0, see the history up to commit `0904dda`, which released i-have-adhd 0.4.1.
 
 [Unreleased]: https://github.com/yungSNAT/laconic/commits/main
 [laconic-check 0.5.0]: https://github.com/yungSNAT/laconic/releases/tag/laconic-check-v0.5.0

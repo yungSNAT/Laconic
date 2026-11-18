@@ -3,3 +3,6 @@
 
 # The fact-survival summary fixture is compared byte for byte with what the tool prints.
 tools/laconic-evals/src/**/*.json text eol=lf
+
+# The record fixtures are compared byte for byte with what the record steps write.
+tools/laconic-evals/src/record/fixtures/** text eol=lf

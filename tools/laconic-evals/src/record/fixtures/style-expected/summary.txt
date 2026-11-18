@@ -1,0 +1,32 @@
+== cold calls
+candidate (setup-laconic): {"answers": 6, "mean output tokens": "40", "mean input tokens, cache included": "118", "mean cache write": "26", "mean cache read": "0", "mean cost US$": "0.0021", "mean characters": "14", "lint clean": "6 of 6", "regex checks passed": "2 of 4", "weighted score, evals/rubric.md": "3.18", "correctness, evals/rubric.md": "2.83", "blocking findings, evals/rubric.md": 1, "correctness, evals/rubric-correctness.md": "3.33", "blocking findings, evals/rubric-correctness.md": 1}
+baseline (claude): {"answers": 6, "mean output tokens": "48", "mean input tokens, cache included": "136", "mean cache write": "29", "mean cache read": "0", "mean cost US$": "0.1312", "mean characters": "20", "lint clean": "6 of 6", "regex checks passed": "3 of 4", "weighted score, evals/rubric.md": "3.28", "correctness, evals/rubric.md": "3.33", "blocking findings, evals/rubric.md": 1, "correctness, evals/rubric-correctness.md": "2.83", "blocking findings, evals/rubric-correctness.md": 1}
+comparator (setup-concise): {"answers": 6, "mean output tokens": "42", "mean input tokens, cache included": "115", "mean cache write": "24", "mean cache read": "0", "mean cost US$": "0.0408", "mean characters": "15", "lint clean": "0 of 6", "regex checks passed": "1 of 4", "weighted score, evals/rubric.md": "3.20", "correctness, evals/rubric.md": "3.17", "blocking findings, evals/rubric.md": 1, "correctness, evals/rubric-correctness.md": "3.00", "blocking findings, evals/rubric-correctness.md": 2}
+ candidate against baseline:
+  output tokens, ratio: 0.84 (0.71 to 0.88)
+  cost, ratio: 0.02 (0.02 to 0.02)
+  weighted score, evals/rubric.md, difference: -0.10 (-0.23 to +0.15)
+  correctness, evals/rubric-correctness.md, difference: +0.50 (+0.50 to +0.50)
+ candidate against comparator:
+  output tokens, ratio: 0.96 (0.74 to 1.16)
+  cost, ratio: 0.05 (0.04 to 0.28)
+  weighted score, evals/rubric.md, difference: -0.02 (-1.28 to +0.98)
+  correctness, evals/rubric-correctness.md, difference: +0.33 (-0.50 to +2.00)
+ baseline against comparator:
+  output tokens, ratio: 1.14 (1.05 to 1.32)
+  cost, ratio: 3.21 (2.28 to 17.49)
+  weighted score, evals/rubric.md, difference: +0.07 (-1.42 to +1.20)
+  correctness, evals/rubric-correctness.md, difference: -0.17 (-1.00 to +1.50)
+== warm calls
+candidate (setup-laconic): {"answers": 3, "mean output tokens": "31", "mean input tokens, cache included": "9013", "mean cache write": "0", "mean cache read": "9010", "mean cost US$": "0.0040", "mean characters": "17", "lint clean": "1 of 3", "regex checks passed": "1 of 2"}
+baseline (claude): {"answers": 3, "mean output tokens": "33", "mean input tokens, cache included": "9015", "mean cache write": "0", "mean cache read": "9012", "mean cost US$": "0.0042", "mean characters": "17", "lint clean": "1 of 3", "regex checks passed": "1 of 2"}
+comparator (setup-concise): {"answers": 3, "mean output tokens": "32", "mean input tokens, cache included": "9014", "mean cache write": "0", "mean cache read": "9011", "mean cost US$": "0.0041", "mean characters": "15", "lint clean": "2 of 3", "regex checks passed": "1 of 2"}
+ candidate against baseline:
+  output tokens, ratio: 0.94 (0.94 to 0.94)
+  cost, ratio: 0.95 (0.91 to 0.97)
+ candidate against comparator:
+  output tokens, ratio: 0.97 (0.97 to 0.97)
+  cost, ratio: 0.98 (0.95 to 0.98)
+ baseline against comparator:
+  output tokens, ratio: 1.03 (1.03 to 1.03)
+  cost, ratio: 1.02 (1.02 to 1.05)

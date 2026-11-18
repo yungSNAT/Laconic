@@ -172,6 +172,11 @@ pub(super) enum Command {
         #[arg(num_args = 0.., allow_hyphen_values = true, trailing_var_arg = true)]
         args: Vec<String>,
     },
+    /// The steps of the dated runs in evals/runs/, which their run.sh files call.
+    Record {
+        #[command(subcommand)]
+        command: Record,
+    },
 }
 
 #[derive(Debug, Subcommand)]
@@ -257,4 +262,27 @@ pub(super) enum Survival {
         #[arg(long, allow_negative_numbers = true, default_value_t = 2)]
         trials: i64,
     },
+}
+
+#[derive(Debug, Subcommand)]
+pub(super) enum Record {
+    /// Writes a run's runner configurations into its work directory, and for the rewrite run
+    /// its cases and patina's input files.
+    Setups {
+        #[arg(value_parser = record::RUNS)]
+        run: String,
+        work: PathBuf,
+    },
+    /// Writes each answer in responses.jsonl and warm.jsonl to answers/<run>-<n>.txt.
+    Answers { work: PathBuf },
+    /// Prints one row per answer of the Concise or token-cost run.
+    StyleResults { work: PathBuf },
+    /// Prints the Concise or token-cost run's figures, recomputed from its results.jsonl.
+    StyleSummary { results: PathBuf },
+    /// Writes the rewrite run's source and rewrite pairs and patina's --verify results.
+    RewritePairs { work: PathBuf },
+    /// Prints one row per rewrite of the rewrite run.
+    RewriteResults { work: PathBuf },
+    /// Prints the rewrite run's table, recomputed from its results.jsonl.
+    RewriteSummary { results: PathBuf },
 }

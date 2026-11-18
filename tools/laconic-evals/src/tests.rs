@@ -8,6 +8,7 @@ use serde_json::{Value, json};
 use std::fs;
 use std::sync::Mutex;
 
+mod record;
 mod scripts;
 mod survival;
 

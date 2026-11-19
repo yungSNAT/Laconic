@@ -1,0 +1,75 @@
+name: scoop install
+
+# Runs the README's Scoop command on a Windows runner, in a Scoop root made for the run: the
+# manifest installs, the shim reports the manifest's version, a clean file passes and a seeded
+# fault fails. A manual run tests the latest release, or the release its input names; a PR that
+# changes this workflow tests the latest release; the release workflow calls it for the release
+# it has just published.
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: The laconic-check release to install, such as 0.5.0; empty for the latest.
+        required: false
+        default: ""
+  workflow_call:
+    inputs:
+      version:
+        description: The laconic-check release to install, such as 0.5.0; empty for the latest.
+        type: string
+        required: false
+        default: ""
+  pull_request:
+    paths:
+      - .github/workflows/scoop-install.yml
+
+permissions:
+  contents: read
+
+jobs:
+  scoop:
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install Scoop in a new root
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $env:SCOOP = Join-Path $env:RUNNER_TEMP 'scoop'
+          # The installer at a fixed commit of ScoopInstaller/Install. Runners run as an
+          # administrator, which the installer refuses without -RunAsAdmin.
+          $installer = Join-Path $env:RUNNER_TEMP 'install-scoop.ps1'
+          Invoke-WebRequest https://raw.githubusercontent.com/ScoopInstaller/Install/1e2f334083d609986d8c8bc9e31ae8e87c39fab4/install.ps1 -OutFile $installer
+          & $installer -ScoopDir $env:SCOOP -RunAsAdmin
+          "SCOOP=$env:SCOOP" >> $env:GITHUB_ENV
+          (Join-Path $env:SCOOP 'shims') >> $env:GITHUB_PATH
+      - name: Install laconic-check from the release's manifest
+        shell: pwsh
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $manifest = if ($env:VERSION) {
+            "https://github.com/yungSNAT/Laconic/releases/download/laconic-check-v$env:VERSION/laconic-check.json"
+          } else {
+            'https://github.com/yungSNAT/Laconic/releases/latest/download/laconic-check.json'
+          }
+          $expected = "laconic-check $((Invoke-RestMethod $manifest).version)"
+          scoop install $manifest
+          if ($LASTEXITCODE -ne 0) { throw "scoop install exited $LASTEXITCODE" }
+          $installed = (Get-Command laconic-check).Source
+          if (-not $installed.StartsWith($env:SCOOP + [IO.Path]::DirectorySeparatorChar)) { throw "laconic-check resolves to $installed, outside $env:SCOOP" }
+          $reported = laconic-check --version
+          if ($reported -ne $expected) { throw "laconic-check --version printed '$reported', not '$expected'" }
+          "Installed $reported from $manifest at $installed"
+      - name: A clean file passes and a seeded fault fails
+        shell: pwsh
+        run: |
+          laconic-check lint tools/laconic-check/action/tests/clean.md
+          if ($LASTEXITCODE -ne 0) { throw "lint failed the clean file (exit $LASTEXITCODE)" }
+          laconic-check lint tools/laconic-check/action/tests/fault.md
+          if ($LASTEXITCODE -ne 1) { throw "lint exited $LASTEXITCODE on the seeded fault, not 1" }
+          exit 0

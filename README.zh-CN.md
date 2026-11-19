@@ -21,7 +21,7 @@
 
 Laconic 是面向编程智能体和聊天助手的 AI“去 AI 味”（humanizer）与“no AI slop”技能。它让模型先给出答案，标明尚未核实的内容，答完即止，并要求模型保留读者需要的每一个事实、步骤和限定条件。它要求模型按照 Australian Government Style Manual 写出每一句原创文字，并按技能中列出的本项目规则覆盖其中部分要求。
 
-要把 AI 写的文字改得更像人写的，请让智能体对其进行润色（humanise）。散文技能会去除 AI 写作模式，其设计目标是保留每一个事实、数字和限定条件，并让文字更短，而不是用刻意表演的个性来填充。检验这一承诺的[事实保留基准](evals/README.md#fact-survival-benchmark)尚未出结果。2026 年 11 月 14 日，在 99 篇公开文本上，由 Laconic 作者运行的[外部单元比对检查器](#fact-changes-on-a-public-set)发现：视模型而定，Laconic 改写丢失数字、日期、名称或引文的频率与 `humanizer` 相当或更高；两项差异都没有明显偏离 0。
+要把 AI 写的文字改得更像人写的，请让智能体对其进行润色（humanise）。写作技能会去除 AI 写作模式，其设计目标是保留每一个事实、数字和限定条件，并让文字更短，而不是用刻意表演的个性来填充。检验这一承诺的[事实保留基准](evals/README.md#fact-survival-benchmark)尚未出结果。2026 年 11 月 14 日，在 99 篇公开文本上，由 Laconic 作者运行的[外部单元比对检查器](#fact-changes-on-a-public-set)发现：视模型而定，Laconic 改写丢失数字、日期、名称或引文的频率与 `humanizer` 相当或更高；两项差异都没有明显偏离 0。
 
 <table>
 <tr>
@@ -105,7 +105,7 @@ npx skills add yungSNAT/laconic --global --agent "*" --yes
 | 组成部分 | 路径 | 何时生效 |
 |---|---|---|
 | 会话模式 | `skills/laconic/SKILL.md` | 输入 `/laconic` 后，在会话剩余时间内生效，直到 'stop laconic' |
-| 散文技能 | `skills/laconic-prose/SKILL.md` | 由模型在起草、编辑和文字审查时加载；只影响该任务 |
+| 写作技能 | `skills/laconic-prose/SKILL.md` | 由模型在起草、编辑和文字审查时加载；只影响该任务 |
 | 精简规则 | `rules/laconic.md` | 加入智能体规则后始终加载（约 240 个单词） |
 
 会话规则全文见 [SKILL.md](skills/laconic/SKILL.md)：
@@ -121,7 +121,7 @@ npx skills add yungSNAT/laconic --global --agent "*" --yes
 9. 长列表要分组，但不要遗漏相关条目。
 10. 不写开场白、复述或结束语。
 
-每个组成部分都采用澳大利亚英语（拼写、单引号、逗号、数字、日期、不用长破折号），在澳大利亚资料无法确定写法时退而采用英式英语，绝不用美式英语。本项目规则：在 Style Manual 倾向使用 'while' 和 'among' 的地方，使用 whilst 和 amongst。散文技能另外提供完整的写作、编辑和审查流程：针对常见 AI 写作模式的快速检查、意义与语气的保留、不同场合的写作指南、Style Manual 的细则以及 AGLC4 引注说明。
+每个组成部分都采用澳大利亚英语（拼写、单引号、逗号、数字、日期、不用长破折号），在澳大利亚资料无法确定写法时退而采用英式英语，绝不用美式英语。本项目规则：在 Style Manual 倾向使用 'while' 和 'among' 的地方，使用 whilst 和 amongst。写作技能另外提供完整的写作、编辑和审查流程：针对常见 AI 写作模式的快速检查、意义与语气的保留、不同场合的写作指南、Style Manual 的细则以及 AGLC4 引注说明。
 
 <a id="evaluation"></a>
 ## 评估
@@ -158,7 +158,7 @@ npx skills add yungSNAT/laconic --global --agent "*" --yes
 - **实际使用：** 在 Laconic 取代旧配置的当天，作者本人的 Claude Code 会话中，没有 `laconic-check` 问题的助手消息从 26% 升到 42%；用单词写的数字从每 1,000 词 5.7 个降到 3.6 个。
 - **智能体成本：** 在 5 个小型仓库修复任务上（`evals/README.md` 中的智能体成本基准，2 次试验），所有配置都通过了所有任务。会话模式每项任务的成本比精简规则高约 27%，主要因为它始终加载的提示更长；单独的智能体指南部分没有节省任何成本，已删除。
 
-2026 年 10 月 20 日的一项简洁对照（45 个案例，2 次试验，Opus 5.5 生成并盲评）比较了已安装的配置：带散文技能的精简规则（在套话、附加限定和财年相关改动之前与之后），对比单条指令 'Answer concisely.'：
+2026 年 10 月 20 日的一项简洁对照（45 个案例，2 次试验，Opus 5.5 生成并盲评）比较了已安装的配置：带写作技能的精简规则（在套话、附加限定和财年相关改动之前与之后），对比单条指令 'Answer concisely.'：
 
 | 指标 | Laconic | 改动前的 Laconic | 'Answer concisely.' |
 |---|---|---|---|
@@ -230,7 +230,7 @@ Laconic 写得最多：输出 token 比 caveman 多 14%，比 Chisle 多 44%。�
 <a id="against-other-humanisers"></a>
 ### 对比其他去 AI 味工具
 
-2026 年 10 月 20 日，3 种已安装的配置为一位澳大利亚读者润色了 20 篇 AI 写的文本（`evals/humanise-cases.jsonl`：客户邮件、一份 PR 描述、发布说明、一份董事会报告、一则招聘广告等），每篇 2 次试验，由 Claude Opus 5.5 生成并盲评。每种配置只有自己的技能，配有 Skill 和 Read 工具，并被要求使用它：Laconic 的散文技能（提交 `c7e3048`）、[humanizer](https://github.com/blader/humanizer)（提交 `8c307f3`）和 [avoid-ai-writing](https://github.com/conorbronsdon/avoid-ai-writing)（提交 `cb16d10`）。
+2026 年 10 月 20 日，3 种已安装的配置为一位澳大利亚读者润色了 20 篇 AI 写的文本（`evals/humanise-cases.jsonl`：客户邮件、一份 PR 描述、发布说明、一份董事会报告、一则招聘广告等），每篇 2 次试验，由 Claude Opus 5.5 生成并盲评。每种配置只有自己的技能，配有 Skill 和 Read 工具，并被要求使用它：Laconic 的写作技能（提交 `c7e3048`）、[humanizer](https://github.com/blader/humanizer)（提交 `8c307f3`）和 [avoid-ai-writing](https://github.com/conorbronsdon/avoid-ai-writing)（提交 `cb16d10`）。
 
 | 指标 | Laconic | `humanizer` | `avoid-ai-writing` |
 |---|---|---|---|
@@ -260,7 +260,7 @@ Laconic 写得最多：输出 token 比 caveman 多 14%，比 Chisle 多 44%。�
 <a id="fact-changes-on-a-public-set"></a>
 ### 公开数据集上的事实变化
 
-2026 年 11 月 14 日，Laconic 的散文技能和 [humanizer](https://github.com/blader/humanizer) 4.0.0 各自改写了 [AI Humanizer Benchmark](https://huggingface.co/datasets/ai-humanizer-benchmark/ai-humanizer-benchmark) 2026 年 9 月至 11 月各期的 99 篇公开文本，每篇 2 次试验，分 2 轮使用不同模型。外部检查器 [humanizer-fact-audit](https://github.com/zwang-devv/humanizer-fact-audit) 统计了至少丢失原文中一个数字、日期、人名或机构名，或 3 个及以上单词的引文的改写。方法在任何改写之前就已提交。
+2026 年 11 月 14 日，Laconic 的写作技能和 [humanizer](https://github.com/blader/humanizer) 4.0.0 各自改写了 [AI Humanizer Benchmark](https://huggingface.co/datasets/ai-humanizer-benchmark/ai-humanizer-benchmark) 2026 年 9 月至 11 月各期的 99 篇公开文本，每篇 2 次试验，分 2 轮使用不同模型。外部检查器 [humanizer-fact-audit](https://github.com/zwang-devv/humanizer-fact-audit) 统计了至少丢失原文中一个数字、日期、人名或机构名，或 3 个及以上单词的引文的改写。方法在任何改写之前就已提交。
 
 | 轮次 | Laconic | `humanizer` | 差值（95% 区间） |
 |---|---|---|---|
@@ -303,7 +303,7 @@ scoop install https://github.com/yungSNAT/Laconic/releases/latest/download/lacon
 
 Homebrew 配方和 winget 清单是为 tap 和 winget 目录附上的，但 tap 和 winget 目录目前还没有收录 laconic-check。
 
-[docs/rules.md](docs/rules.md) 按名称介绍每条规则，附有示例、对应的 Style Manual 章节以及它标记人类文字的频率；它还列出检查器覆盖了 Style Manual 的哪些章节。误报请通过[问题表单](https://github.com/yungSNAT/Laconic/issues/new?template=false-positive.yml)报告。[docs/humanizer-coverage.md](docs/humanizer-coverage.md) 把 `humanizer` 4.0.0 中的 26 种模式逐一对应到涵盖它的规则和散文技能章节：技能涵盖全部 26 种，`lint` 能以某种形式标出其中 8 种。
+[docs/rules.md](docs/rules.md) 按名称介绍每条规则，附有示例、对应的 Style Manual 章节以及它标记人类文字的频率；它还列出检查器覆盖了 Style Manual 的哪些章节。误报请通过[问题表单](https://github.com/yungSNAT/Laconic/issues/new?template=false-positive.yml)报告。[docs/humanizer-coverage.md](docs/humanizer-coverage.md) 把 `humanizer` 4.0.0 中的 26 种模式逐一对应到涵盖它的规则和写作技能章节：技能涵盖全部 26 种，`lint` 能以某种形式标出其中 8 种。
 
 要在 CI 或 pre-commit 钩子中把 `lint` 用作门禁，以下选项决定它报告什么、何时失败：
 

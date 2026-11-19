@@ -3207,6 +3207,22 @@ mod tests {
     }
 
     #[test]
+    fn columns_hold_after_a_character_whose_lower_case_is_longer() {
+        // 'İ' lower-cases to 2 characters.
+        let columns = |text: &str| -> Vec<(usize, &'static str)> {
+            lint(text)
+                .iter()
+                .map(|f| (f.column, f.rule.house().unwrap().name()))
+                .collect()
+        };
+        assert_eq!(
+            columns("\u{130} color, e.g. 9am."),
+            [(3, "us-spelling"), (10, "latin"), (15, "time")]
+        );
+        assert_eq!(columns("\u{130} oaicite"), [(3, "residue")]);
+    }
+
+    #[test]
     fn finds_phrases_split_by_a_line_wrap() {
         let at = |text: &str| -> Vec<(usize, usize, &'static str)> {
             lint(text)

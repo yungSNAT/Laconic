@@ -51,6 +51,10 @@ The manifests other than Claude Code's still declare plugin 0.5.0, so a build fr
 - Pin CI agent installs and disable lifecycle scripts (#28).
 - Keep scenario prompts out of Claude CLI arguments and reject model values that could become options (#30).
 
+### laconic-check: added
+
+- `laconic-check mcp` and the deprecated Node server speak MCP 2026-07-28 beside the handshake versions: a request naming `2026-07-28` in `_meta` is served with no `initialize`, `server/discover` names the versions spoken without a handshake, and a request naming another version in `_meta` gets error -32022 listing them. A request with no version in `_meta` is served as before.
+
 ## [laconic-check 0.6.0] - 2026-11-19
 
 ### Added

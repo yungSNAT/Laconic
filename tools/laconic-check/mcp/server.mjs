@@ -17,6 +17,11 @@ import { createInterface } from "node:readline";
 
 const WINDOWS = process.platform === "win32";
 const MAX_INPUT = 200_000; // characters per text argument
+const STATELESS_VERSIONS = ["2026-07-28"]; // spoken without a handshake, newest first
+const META_VERSION = "io.modelcontextprotocol/protocolVersion";
+const META_CAPABILITIES = "io.modelcontextprotocol/clientCapabilities";
+const TTL_MS = 3_600_000; // the description and tools change only with the server
+const SERVER_INFO = { name: "laconic-check", version: "0.1.0" };
 
 // PATH's entries. On Windows, as libuv splits them: an entry that starts with a double or single
 // quote runs to the matching quote and then to the next semicolon; one leading and one trailing
@@ -124,24 +129,54 @@ lines.on("line", (line) => {
   }
   const { id, method, params } = request;
   if (id === undefined) return; // notifications need no reply
+  // MCP 2026-07-28 has no handshake: each request names its version in _meta. A request naming
+  // none is served as the handshake versions are.
+  const meta = params?._meta;
+  const requested = meta?.[META_VERSION];
+  const stateless = requested !== undefined;
+  if (stateless && typeof requested !== "string") {
+    return reply(id, undefined, { code: -32602, message: `invalid params: _meta ${META_VERSION} is not a string` });
+  }
+  if (stateless && !STATELESS_VERSIONS.includes(requested)) {
+    return reply(id, undefined, {
+      code: -32022,
+      message: "Unsupported protocol version",
+      data: { supported: STATELESS_VERSIONS, requested },
+    });
+  }
+  const capabilities = meta?.[META_CAPABILITIES];
+  const isObject = typeof capabilities === "object" && capabilities !== null && !Array.isArray(capabilities);
+  if (stateless && method !== "server/discover" && !isObject) {
+    return reply(id, undefined, { code: -32602, message: `invalid params: _meta has no ${META_CAPABILITIES} object` });
+  }
+  const complete = (result) => (stateless ? { resultType: "complete", ...result } : result);
   switch (method) {
+    case "server/discover":
+      return reply(id, {
+        resultType: "complete",
+        supportedVersions: STATELESS_VERSIONS,
+        capabilities: { tools: {} },
+        _meta: { "io.modelcontextprotocol/serverInfo": SERVER_INFO },
+        ttlMs: TTL_MS,
+        cacheScope: "public",
+      });
     case "initialize":
+      if (stateless) break;
       return reply(id, {
         protocolVersion: params?.protocolVersion ?? "2025-06-18",
         capabilities: { tools: {} },
-        serverInfo: { name: "laconic-check", version: "0.1.0" },
+        serverInfo: SERVER_INFO,
       });
     case "ping":
-      return reply(id, {});
+      return reply(id, complete({}));
     case "tools/list":
-      return reply(id, { tools: TOOLS });
+      return reply(id, complete(stateless ? { tools: TOOLS, ttlMs: TTL_MS, cacheScope: "public" } : { tools: TOOLS }));
     case "tools/call":
       try {
-        return reply(id, { content: [{ type: "text", text: callTool(params?.name, params?.arguments) }] });
+        return reply(id, complete({ content: [{ type: "text", text: callTool(params?.name, params?.arguments) }] }));
       } catch (e) {
-        return reply(id, { content: [{ type: "text", text: e.message }], isError: true });
+        return reply(id, complete({ content: [{ type: "text", text: e.message }], isError: true }));
       }
-    default:
-      return reply(id, undefined, { code: -32601, message: `method not found: ${method}` });
   }
+  return reply(id, undefined, { code: -32601, message: `method not found: ${method}` });
 });

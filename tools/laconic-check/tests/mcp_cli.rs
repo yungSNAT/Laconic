@@ -139,6 +139,59 @@ fn initialise_then_list_tools() {
     }
 }
 
+/// MCP 2026-07-28: no handshake; each request names its version in `_meta`.
+#[test]
+fn stateless_discover_list_and_call() {
+    let meta = r#""_meta": {"io.modelcontextprotocol/protocolVersion": "2026-07-28", "io.modelcontextprotocol/clientCapabilities": {}}"#;
+    let discover =
+        format!(r#"{{"jsonrpc": "2.0", "id": 1, "method": "server/discover", "params": {{{meta}}}}}"#);
+    let list =
+        format!(r#"{{"jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {{{meta}}}}}"#);
+    let call = format!(
+        r#"{{"jsonrpc": "2.0", "id": 3, "method": "tools/call", "params": {{{meta}, "name": "lint", "arguments": {{"text": "It worked.\n"}}}}}}"#
+    );
+    let unsupported = r#"{"jsonrpc": "2.0", "id": 4, "method": "tools/list", "params": {"_meta": {"io.modelcontextprotocol/protocolVersion": "1900-01-01", "io.modelcontextprotocol/clientCapabilities": {}}}}"#;
+    let no_capabilities = r#"{"jsonrpc": "2.0", "id": 5, "method": "tools/list", "params": {"_meta": {"io.modelcontextprotocol/protocolVersion": "2026-07-28"}}}"#;
+    for replies in exchange(&[&discover, &list, &call, unsupported, no_capabilities]) {
+        let [discovered, listed, called, unsupported, no_capabilities] =
+            <[Json; 5]>::try_from(replies).unwrap();
+        let discovered = at(&discovered, &["result"]);
+        assert_eq!(string(at(discovered, &["resultType"])), "complete");
+        let versions: Vec<&str> = items(at(discovered, &["supportedVersions"]))
+            .iter()
+            .map(string)
+            .collect();
+        assert_eq!(versions, ["2026-07-28"]);
+        assert_eq!(
+            string(at(
+                discovered,
+                &["_meta", "io.modelcontextprotocol/serverInfo", "name"]
+            )),
+            "laconic-check"
+        );
+        assert_eq!(string(at(discovered, &["cacheScope"])), "public");
+        let listed = at(&listed, &["result"]);
+        assert_eq!(string(at(listed, &["resultType"])), "complete");
+        assert_eq!(items(at(listed, &["tools"])).len(), 2);
+        assert!(matches!(at(listed, &["ttlMs"]), Json::Number(_)));
+        let called = at(&called, &["result"]);
+        assert_eq!(string(at(called, &["resultType"])), "complete");
+        assert_eq!(text(called), "No findings.");
+        assert_eq!(
+            at(&unsupported, &["error", "code"]),
+            &Json::Number("-32022".into())
+        );
+        assert_eq!(
+            string(at(&unsupported, &["error", "data", "requested"])),
+            "1900-01-01"
+        );
+        assert_eq!(
+            at(&no_capabilities, &["error", "code"]),
+            &Json::Number("-32602".into())
+        );
+    }
+}
+
 #[test]
 fn lint_reports_a_finding_by_line() {
     for result in call(

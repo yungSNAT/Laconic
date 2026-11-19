@@ -53,7 +53,7 @@ The manifests other than Claude Code's still declare plugin 0.5.0, so a build fr
 
 ### laconic-check: added
 
-- `laconic-check mcp` and the deprecated Node server speak MCP 2026-07-28 beside the handshake versions: a request naming `2026-07-28` in `_meta` is served with no `initialize`, `server/discover` names the versions spoken without a handshake, and a request naming another version in `_meta` gets error -32022 listing them. A request with no version in `_meta` is served as before.
+- `laconic-check mcp` and the deprecated Node server speak MCP 2026-07-28 beside the handshake versions: a request naming `2026-07-28` in `_meta` is served with no `initialize`, `server/discover` names the versions spoken without a handshake, a request naming another version in `_meta` gets error -32022 listing them, and `ping`, which 2026-07-28 removed, is not served to it. A request with no version in `_meta` is served as before.
 
 ## [laconic-check 0.6.0] - 2026-11-19
 

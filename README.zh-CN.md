@@ -407,7 +407,7 @@ claude mcp add --scope user laconic-check -- laconic-check mcp
 claude mcp add --scope user laconic-check -- node /path/to/laconic/tools/laconic-check/mcp/server.mjs
 ```
 
-`laconic-check lsp` 是通过标准输入输出运行的语言服务器，让编辑器在你输入时显示 `lint` 的问题（自 0.6.0 起）。每当打开的 Markdown 文档发生变化，它就检查一遍，并把每个问题标为警告（若为建议则为提示），链接到对应规则。它应用包含该文档的工作区文件夹（文件夹嵌套时取最内层）中的 `.laconic-check` 文件，并把无法读取或解析的文件作为错误显示在第一行。除诊断外它不提供其他功能。在 Neovim 0.11 或更高版本中（它会把包含 `.laconic-check` 或 `.git` 的文件夹作为工作区文件夹）：
+`laconic-check lsp` 是通过标准输入输出运行的语言服务器，让编辑器在你输入时显示 `lint` 的问题（自 0.6.0 起）。每当打开的 Markdown 文档发生变化，它就检查一遍，并把每个问题标为警告（若为建议则为提示），链接到对应规则。它应用包含该文档的工作区文件夹（文件夹嵌套时取最内层）中的 `.laconic-check` 文件，并把无法读取或解析的文件作为错误显示在第一行。0.6.0 之后，凡规则知道唯一替换写法之处，它还提供快速修复，例如美式拼写、用文字写的数字、拉丁缩写、时间或日期格式、双引号和不可见字符。修复只改动被标出的文字，而且只在你选择时才应用（Neovim 中为 `gra`，Helix 中为 `space a`）。需要改写的规则，例如长破折号、套话和可能的连续逗号，不提供修复。编辑器必须应用带版本号的编辑，Neovim 和 Helix 都是如此，因此在文本改动之后才到达的修复会被拒绝，而不会落在错误的位置。在 Neovim 0.11 或更高版本中（它会把包含 `.laconic-check` 或 `.git` 的文件夹作为工作区文件夹）：
 
 ```lua
 vim.lsp.config('laconic_check', {

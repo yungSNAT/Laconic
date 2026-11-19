@@ -26,7 +26,7 @@ AI가 쓴 글을 사람이 쓴 글처럼 바꾸려면 에이전트에게 휴머�
 <table>
 <tr>
 <td align="center" width="33%"><h3>5점 만점에 4.92</h3>휴머나이즈 품질, 상대는 4.54와 4.50<br><sub><a href="#against-other-humanisers">중립 루브릭, 텍스트 20개, 블라인드 심사</a></sub></td>
-<td align="center" width="33%"><h3>원문 길이의 65%</h3>두 경쟁 도구는 모두 81%<br><sub><a href="#against-other-humanisers">길이만 비교, 사실 검사는 따로 제시</a></sub></td>
+<td align="center" width="33%"><h3>원문 길이의 65%</h3>두 경쟁 도구는 모두 81%<br><sub><a href="#against-other-humanisers">길이만 비교, 사실 검사는 같은 표에 함께 제시</a></sub></td>
 <td align="center" width="33%"><h3>4.63 대 4.07</h3>단순한 'Answer concisely.'와 비교<br><sub><a href="#evaluation">자체 루브릭, 사례 45개, 차단 결함 6개 대 29개</a></sub></td>
 </tr>
 </table>
@@ -63,7 +63,7 @@ npx skills add yungSNAT/laconic --global --agent "*" --yes
 <a id="when-to-choose-something-else"></a>
 ## 다른 도구를 고를 때
 
-- **토큰 비용이 가장 중요하다면:** [caveman](https://github.com/JuliusBrussee/caveman)은 그 목적으로 만들어졌고 에이전트가 읽는 내용도 압축합니다. [Chisle](https://github.com/JayPokale/Chisle)은 출력 토큰을 더 적게 씁니다. Laconic의 사례 47개에서([토큰 비용](#token-cost-against-caveman-and-chisle), 2026년 11월 17일) Laconic의 간결 규칙은 caveman보다 출력 토큰을 14%, Chisle보다 44% 더 썼습니다. 세션에서처럼 규칙을 프롬프트 캐시에서 읽으면 답변 하나의 비용이 caveman보다 17%, Chisle보다 45% 더 들었습니다. 매번 규칙을 캐시에 쓰는 단일 콜드 호출에서는 caveman보다 11% 적게(caveman의 규칙이 더 깁니다), Chisle보다 5% 더 들었습니다. 세션 모드는 작업당 간결 규칙보다 약 27% 더 들었습니다.
+- **토큰 비용이 가장 중요하다면:** [caveman](https://github.com/JuliusBrussee/caveman)은 그 목적으로 만들어졌고 에이전트가 읽는 내용도 압축합니다. [Chisle](https://github.com/JayPokale/Chisle)은 출력 토큰을 그보다도 더 적게 씁니다. Laconic의 사례 47개에서([토큰 비용](#token-cost-against-caveman-and-chisle), 2026년 11월 17일) Laconic의 간결 규칙은 caveman보다 출력 토큰을 14%, Chisle보다 44% 더 썼습니다. 세션에서처럼 규칙을 프롬프트 캐시에서 읽으면 답변 하나의 비용이 caveman보다 17%, Chisle보다 45% 더 들었습니다. 매번 규칙을 캐시에 쓰는 단일 콜드 호출에서는 caveman보다 11% 적게(caveman의 규칙이 더 깁니다), Chisle보다 5% 더 들었습니다. 세션 모드는 작업당 간결 규칙보다 약 27% 더 들었습니다.
 - **다른 영어 변형이 필요하다면:** Laconic은 호주 영어로만 씁니다. [LanguageTool](https://github.com/languagetool-org/languagetool)은 글을 쓴 뒤 호주, 영국, 캐나다, 뉴질랜드, 남아프리카, 미국 영어의 문법과 문체를 검사합니다.
 - **세부 내용을 덧붙이는 재작성을 받아들인다면:** [humanizer](https://github.com/blader/humanizer) 4.0.0(2026년 11월 10일)은 글이 일반적인 곳에서 모델에게 'add a specific detail you know to be true'라고 지시합니다. Laconic은 사실을 덧붙이지 않으며, `laconic-check preserve --strict`는 보호 대상인 수치, URL, 인용 등을 추가한 편집을 실패 처리합니다.
 - **글쓰기 안내만 원한다면:** Laconic의 글쓰기 안내가 바탕으로 삼은 [No AI Slop](https://github.com/petergyang/no-ai-slop)은 응답 규칙과 호주 영어 없이 그 안내를 제공합니다.
@@ -140,7 +140,7 @@ npx skills add yungSNAT/laconic --global --agent "*" --yes
 <details>
 <summary>두 번째 심사자, 검사기 집계, 후속 실행</summary>
 
-다른 모델 계열의 두 번째 블라인드 심사자(GPT-6 Pro)도 방향에는 동의했지만 격차는 더 작았습니다. 가중 점수 4.63 대 4.46(차이 +0.17, 95% 구간 +0.05 ~ +0.30), 정확성 +0.33(+0.12 ~ +0.58)입니다. 이 심사자는 자체 세부 규칙을 훨씬 엄격하게 적용해 두 구성의 많은 답변에서 연속 쉼표(serial comma)와 글자로 쓴 숫자를 찾아냈습니다.
+다른 모델 계열의 두 번째 블라인드 심사자(GPT-6 Pro)도 방향에는 동의했지만 격차는 더 작았습니다. 가중 점수 4.63 대 4.46(차이 +0.17, 95% 구간 +0.05 ~ +0.30), 정확성 +0.33(+0.12 ~ +0.58)입니다. 이 심사자는 Laconic의 세부 규칙을 훨씬 엄격하게 적용해 두 구성의 많은 답변에서 연속 쉼표(serial comma)와 글자로 쓴 숫자를 찾아냈습니다.
 
 `tools/laconic-check`는 심사자 없이 그런 실수를 셉니다. 구성당 같은 답변 60개에서:
 
@@ -381,7 +381,7 @@ GitHub Actions에서는 복합 Action이 러너(Linux x86_64, Windows x86_64, Ap
     sarif_file: laconic-check.sarif
 ```
 
-`lint -`는 표준 입력을 읽으므로 에이전트는 초안을 저장하지 않고도 검사할 수 있습니다. `laconic-check`가 PATH에 있으면 두 스킬 모두 작성한 결과물을 보내기 전에 그것을 실행합니다. 미국식에서 호주식으로 바꾸는 단어 목록은 손으로 쓴 목록과, [English Speller Database](https://github.com/en-wl/wordlist)에서 생성해 Style Manual에 맞춰 검토한 약 2,400쌍을 합친 것입니다(`laconic-tools gen-au-words`). 심은 결함 테스트는 깨끗한 산문에 규칙마다 알려진 결함을 하나씩 심고, 검사기가 각각을 정확히 한 번 잡되 깨끗한 텍스트에서는 아무것도 지적하지 않도록 요구합니다. 보정 테스트는 2018년과 2021년에 발간된 Productivity Commission 보고서 3건(사람이 쓴 산문 약 198,500단어, CC BY 3.0 AU)에 `lint`를 실행하고, 지적 2,246개, 조언 67개(절 대시 문단 41개, 겹친 얼버무림 8개, 정의 전에 쓴 약어 14개, 붙여 쓰기와 하이픈 쓰기가 섞인 합성어 4개), 또는 그 가운데 상투 문구, 꾸민 대조, 불필요한 하이픈 7개가 늘면 실패합니다. 이것이 사람이 쓴 글에서 지적이 순증하는 것을 막습니다. 2026년 11월 5일 외부 실행은 [jenna-russell/human_detectors](https://github.com/jenna-russell/human_detectors)의 커밋 `afcf03d`에 있는 사람이 쓴 기사 150개(대부분 미국식 논픽션 110,723단어, 여기에 저장하지 않음)를 검사했습니다. 1,000단어당 지적 25.9개였고, 97%가 자체 스타일 차이(큰따옴표, 미국식 철자, 엠 대시, 글자로 쓴 숫자, 단어 선택, 연속 쉼표)였습니다. AI 흔적 규칙은 18번 작동했으며(1,000단어당 0.16: 꾸민 대조 8, 상투 문구 7, 폭로형 질문 2, 챗봇식 맺음말 1), 아직 참과 거짓으로 분류하지 않았습니다. 기사가 일반 텍스트이므로 이 실행은 `bold-label`을 시험하지 않습니다.
+`lint -`는 표준 입력을 읽으므로 에이전트는 초안을 저장하지 않고도 검사할 수 있습니다. `laconic-check`가 PATH에 있으면 두 스킬 모두 작성한 결과물을 보내기 전에 그것을 실행합니다. 미국식에서 호주식으로 바꾸는 단어 목록은 손으로 쓴 목록과, [English Speller Database](https://github.com/en-wl/wordlist)에서 생성해 Style Manual에 맞춰 검토한 약 2,400쌍을 합친 것입니다(`laconic-tools gen-au-words`). 심은 결함 테스트는 깨끗한 산문에 규칙마다 알려진 결함을 하나씩 심고, 검사기가 각각을 정확히 한 번 잡되 깨끗한 텍스트에서는 아무것도 지적하지 않도록 요구합니다. 보정 테스트는 2018년과 2021년에 발간된 Productivity Commission 보고서 3건(사람이 쓴 산문 약 198,500단어, CC BY 3.0 AU)에 `lint`를 실행하고, 지적 2,246개, 조언 67개(절 대시 문단 41개, 겹친 얼버무림 8개, 정의 전에 쓴 약어 14개, 붙여 쓰기와 하이픈 쓰기가 섞인 합성어 4개), 또는 그 가운데 상투 문구, 꾸민 대조, 불필요한 하이픈 7개가 늘면 실패합니다. 이것이 사람이 쓴 글에서 지적이 순증하는 것을 막습니다. 2026년 11월 5일 외부 실행은 [jenna-russell/human_detectors](https://github.com/jenna-russell/human_detectors)의 커밋 `afcf03d`에 있는 사람이 쓴 기사 150개(대부분 미국식 논픽션 110,723단어, 여기에 저장하지 않음)를 검사했습니다. 1,000단어당 지적 25.9개였고, 97%가 Laconic 하우스 스타일과의 차이(큰따옴표, 미국식 철자, 엠 대시, 글자로 쓴 숫자, 단어 선택, 연속 쉼표)였습니다. AI 흔적 규칙은 18번 작동했으며(1,000단어당 0.16: 꾸민 대조 8, 상투 문구 7, 폭로형 질문 2, 챗봇식 맺음말 1), 아직 참과 거짓으로 분류하지 않았습니다. 기사가 일반 텍스트이므로 이 실행은 `bold-label`을 시험하지 않습니다.
 
 2026년 11월 13일, [AI Humanizer Benchmark](https://huggingface.co/datasets/ai-humanizer-benchmark/ai-humanizer-benchmark) 2026-10 주기에서 상용 휴머나이저 11개가 만든 재작성 363개에 `preserve`를 실행하고, 그 결과를 논문 [Humanized but Still True?](https://arxiv.org/abs/2611.00359)와 함께 공개된 문서별 사실 판정과 비교했습니다. 고정한 리비전과 명령은 [evals/README.md](evals/README.md#fact-audit-agreement)에 있습니다.
 

@@ -65,7 +65,7 @@ npx skills add yungSNAT/laconic --global --agent "*" --yes
 
 - **トークンコストが最優先なら:** [caveman](https://github.com/JuliusBrussee/caveman) はそのために作られており、エージェントが読む内容も圧縮します。[Chisle](https://github.com/JayPokale/Chisle) は出力トークンがさらに少なくなります。Laconic の 47 ケース（[トークンコスト](#token-cost-against-caveman-and-chisle)、2026 年 11 月 17 日）では、Laconic のコンパクトルールの出力トークンは caveman より 14%、Chisle より 44% 多くなりました。セッション内と同じくルールをプロンプトキャッシュから読んだ場合、回答 1 件のコストは caveman より 17%、Chisle より 45% 高くなりました。毎回ルールをキャッシュに書き込む単発のコールド呼び出しでは、caveman より 11% 安く（caveman のルールのほうが長いため）、Chisle より 5% 高くなりました。セッションモードはタスクあたりコンパクトルールより約 27% 高くつきました。
 - **別の種類の英語が必要なら:** Laconic はオーストラリア英語でのみ書きます。[LanguageTool](https://github.com/languagetool-org/languagetool) は、書き終えた文章についてオーストラリア、イギリス、カナダ、ニュージーランド、南アフリカ、アメリカの英語の文法と文体をチェックします。
-- **詳細を付け加える書き換えを受け入れるなら:** [humanizer](https://github.com/blader/humanizer) 4.0.0（2026 年 11 月 10 日）は、文章が一般的な箇所でモデルに 'add a specific detail you know to be true' と指示します。Laconic は事実を付け加えず、`laconic-check preserve --strict` は保護対象の数値、URL、引用などを追加した編集を失敗にします。
+- **詳細を付け加える書き換えを受け入れるなら:** [humanizer](https://github.com/blader/humanizer) 4.0.0（2026 年 11 月 10 日）は、文章が具体性に欠ける箇所でモデルに 'add a specific detail you know to be true' と指示します。Laconic は事実を付け加えず、`laconic-check preserve --strict` は保護対象の数値、URL、引用などを追加した編集を失敗にします。
 - **文章ガイドだけが欲しいなら:** Laconic の文章ガイドの土台である [No AI Slop](https://github.com/petergyang/no-ai-slop) は、応答ルールとオーストラリア英語なしでそれを提供します。
 - **Microsoft Word で編集するなら:** [PerfectIt](https://www.perfectit.com/) は Word 上で、Australian Government Style 用を含むスタイルシートに照らして一貫性をチェックします。Laconic はエージェント、チャットアシスタント、CI で動き、Word では動きません。
 - **自分たちのハウススタイルを CI でチェックしたいなら:** [Vale](https://github.com/vale-cli/vale) は、正規表現、ルールの種類、パッケージで設定したルールに照らして文章をチェックします。`laconic-check` は Laconic のルールにプロジェクト独自の語の置き換えと禁止フレーズを加えるだけです。
@@ -121,7 +121,7 @@ npx skills add yungSNAT/laconic --global --agent "*" --yes
 9. 長いリストはまとめるが、関係する項目は落とさない。
 10. 前置き、まとめ直し、締めの言葉は書かない。
 
-どの構成要素もオーストラリア英語（綴り、一重引用符、カンマ、数字、日付、エムダッシュ不使用）を適用し、オーストラリアの資料で形が決まらない場合はアメリカ英語ではなくイギリス英語に従います。独自ルール: Style Manual が 'while' と 'among' を好む箇所でも whilst と amongst を使います。散文スキルは、執筆、編集、監査の完全な流れを加えます。よくある AI の文章パターンに対する素早いチェック、意味と語り口の維持、媒体別のガイド、Style Manual の細則、AGLC4 の引用メモです。
+どの構成要素もオーストラリア英語（綴り、一重引用符、カンマ、数字、日付、エムダッシュ不使用）を適用し、オーストラリアの資料で形が決まらない場合はイギリス英語に従い、アメリカ英語は決して使いません。独自ルール: Style Manual が 'while' と 'among' を好む箇所でも whilst と amongst を使います。散文スキルは、執筆、編集、監査の完全な流れを加えます。よくある AI の文章パターンに対する素早いチェック、意味と語り口の維持、媒体別のガイド、Style Manual の細則、AGLC4 の引用メモです。
 
 <a id="evaluation"></a>
 ## 評価
@@ -197,7 +197,7 @@ Laconic は単純な指示より加重で 0.56 上回ります。変更は審査
 
 Laconic 独自のルーブリックは、Laconic だけが求めるオーストラリア英語と独自の細則を採点し、審査者はそれを加重スコアだけでなく正確さとブロッキング指摘にも適用しました。そのため、審査した行のうち文体に中立なのは最初の 3 行だけです。正確さだけで見ると Laconic は Concise スタイルより 0.53 高いものの、10 ケースでは区間が差なしに届くため、明確な優位ではありません。ブロッキング指摘は Laconic が 0 件、Concise スタイルが 4 件でした。最初の審査のメモによると、Concise スタイルは給与関連メール 3 通のうち 2 通で 2026 年 11 月 26 日または 28 日の曜日を誤り、3 通目では締め切りを埋もれさせ、レビュー用メモ 3 件のうち 2 件でタスクが確認していないテストカバレッジを主張し、監査対象のテキストを 1 回誤って引用しました。'Answer concisely.' も同様のミスをしました。Laconic は Concise スタイルより出力トークンが 46% 多く、回答あたりのコストは 18% 高くなりました。3 構成とも、Laconic のルールが独自のハイフンを求める '2026–27' で Style Manual のエンダッシュを残したため、そのケースの正規表現チェックに失敗しました。
 
-限界: 構成あたり 30 件の回答で、生成したモデル自身が審査し、ケースは Laconic の作者が書いたものです。文体を除く審査には較正セットがありませんでした。各区間は 10 ケースをリサンプリングしています（10,000 回、シード 2282）。各呼び出しはプロンプトをプロンプトキャッシュに書き込んだため、コストの行は単発のコールド呼び出しのものです。セッション内のようにルールがキャッシュされていれば Laconic の余分な出力はより大きく効く可能性がありますが、今回の実行では測っていません。Claude Code とその Concise スタイルはソフトウェア開発のセッション向けで、これらのケースの多くは執筆と助言のタスクです。実行スクリプト、回答ごとのスコア、トークン数とコスト、この表を再計算するスクリプトは [`evals/runs/concise-style-2026-11-17`](evals/runs/concise-style-2026-11-17/) にあり、回答そのものは保存していません。
+限界: 構成あたり 30 件の回答で、生成したモデル自身が審査し、ケースは Laconic の作者が書いたものです。文体を除く審査には較正セットがありませんでした。各区間は 10 ケースをリサンプリングしています（10,000 回、シード 2282）。各呼び出しはプロンプトをプロンプトキャッシュに書き込んだため、コストの行は単発のコールド呼び出しのものです。セッション内のようにルールがキャッシュされていれば Laconic の余分な出力はおそらくより大きく効きますが、今回の実行では測っていません。Claude Code とその Concise スタイルはソフトウェア開発のセッション向けで、これらのケースの大半は執筆と助言のタスクです。実行スクリプト、回答ごとのスコア、トークン数とコスト、この表を再計算するスクリプトは [`evals/runs/concise-style-2026-11-17`](evals/runs/concise-style-2026-11-17/) にあり、回答そのものは保存していません。
 
 <a id="token-cost-against-caveman-and-chisle"></a>
 ### caveman、Chisle とのトークンコスト比較
@@ -301,7 +301,7 @@ Linux（x86_64、静的リンク）、Windows（x86_64）、macOS（Apple silico
 scoop install https://github.com/yungSNAT/Laconic/releases/latest/download/laconic-check.json
 ```
 
-Homebrew のフォーミュラと winget のマニフェストは tap と winget カタログ用に添付していますが、どちらもまだ laconic-check を掲載していません。
+Homebrew のフォーミュラと winget のマニフェストは tap と winget カタログ用に添付していますが、tap と winget カタログにはまだ laconic-check が掲載されていません。
 
 [docs/rules.md](docs/rules.md) は各ルールを名前ごとに、例、対応する Style Manual の節、人が書いた文章をどのくらいの頻度で指摘するかとともに説明し、チェッカーが扱う Style Manual の節も示します。誤検知は [issue フォーム](https://github.com/yungSNAT/Laconic/issues/new?template=false-positive.yml)で報告してください。[docs/humanizer-coverage.md](docs/humanizer-coverage.md) は `humanizer` 4.0.0 の 26 パターンそれぞれを、それを扱うルールと散文スキルの節に対応付けています。スキルは 26 すべてを扱い、`lint` はそのうち 8 つを何らかの形で指摘します。
 

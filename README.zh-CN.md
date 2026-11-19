@@ -19,7 +19,7 @@
 
 </div>
 
-Laconic 是面向编程智能体和聊天助手的 AI“去 AI 味”（humanizer）与“no AI slop”技能。它让模型先给出答案，标明尚未核实的内容，答完即止，并要求模型保留读者需要的每一个事实、步骤和限定条件。它要求模型按照 Australian Government Style Manual 写出每一句原创文字，并遵循技能中列出的本项目规则。
+Laconic 是面向编程智能体和聊天助手的 AI“去 AI 味”（humanizer）与“no AI slop”技能。它让模型先给出答案，标明尚未核实的内容，答完即止，并要求模型保留读者需要的每一个事实、步骤和限定条件。它要求模型按照 Australian Government Style Manual 写出每一句原创文字，并按技能中列出的本项目规则覆盖其中部分要求。
 
 要把 AI 写的文字改得更像人写的，请让智能体对其进行润色（humanise）。散文技能会去除 AI 写作模式，其设计目标是保留每一个事实、数字和限定条件，并让文字更短，而不是用刻意表演的个性来填充。检验这一承诺的[事实保留基准](evals/README.md#fact-survival-benchmark)尚未出结果。2026 年 11 月 14 日，在 99 篇公开文本上，由 Laconic 作者运行的[外部单元比对检查器](#fact-changes-on-a-public-set)发现：视模型而定，Laconic 改写丢失数字、日期、名称或引文的频率与 `humanizer` 相当或更高；两项差异都没有明显偏离 0。
 
@@ -156,7 +156,7 @@ npx skills add yungSNAT/laconic --global --agent "*" --yes
 
 - **发送前检查草稿：** 带 `laconic-check` 自检的会话模式在 18 个文字和会计案例上加权得分 4.82，不带自检为 4.71（在 10 个会计案例上为 4.74 对 4.49），阻断问题 0 个对 1 个。
 - **实际使用：** 在 Laconic 取代旧配置的当天，作者本人的 Claude Code 会话中，没有 `laconic-check` 问题的助手消息从 26% 升到 42%；用单词写的数字从每 1,000 词 5.7 个降到 3.6 个。
-- **智能体成本：** 在 5 个小型仓库修复任务上（`evals/README.md` 中的智能体成本基准，2 次试验），所有配置都完成了所有任务。会话模式每项任务的成本比精简规则高约 27%，主要因为它始终加载的提示更长；单独的智能体指南部分没有节省任何成本，已删除。
+- **智能体成本：** 在 5 个小型仓库修复任务上（`evals/README.md` 中的智能体成本基准，2 次试验），所有配置都通过了所有任务。会话模式每项任务的成本比精简规则高约 27%，主要因为它始终加载的提示更长；单独的智能体指南部分没有节省任何成本，已删除。
 
 2026 年 10 月 20 日的一项简洁对照（45 个案例，2 次试验，Opus 5.5 生成并盲评）比较了已安装的配置：带散文技能的精简规则（在套话、附加限定和财年相关改动之前与之后），对比单条指令 'Answer concisely.'：
 
@@ -197,7 +197,7 @@ Laconic 的加权分比简单指令高 0.56。这些改动对评审质量没有�
 
 Laconic 自己的评分标准会给澳大利亚英语和本项目细则打分，而只有 Laconic 要求这些；评审不仅在加权分中，也在正确性和阻断问题中应用了它们，因此评审行中只有前 3 行与文风无关。只看正确性，Laconic 比 Concise 风格高 0.53，但在 10 个案例上区间触及零差异，所以这并非明确领先；Laconic 没有阻断问题，Concise 风格有 4 个。第一次评审的记录显示：Concise 风格在 3 封工资邮件中的 2 封里把 2026 年 11 月 26 日或 28 日的星期几写错，在第三封里把截止日期埋没了；在 3 份审查说明中的 2 份里声称了任务并未证实的测试覆盖率；还有一次错误引用了被审核的文本；'Answer concisely.' 也有类似疏漏。Laconic 的输出 token 比 Concise 风格多 46%，每个回答的成本高 18%。在 Laconic 规则要求使用本项目连字符的 '2026–27' 中，3 种配置都保留了 Style Manual 的短破折号，因此都没通过该案例的正则检查。
 
-局限：每种配置 30 个回答，来自同一个模型，它也负责评审，案例由 Laconic 作者编写；排除文风的评审没有校准集。每个区间都对 10 个案例重抽样（10,000 次，种子 2282）。每次调用都把提示写入了提示缓存，因此成本行是单次冷调用的数据；若像会话中那样缓存规则，Laconic 多出的输出可能占更大比重，但本次运行没有测量这一点。Claude Code 及其 Concise 风格面向软件工程会话，而这些案例大多是写作和咨询任务。运行脚本、逐个回答的得分、token 数和成本，以及重新计算此表的脚本都在 [`evals/runs/concise-style-2026-11-17`](evals/runs/concise-style-2026-11-17/)；回答本身未保存。
+局限：每种配置 30 个回答，来自同一个模型，它也负责评审，案例由 Laconic 作者编写；排除文风的评审没有校准集。每个区间都对 10 个案例重抽样（10,000 次，种子 2282）。每次调用都把提示写入了提示缓存，因此成本行是单次冷调用的数据；若像会话中那样缓存规则，Laconic 多出的输出很可能占更大比重，但本次运行没有测量这一点。Claude Code 及其 Concise 风格面向软件工程会话，而这些案例大多是写作和咨询任务。运行脚本、逐个回答的得分、token 数和成本，以及重新计算此表的脚本都在 [`evals/runs/concise-style-2026-11-17`](evals/runs/concise-style-2026-11-17/)；回答本身未保存。
 
 <a id="token-cost-against-caveman-and-chisle"></a>
 ### 与 caveman 和 Chisle 的 token 成本对比
@@ -301,7 +301,7 @@ cargo run --manifest-path tools/laconic-tools/Cargo.toml -- web-page tools/lacon
 scoop install https://github.com/yungSNAT/Laconic/releases/latest/download/laconic-check.json
 ```
 
-Homebrew 配方和 winget 清单是为 tap 和 winget 目录附上的，但它们目前还没有收录 laconic-check。
+Homebrew 配方和 winget 清单是为 tap 和 winget 目录附上的，但 tap 和 winget 目录目前还没有收录 laconic-check。
 
 [docs/rules.md](docs/rules.md) 按名称介绍每条规则，附有示例、对应的 Style Manual 章节以及它标记人类文字的频率；它还列出检查器覆盖了 Style Manual 的哪些章节。误报请通过[问题表单](https://github.com/yungSNAT/Laconic/issues/new?template=false-positive.yml)报告。[docs/humanizer-coverage.md](docs/humanizer-coverage.md) 把 `humanizer` 4.0.0 中的 26 种模式逐一对应到涵盖它的规则和散文技能章节：技能涵盖全部 26 种，`lint` 能以某种形式标出其中 8 种。
 

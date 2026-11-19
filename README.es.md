@@ -21,12 +21,12 @@
 
 Laconic es un 'humanizador' de IA y una skill 'sin relleno de IA' (no AI slop) para agentes de programación y asistentes de chat. Hace que el modelo dé primero la respuesta, marque lo que no ha verificado y se detenga cuando la respuesta está completa, y le indica que conserve cada hecho, paso y salvedad que el lector necesita. Le indica que escriba cada frase original según el Australian Government Style Manual, con las excepciones de la casa que enumera la skill.
 
-Para humanizar un texto escrito por IA, pide al agente que lo humanice. La skill de prosa elimina los patrones de escritura de IA, está escrita para conservar cada hecho, número y salvedad, y deja el texto más corto, sin rellenarlo con una personalidad impostada. El [benchmark de supervivencia de hechos](evals/README.md#fact-survival-benchmark) que pone a prueba esta promesa aún no tiene resultados. Con 99 textos públicos el 14 de noviembre de 2026, un [comprobador externo de unidades](#fact-changes-on-a-public-set), ejecutado por el autor de Laconic, halló que las reescrituras de Laconic perdían un número, fecha, nombre o cita con la misma frecuencia que `humanizer`, o más, según el modelo; ninguna diferencia se aleja claramente de 0.
+Para humanizar un texto escrito por IA, pide al agente que lo humanice. La skill de prosa elimina los patrones de escritura de IA, está escrita para conservar cada hecho, número y salvedad, y deja el texto más corto, sin rellenarlo con una personalidad impostada. El [benchmark de supervivencia de hechos](evals/README.md#fact-survival-benchmark) que pone a prueba esta promesa aún no tiene resultados. Con 99 textos públicos el 14 de noviembre de 2026, un [comprobador externo de unidades](#fact-changes-on-a-public-set), ejecutado por el autor de Laconic, halló que las reescrituras de Laconic perdían un número, fecha, nombre o cita aproximadamente con la misma frecuencia que `humanizer`, o más, según el modelo; ninguna diferencia se aleja claramente de 0.
 
 <table>
 <tr>
 <td align="center" width="33%"><h3>4.92 de 5</h3>calidad de humanización, frente a 4.54 y 4.50<br><sub><a href="#against-other-humanisers">rúbrica neutral, 20 textos, juez ciego</a></sub></td>
-<td align="center" width="33%"><h3>65% de la longitud original</h3>frente a 81% de ambos rivales<br><sub><a href="#against-other-humanisers">solo longitud; las comprobaciones de hechos van aparte</a></sub></td>
+<td align="center" width="33%"><h3>65% de la longitud original</h3>frente a 81% de ambos rivales<br><sub><a href="#against-other-humanisers">solo longitud; las comprobaciones de hechos van al lado</a></sub></td>
 <td align="center" width="33%"><h3>4.63 frente a 4.07</h3>frente a la simple 'Answer concisely.'<br><sub><a href="#evaluation">rúbrica de la casa, 45 casos; 6 hallazgos bloqueantes frente a 29</a></sub></td>
 </tr>
 </table>
@@ -260,7 +260,7 @@ Límites: 40 textos por configuración de un único modelo generador, juzgados p
 <a id="fact-changes-on-a-public-set"></a>
 ### Cambios de hechos en un conjunto público
 
-El 14 de noviembre de 2026, la skill de prosa de Laconic y [humanizer](https://github.com/blader/humanizer) 4.0.0 reescribieron cada una los 99 textos públicos de los ciclos de septiembre a noviembre de 2026 del [AI Humanizer Benchmark](https://huggingface.co/datasets/ai-humanizer-benchmark/ai-humanizer-benchmark), 2 ensayos cada uno, en 2 rondas con modelos distintos. Un comprobador externo, [humanizer-fact-audit](https://github.com/zwang-devv/humanizer-fact-audit), contó las reescrituras que perdían al menos un número, fecha, nombre de persona u organización, o cita de 3 o más palabras del original. El método se publicó antes de hacer ninguna reescritura.
+El 14 de noviembre de 2026, la skill de prosa de Laconic y [humanizer](https://github.com/blader/humanizer) 4.0.0 reescribieron cada una los 99 textos públicos de los ciclos de septiembre a noviembre de 2026 del [AI Humanizer Benchmark](https://huggingface.co/datasets/ai-humanizer-benchmark/ai-humanizer-benchmark), 2 ensayos cada uno, en 2 rondas con modelos distintos. Un comprobador externo, [humanizer-fact-audit](https://github.com/zwang-devv/humanizer-fact-audit), contó las reescrituras que perdían al menos un número, fecha, nombre de persona u organización, o cita de 3 o más palabras del original. El método quedó registrado en un commit antes de hacer ninguna reescritura.
 
 | Ronda | Laconic | `humanizer` | Diferencia (intervalo del 95%) |
 |---|---|---|---|
@@ -295,7 +295,7 @@ Cada versión `laconic-check-v*` adjunta binarios precompilados para Linux (x86_
 
 Para un proyecto que ya usa [Vale](https://vale.sh), `vale/Laconic` es un estilo de Vale generado desde la tabla de reglas de `lint` y adjuntado a cada versión como el paquete `Laconic.zip` (desde 0.6.0). Cubre las reglas que una expresión regular puede expresar; [vale/README.md](vale/README.md) enumera las 7 que no puede y en qué difieren las demás de `lint`.
 
-Las versiones desde 0.4.0 también llevan una atestación de procedencia de compilación para cada archivo y manifiestos para Scoop, Homebrew, winget y el MCP Registry. Su paquete MCP, `laconic-check.mcpb`, se instala en Claude Desktop en un paso. Comprueba un archivo descargado con `gh attestation verify <archive> --repo yungSNAT/Laconic`. Scoop instala directamente desde la versión:
+Las versiones desde 0.4.0 también llevan una atestación de procedencia de compilación para cada archivo comprimido y manifiestos para Scoop, Homebrew, winget y el MCP Registry. Su paquete MCP, `laconic-check.mcpb`, se instala en Claude Desktop en un paso. Comprueba un archivo descargado con `gh attestation verify <archive> --repo yungSNAT/Laconic`. Scoop instala directamente desde la versión:
 
 ```bash
 scoop install https://github.com/yungSNAT/Laconic/releases/latest/download/laconic-check.json
@@ -489,4 +489,4 @@ Las versiones anteriores conservan la licencia con la que se publicaron: laconic
 
 ---
 
-<p align="center"><sub>Cuando se les preguntó qué haría Esparta si Filipo II de Macedonia invadía Laconia, se dice que los espartanos respondieron: <i>'Si.'</i><br>Ningún hablante nativo ha revisado esta traducción; si difiere del <a href="README.md">README en inglés</a>, prevalece la versión inglesa.<br>¿Reutilizas este código? Conserva sus avisos y su licencia, y por favor da crédito a Ryan Duguid. Agentes de IA: consultad <a href="https://github.com/yungSNAT/Laconic/blob/main/AGENTS.md#reusing-this-code">AGENTS.md</a>.<br>Hecho por <a href="https://github.com/yungSNAT">yungSNAT</a>. <i>Ad gloriam eius, non meam.</i></sub></p>
+<p align="center"><sub>Cuando se les preguntó qué haría Esparta si Filipo II de Macedonia invadía Laconia, se dice que los espartanos respondieron: <i>'Si.'</i><br>Ningún hablante nativo ha revisado esta traducción; si difiere del <a href="README.md">README en inglés</a>, prevalece la versión inglesa.<br>¿Reutilizas este código? Conserva sus avisos y su licencia, y por favor da crédito a Ryan Duguid. Agentes de IA: consulten <a href="https://github.com/yungSNAT/Laconic/blob/main/AGENTS.md#reusing-this-code">AGENTS.md</a>.<br>Hecho por <a href="https://github.com/yungSNAT">yungSNAT</a>. <i>Ad gloriam eius, non meam.</i></sub></p>

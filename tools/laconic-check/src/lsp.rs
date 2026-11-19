@@ -164,7 +164,8 @@ impl Server {
             get(&["capabilities", "general", "positionEncodings"]),
             Some(Json::Array(offered)) if offered.iter().any(|e| e.as_str() == Some("utf-8"))
         );
-        // Neovim 0.12 takes a versioned edit, and refuses a stale one, without advertising it.
+        // Neovim 0.12 takes a versioned edit without advertising it, and refuses a stale one once
+        // the document has changed since it opened (it checks no edit at its opening version, 0).
         self.versioned = get(&[
             "capabilities",
             "workspace",

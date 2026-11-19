@@ -2,7 +2,7 @@
 
 This file follows the shape of [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and is built from `git log`. The plugin and `laconic-check` are versioned separately. Dates are commit dates. Numbers in brackets are pull requests.
 
-The manifests other than Claude Code's still declare plugin 0.5.0, so a build from `main` carries that version plus the Unreleased changes. `laconic-check-v0.1.0`, `laconic-check-v0.2.0`, `laconic-check-v0.3.0`, `laconic-check-v0.4.0` and `laconic-check-v0.5.0` are tagged; no plugin version has a tag or release.
+The manifests other than Claude Code's still declare plugin 0.5.0, so a build from `main` carries that version plus the Unreleased changes. `laconic-check-v0.1.0`, `laconic-check-v0.2.0`, `laconic-check-v0.3.0`, `laconic-check-v0.4.0`, `laconic-check-v0.5.0` and `laconic-check-v0.6.0` are tagged; no plugin version has a tag or release.
 
 ## [Unreleased]
 
@@ -51,7 +51,9 @@ The manifests other than Claude Code's still declare plugin 0.5.0, so a build fr
 - Pin CI agent installs and disable lifecycle scripts (#28).
 - Keep scenario prompts out of Claude CLI arguments and reject model values that could become options (#30).
 
-### laconic-check: added
+## [laconic-check 0.6.0] - 2026-11-19
+
+### Added
 
 - A Vale style, `vale/Laconic`, generated from `lint`'s rule table and word lists by `laconic-tools vale-style` and attached to each release as the Vale package `Laconic.zip`. Its 17 rules link to `docs/rules.md`; the 7 `lint` rules a regular expression cannot express are listed in `vale/README.md`. A workflow runs Vale 3.27.0 on fixtures whose findings `lint` must match line for line.
 - `lint` and `preserve` in the browser: `tools/laconic-web` compiles them to WebAssembly with no dependencies, and `laconic-tools web-page` puts it into `web/index.html` as one file whose content security policy blocks every request. A workflow tests the crate, opens the page in headless Chromium and publishes it with GitHub Pages once Pages is turned on.
@@ -66,14 +68,14 @@ The manifests other than Claude Code's still declare plugin 0.5.0, so a build fr
 - The MCP `preserve` tool takes an optional boolean `loose`, which does what `preserve --loose` does; without it, or with `false`, a lost word such as 'often' is still reported as dropped. Any other value is an error.
 - `preserve --loose` lists a lost word of frequency, quantity, ability, prediction, cause or hedging, such as 'often', 'some', 'can', 'will', 'because' or 'likely', on a `check meaning word:` line that does not fail; without it, these losses fail as before. On the fact audit, 64 of the 258 rewrites the paper marks fully kept pass with `--loose` (23 without), and all 105 it marks altered still fail. `evals/fact_audit_agreement.py --loose` measures it.
 
-### laconic-check: changed
+### Changed
 
 - Relicense under Apache-2.0 instead of FSL-1.1-ALv2. Releases 0.2.0 to 0.5.0 keep FSL-1.1-ALv2 (0.1.0 was MIT), each turning Apache-2.0 2 years after it was made available.
 - Builds need Rust 1.100 or later: `rust-toolchain.toml` pins 1.100.0 for every crate in the repository, and each crate declares `rust-version = "1.100"`.
 - Release builds use link-time optimisation and one codegen unit, so the Linux binary is about a fifth smaller and starts slightly faster (#119).
 - The Action's `args` input documents that it splits at spaces, tabs and new lines and keeps quotation marks as written, so an option's value cannot contain a space, and that a project file whose path has one can go in the working directory as `.laconic-check`.
 
-### laconic-check: fixed
+### Fixed
 
 - Each `laconic-check` binary archive carries `LICENSE` and `NOTICE` beside the binary, and the release workflow fails if an archive holds anything else; the archives of 0.1.0 to 0.5.0 held only the binary.
 - The `web` workflow takes the browser page's snapshot again, up to 3 times, when Chromium took it before the checker had run (this failed one run on `main`). When a check fails, it shows the page's statuses.
@@ -92,7 +94,7 @@ The manifests other than Claude Code's still declare plugin 0.5.0, so a build fr
 - `preserve` reads 'dollars', 'euros' and 'yen' after a number, or after both bounds of a range, as its currency, so '$30 billion' to '30 billion dollars' and '$5-10' to '5-10 dollars' no longer fail, and reads every mark in the Unicode Currency Symbols block, so '₹500' to '₩500' now fails. 'Pounds' after a number is money when either text writes '£' with that number, so '£5' to '5 pounds' no longer fails or lists an added '5 lb'. Report lines change with it: a dropped '30 dollars' is now 'dropped number: $30'.
 - `preserve` reads both bounds of a range in its unit, whether written with a hyphen, an en dash, 'to', 'and' or 'or', so '45 to 60 minutes' to '45-60 minutes' or '45–60 minutes' no longer reports 'dropped quantity: 60 minute', '30 to 60 grams' to '30-60 grams' no longer reports '60 g', and '5-10 kg' to '5 to 10 g' now fails.
 
-### laconic-check: security
+### Security
 
 - The deprecated Node MCP server, `mcp/server.mjs`, looks for `laconic-check` only in PATH's fully qualified entries when `LACONIC_CHECK` is not set, and reports an error naming `LACONIC_CHECK` when none holds it. Before, Node on Windows looked in the server's working directory first, as it does through a relative PATH entry such as `.` on any system, so a `laconic-check` planted in the project the client ran in ran on each call.
 
@@ -199,6 +201,7 @@ The manifests other than Claude Code's still declare plugin 0.5.0, so a build fr
 For versions before 0.5.0, see the history up to commit `0904dda`, which released i-have-adhd 0.4.1.
 
 [Unreleased]: https://github.com/yungSNAT/laconic/commits/main
+[laconic-check 0.6.0]: https://github.com/yungSNAT/laconic/releases/tag/laconic-check-v0.6.0
 [laconic-check 0.5.0]: https://github.com/yungSNAT/laconic/releases/tag/laconic-check-v0.5.0
 [laconic-check 0.4.0]: https://github.com/yungSNAT/laconic/releases/tag/laconic-check-v0.4.0
 [laconic-check 0.3.0]: https://github.com/yungSNAT/laconic/releases/tag/laconic-check-v0.3.0

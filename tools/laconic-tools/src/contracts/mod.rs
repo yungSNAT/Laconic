@@ -16,6 +16,7 @@ mod install_docs;
 mod manifests;
 mod omp;
 mod opencode;
+mod readme_translations;
 mod skills;
 
 use crate::pi_check::TempDir;

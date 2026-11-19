@@ -15,6 +15,8 @@
 
 [Install](#install) · [Use](#use) · [What changes](#what-changes) · [Evaluation](#evaluation) · [Checker](#checker) · [Always on](#always-on) · [Development](#development) · [Credits](#credits) · [Licence](#licence)
 
+English · [Español](README.es.md) · [한국어](README.ko.md) · [简体中文](README.zh-CN.md) · [日本語](README.ja.md)
+
 </div>
 
 Laconic is an AI 'humanizer' (humaniser) and 'no AI slop' skill for coding agents and chat assistants. It makes the model lead with the answer, mark what it has not verified and stop when the answer is complete, and tells it to keep every fact, step and caveat the reader needs. It instructs the model to write every original sentence to the Australian Government Style Manual, with the house overrides listed in the skill.

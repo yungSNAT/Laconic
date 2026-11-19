@@ -270,6 +270,50 @@ pub struct Finding {
     pub column: usize,
     pub rule: RuleRef,
     pub message: String,
+    /// The one replacement the rule knows, if any.
+    pub fix: Option<Fix>,
+}
+
+/// A replacement on a finding's line: `old`, the characters from the 1-based `column`, becomes
+/// `new`. `old` is always the line's text there.
+#[derive(Debug, PartialEq)]
+pub struct Fix {
+    pub column: usize,
+    pub old: String,
+    pub new: String,
+}
+
+impl Fix {
+    /// The fix replacing `len` characters of `chars` from 0-based `start` with `new`.
+    fn of(chars: &[char], start: usize, len: usize, new: String) -> Option<Fix> {
+        Some(Fix {
+            column: start + 1,
+            old: chars.get(start..start + len)?.iter().collect(),
+            new,
+        })
+    }
+
+    /// As `of`, with `new` written in the case of the text it replaces: a capital first letter,
+    /// or all capitals.
+    fn cased(chars: &[char], start: usize, len: usize, new: &str) -> Option<Fix> {
+        let old = chars.get(start..start + len)?;
+        let new = if old.len() > 1 && old.iter().all(|c| !c.is_lowercase()) {
+            new.to_uppercase()
+        } else if old.first().is_some_and(|c| c.is_uppercase()) {
+            capitalise(new)
+        } else {
+            new.to_owned()
+        };
+        Fix::of(chars, start, len, new)
+    }
+}
+
+/// `text` in lower case, one character for each of its characters, so columns found in it are
+/// columns in `text`. `str::to_lowercase` can write 2 for one ('İ' becomes 'i̇').
+fn lower_exact(text: &str) -> String {
+    text.chars()
+        .map(|c| c.to_lowercase().next().unwrap_or(c))
+        .collect()
 }
 
 pub const CLOSERS: &[&str] = &[
@@ -552,6 +596,7 @@ pub fn lint_counting(text: &str, project: &[Rc<ProjectRule>]) -> (Vec<Finding>, 
     let mut suppressions: Vec<Suppression> = Vec::new();
     let mut paragraph = Paragraph::default();
     let mut document = Document::default();
+    let mut code_lines = Vec::new();
     let mut fence: Option<&str> = None;
     let mut list_indent = None;
     // The indent and length of the current run of bold-label bullets.
@@ -588,7 +633,8 @@ pub fn lint_counting(text: &str, project: &[Rc<ProjectRule>]) -> (Vec<Finding>, 
         // Four columns beyond the current list item's content start form indented code.
         let indent = raw.len() - trimmed.len();
         let columns = indent_columns(&raw[..indent]);
-        let names = if paragraph.lines.is_empty() && columns >= list_indent.unwrap_or(0) + 4 {
+        let code_line = paragraph.lines.is_empty() && columns >= list_indent.unwrap_or(0) + 4;
+        let names = if code_line {
             None
         } else {
             suppression_names(trimmed)
@@ -659,6 +705,9 @@ pub fn lint_counting(text: &str, project: &[Rc<ProjectRule>]) -> (Vec<Finding>, 
             || trimmed.starts_with('<')
             || is_break_line(trimmed)
             || indented_code;
+        if code_line {
+            code_lines.push(line_no);
+        }
         if single_line || list_item {
             paragraph.flush(&mut findings, &mut document, project);
         }
@@ -676,6 +725,7 @@ pub fn lint_counting(text: &str, project: &[Rc<ProjectRule>]) -> (Vec<Finding>, 
                     column: indent + 1,
                     rule: RuleId::BoldLabel.into(),
                     message: "3 or more bullets in a row open with a bold label (advisory); use prose or plain bullets unless a template requires the labels".into(),
+                    fix: None,
                 });
             }
         } else if !list_item && (single_line || !in_list) {
@@ -690,6 +740,13 @@ pub fn lint_counting(text: &str, project: &[Rc<ProjectRule>]) -> (Vec<Finding>, 
     paragraph.flush(&mut findings, &mut document, project);
     // Rules that compare paragraphs report once the whole document is read.
     findings.extend(document.findings());
+    // An indented code line is read as prose, as it may be a paragraph indented by mistake;
+    // its code is not for an editor to change.
+    for finding in &mut findings {
+        if code_lines.contains(&finding.line) {
+            finding.fix = None;
+        }
+    }
     let before = findings.len();
     findings.retain(|f| {
         let hit = suppressions
@@ -727,6 +784,7 @@ pub fn lint_counting(text: &str, project: &[Rc<ProjectRule>]) -> (Vec<Finding>, 
             column: s.column,
             rule: RuleId::UnusedSuppression.into(),
             message,
+            fix: None,
         }));
     }
     // Report in line order. The sort is stable, so each line keeps the order its findings were
@@ -1001,13 +1059,24 @@ impl Paragraph {
         let (masked, doubles) = mask(&self.chars);
         document.collect(&masked, |column| self.at(column));
         let mut found = Vec::new();
-        for column in doubles {
-            found.push(self.place(Finding {
-                line: 0,
-                column,
-                rule: RuleId::DoubleQuotes.into(),
-                message: "double quotation marks in prose; use single marks".into(),
-            }));
+        // Once a span holds code, an HTML tag or a link, its marks may belong to them, and so
+        // may the pairing of every later mark in the paragraph: none of those gets a fix.
+        let mut paired = true;
+        for (open, close) in doubles {
+            let span = &self.chars[open..=close];
+            paired &= !span.iter().any(|c| matches!(c, '`' | '<'))
+                && !span.windows(2).any(|w| w == [']', '(']);
+            found.push(
+                self.place(Finding {
+                    line: 0,
+                    column: open + 1,
+                    rule: RuleId::DoubleQuotes.into(),
+                    message: "double quotation marks in prose; use single marks".into(),
+                    fix: single_marks(span)
+                        .filter(|_| paired)
+                        .and_then(|new| Fix::of(&self.chars, open, span.len(), new)),
+                }),
+            );
         }
         for (line, chars) in &self.lines {
             check_residue(chars, *line, &mut found);
@@ -1034,11 +1103,59 @@ impl Paragraph {
         }
     }
 
-    /// Moves a finding from its joined column to its original line and column.
+    /// Moves a finding, and its fix, from joined columns to its original line and column.
     fn place(&self, mut finding: Finding) -> Finding {
         (finding.line, finding.column) = self.at(finding.column);
+        finding.fix = finding
+            .fix
+            .take()
+            .and_then(|fix| self.place_fix(finding.line, fix));
         finding
     }
+
+    /// A fix at its column on `line`, or `None` unless every character it replaces lies on
+    /// that line, in a row, and reads there as `old`: a fix across a line wrap, or over text
+    /// the mask blanked, is dropped.
+    fn place_fix(&self, line: usize, fix: Fix) -> Option<Fix> {
+        let start = fix.column - 1;
+        let len = fix.old.chars().count();
+        let origin = self.origin.get(start..start + len)?;
+        let column = origin.first()?.1;
+        let in_row = origin
+            .iter()
+            .enumerate()
+            .all(|(k, &at)| at == (line, column + k));
+        let (_, chars) = self.lines.iter().find(|(l, _)| *l == line)?;
+        let here = chars.get(column - 1..column - 1 + len)?;
+        (in_row && here.iter().copied().eq(fix.old.chars())).then_some(Fix { column, ..fix })
+    }
+}
+
+/// A double-quoted span with single marks, straight for straight and curly for curly; `None`
+/// when it holds a single quotation mark other than an apostrophe inside a word, as the swap
+/// would leave that quotation's marks the same as the outer ones.
+fn single_marks(span: &[char]) -> Option<String> {
+    let inner = &span[1..span.len() - 1];
+    let in_word = |k: usize| {
+        k > 0
+            && inner[k - 1].is_alphanumeric()
+            && inner.get(k + 1).is_some_and(|c| c.is_alphanumeric())
+    };
+    let nested = inner
+        .iter()
+        .enumerate()
+        .any(|(k, c)| matches!(c, '\'' | '\u{2018}' | '\u{2019}') && !in_word(k));
+    let (open, close) = if span[0] == '"' {
+        ('\'', '\'')
+    } else {
+        ('\u{2018}', '\u{2019}')
+    };
+    (!nested).then(|| {
+        std::iter::once(open)
+            .chain(inner.iter().copied())
+            .chain(std::iter::once(close))
+            .collect()
+    })
 }
 
 /// The words and acronyms of a whole document, for the rules that compare one paragraph with
@@ -1145,6 +1262,7 @@ impl Document {
                     "'{here}' here and '{there}' on line {} (advisory); use one form unless they are different words",
                     there_at.0
                 ),
+                fix: None,
             });
         }
         for (acronym, &used) in &self.used {
@@ -1159,6 +1277,7 @@ impl Document {
                         "'{acronym}' is used before its definition on line {} (advisory); define it at first use",
                         defined.0
                     ),
+                    fix: None,
                 });
             }
         }
@@ -1272,6 +1391,7 @@ fn check_residue(chars: &[char], line: usize, findings: &mut Vec<Finding>) {
                         "{n} hidden tag character{} (U+E0000 to U+E007F)",
                         if n == 1 { "" } else { "s" }
                     ),
+                    fix: Fix::of(&text, k, n, String::new()),
                 });
             }
             k = end;
@@ -1293,11 +1413,16 @@ fn check_residue(chars: &[char], line: usize, findings: &mut Vec<Finding>) {
                 column: k + 1,
                 rule: RuleId::Residue.into(),
                 message: format!("{kind} U+{:04X}", c as u32),
+                // A joiner has its uses (inside an emoji sequence, or in Persian and Indic
+                // scripts), as does an isolate in mixed-direction text, so deleting one is left
+                // to the writer.
+                fix: Fix::of(&text, k, 1, String::new())
+                    .filter(|_| !matches!(c, '\u{200c}' | '\u{200d}' | '\u{2066}'..='\u{2069}')),
             });
         }
         k += 1;
     }
-    let lower: String = text.iter().collect::<String>().to_lowercase();
+    let lower = lower_exact(&text.iter().collect::<String>());
     for marker in RESIDUE_MARKERS {
         let mut from = 0;
         while let Some(pos) = lower[from..].find(marker) {
@@ -1306,6 +1431,7 @@ fn check_residue(chars: &[char], line: usize, findings: &mut Vec<Finding>) {
                 column: lower[..from + pos].chars().count() + 1,
                 rule: RuleId::Residue.into(),
                 message: format!("chat-tool residue '{marker}'"),
+                fix: None,
             });
             from += pos + marker.len();
         }
@@ -1313,8 +1439,8 @@ fn check_residue(chars: &[char], line: usize, findings: &mut Vec<Finding>) {
 }
 
 /// Replaces protected spans with spaces, keeping columns. Returns the masked line and
-/// the columns of double-quoted spans.
-fn mask(chars: &[char]) -> (Vec<char>, Vec<usize>) {
+/// the 0-based indexes of each double-quoted span's opening and closing marks.
+fn mask(chars: &[char]) -> (Vec<char>, Vec<(usize, usize)>) {
     let mut out = chars.to_vec();
     let mut doubles = Vec::new();
     let mut i = 0;
@@ -1381,7 +1507,7 @@ fn mask(chars: &[char]) -> (Vec<char>, Vec<usize>) {
                 && end > i + 1
                 && end - i <= 120
             {
-                doubles.push(i + 1);
+                doubles.push((i, end));
                 blank(&mut out, i, end + 1);
                 i = end + 1;
                 continue;
@@ -1491,6 +1617,7 @@ fn check_line(masked: &[char], line: usize, findings: &mut Vec<Finding>) {
                 column: k + 1,
                 rule: RuleId::EmDash.into(),
                 message: "em dash in original prose".into(),
+                fix: None,
             });
         }
     }
@@ -1509,10 +1636,11 @@ fn check_line(masked: &[char], line: usize, findings: &mut Vec<Finding>) {
             column: at + 1,
             rule: RuleId::ClauseDashes.into(),
             message: "clause dashes in 2 or more sentences of one paragraph (advisory); use a comma, colon or full stop where one reads as well".into(),
+            fix: None,
         });
     }
     let text: String = masked.iter().collect();
-    let lower = text.to_lowercase();
+    let lower = lower_exact(&text);
     let lower_chars: Vec<char> = lower.chars().collect();
     for phrase in CLOSERS {
         let mut from = 0;
@@ -1523,6 +1651,7 @@ fn check_line(masked: &[char], line: usize, findings: &mut Vec<Finding>) {
                 column: col,
                 rule: RuleId::Closer.into(),
                 message: format!("chatbot phrase '{phrase}'"),
+                fix: None,
             });
             from += pos + phrase.len();
         }
@@ -1553,6 +1682,7 @@ fn check_line(masked: &[char], line: usize, findings: &mut Vec<Finding>) {
                     column: plain[..at].chars().count() + 1,
                     rule: RuleId::StockPhrase.into(),
                     message: format!("stock phrase '{phrase}'; state the point directly"),
+                    fix: None,
                 });
             }
             from = end;
@@ -1571,6 +1701,7 @@ fn check_line(masked: &[char], line: usize, findings: &mut Vec<Finding>) {
                     column: plain[..at].chars().count() + 1,
                     rule: RuleId::StackedHedge.into(),
                     message: format!("stacked hedge '{phrase}' (advisory); keep one qualifier at the confidence the source supports"),
+                    fix: None,
                 });
             }
             from = end;
@@ -1590,11 +1721,14 @@ fn check_line(masked: &[char], line: usize, findings: &mut Vec<Finding>) {
             }) else {
                 continue;
             };
+            let column = plain[..at].chars().count();
+            let len = hyphenated.len() + suffix.len();
             findings.push(Finding {
                 line,
-                column: plain[..at].chars().count() + 1,
+                column: column + 1,
                 rule: RuleId::Hyphen.into(),
                 message: format!("'{hyphenated}{suffix}': write '{house}{suffix}'"),
+                fix: Fix::cased(masked, column, len, &format!("{house}{suffix}")),
             });
         }
     }
@@ -1617,6 +1751,7 @@ fn check_line(masked: &[char], line: usize, findings: &mut Vec<Finding>) {
                         column: s + 1,
                         rule: RuleId::UsSpelling.into(),
                         message: format!("'{word}': Australian form is '{au}'"),
+                        fix: Fix::cased(masked, s, k - s, &au),
                     });
                 }
                 let noun_while = word == "while"
@@ -1630,6 +1765,7 @@ fn check_line(masked: &[char], line: usize, findings: &mut Vec<Finding>) {
                         column: s + 1,
                         rule: RuleId::WordChoice.into(),
                         message: format!("'{word}': the house style prefers '{house}'"),
+                        fix: Fix::cased(masked, s, k - s, house),
                     });
                 }
                 // A number word inside a hyphenated compound (forty-five) is a fixed form.
@@ -1643,6 +1779,9 @@ fn check_line(masked: &[char], line: usize, findings: &mut Vec<Finding>) {
                         column: s + 1,
                         rule: RuleId::NumberWord.into(),
                         message: format!("'{word}': use the numeral {numeral} (words only at the start of a sentence)"),
+                        // A capital marks a name ('the Five Eyes'), which keeps its word.
+                        fix: Fix::of(masked, s, k - s, numeral.to_string())
+                            .filter(|_| !proper_noun),
                     });
                 }
                 start = None;
@@ -1733,7 +1872,7 @@ fn check_line(masked: &[char], line: usize, findings: &mut Vec<Finding>) {
             && !introductory
             && !clause_join
         {
-            findings.push(Finding { line, column: k + 1, rule: RuleId::SerialComma.into(), message: "possible comma before a final 'and' or 'or'; keep it only if it prevents a misreading".into() });
+            findings.push(Finding { line, column: k + 1, rule: RuleId::SerialComma.into(), message: "possible comma before a final 'and' or 'or'; keep it only if it prevents a misreading".into(), fix: None });
         }
     }
 }
@@ -1868,6 +2007,7 @@ fn check_structure(masked: &[char], plain: &str, line: usize, findings: &mut Vec
                 column: start + sentence[..at].chars().count() + 1,
                 rule: RuleId::StagedContrast.into(),
                 message: "staged contrast ('not X, it's Y'); state what it is".into(),
+                fix: None,
             });
         }
         // The answer is the next sentence on the line, and it must not be a question:
@@ -1897,6 +2037,7 @@ fn check_structure(masked: &[char], plain: &str, line: usize, findings: &mut Vec
                 column: start + lead + 1,
                 rule: RuleId::RevealQuestion.into(),
                 message: "question-and-answer reveal; state the answer directly".into(),
+                fix: None,
             });
         }
         start = next;
@@ -1962,9 +2103,32 @@ fn check_style_manual_forms(lower: &str, text: &str, line: usize, findings: &mut
         .split_whitespace()
         .map(|w| (w.as_ptr() as usize - lower.as_ptr() as usize, w))
         .collect();
-    let core = |w: &str| -> String {
-        w.trim_matches(|c: char| matches!(c, ',' | ';' | '(' | ')' | '*' | '_'))
-            .to_string()
+    let edge = |c: char| matches!(c, ',' | ';' | '(' | ')' | '*' | '_');
+    let core = |w: &str| -> String { w.trim_matches(edge).to_string() };
+    // Fixes index `text`, the masked line, by character: `lower` has one character for each
+    // of its characters, though not always the same number of bytes.
+    let chars: Vec<char> = text.chars().collect();
+    let originals: Vec<&str> = text.split_whitespace().collect();
+    let column = |at: usize| lower[..at].chars().count();
+    // The fix replacing `lower[from..to]`, in bytes, with `new`.
+    let edit = |from: usize, to: usize, new: String| {
+        Fix::of(&chars, column(from), lower[from..to].chars().count(), new)
+    };
+    let original =
+        |from: usize, to: usize| -> String { chars[column(from)..column(to)].iter().collect() };
+    // Where token `i`'s core starts, in bytes.
+    let core_at = |i: usize| {
+        let (at, raw): (usize, &str) = tokens[i];
+        at + raw.len() - raw.trim_start_matches(edge).len()
+    };
+    // A full stop that ends token `i` may also end its sentence when no word follows or the
+    // next word opens with a capital; a fix that drops it then could join 2 sentences.
+    let may_end_sentence = |i: usize| {
+        originals.get(i + 1).is_none_or(|w| {
+            w.chars()
+                .find(|c| c.is_alphanumeric())
+                .is_some_and(char::is_uppercase)
+        })
     };
     let digits = |w: &str| !w.is_empty() && w.chars().all(|c| c.is_ascii_digit());
     let ordinal = |w: &str| {
@@ -1980,12 +2144,13 @@ fn check_style_manual_forms(lower: &str, text: &str, line: usize, findings: &mut
                 .chars()
                 .all(|c| c.is_ascii_digit() || matches!(c, ',' | '.'))
     };
-    let mut push = |at: usize, rule: RuleId, message: &str| {
+    let mut push = |at: usize, rule: RuleId, message: &str, fix: Option<Fix>| {
         findings.push(Finding {
             line,
-            column: lower[..at].chars().count() + 1,
+            column: column(at) + 1,
             rule: rule.into(),
             message: message.into(),
+            fix,
         })
     };
     for (i, &(at, raw)) in tokens.iter().enumerate() {
@@ -1994,10 +2159,28 @@ fn check_style_manual_forms(lower: &str, text: &str, line: usize, findings: &mut
         let prev = i.checked_sub(1).map(|j| core(tokens[j].1));
         let next = tokens.get(i + 1).map(|t| core(t.1));
         if word.starts_with("e.g.") || word.starts_with("i.e.") || bare == "eg" || bare == "ie" {
+            // 'e.g.' or 'eg', with the full stop after 'eg' when there is one.
+            let len = if word.starts_with("e.g.") || word.starts_with("i.e.") {
+                4
+            } else {
+                2 + usize::from(word[2..].starts_with('.'))
+            };
+            let start = core_at(i);
+            let new = if word.starts_with('e') {
+                "for example"
+            } else {
+                "that is"
+            };
+            // 'IE' in capitals may be the browser.
+            let fix = Fix::cased(&chars, column(start), len, new).filter(|f| {
+                f.old.chars().any(char::is_lowercase)
+                    && !(f.old.ends_with('.') && may_end_sentence(i))
+            });
             push(
                 at,
                 RuleId::Latin,
                 "Latin abbreviation; write 'for example' or 'that is'",
+                fix,
             );
         }
         // 9am, 9:30pm, 9.30am, 9 a.m.: write 9:30 am.
@@ -2018,7 +2201,24 @@ fn check_style_manual_forms(lower: &str, text: &str, line: usize, findings: &mut
                 .as_deref()
                 .is_some_and(|n| matches!(n.trim_end_matches('.'), "am" | "pm"));
         if time || dotted || period_separator {
-            push(at, RuleId::Time, "write times as 9:30 am or 9 am");
+            let start = core_at(i);
+            let fix = if time {
+                let (clock, half) = bare.split_at(bare.len() - 2);
+                edit(
+                    start,
+                    start + bare.len(),
+                    format!(
+                        "{} {half}",
+                        clock.trim_end_matches(['.', ':']).replace('.', ":")
+                    ),
+                )
+            } else if dotted {
+                edit(start, start + word.len(), format!("{}m", &word[..1]))
+                    .filter(|_| !(word.ends_with('.') && may_end_sentence(i)))
+            } else {
+                edit(start, start + word.len(), word.replace('.', ":"))
+            };
+            push(at, RuleId::Time, "write times as 9:30 am or 9 am", fix);
         }
         // A digit after the sign is a remainder ('5 % 3'), and a year before it a table
         // heading ('2020 % change').
@@ -2033,20 +2233,30 @@ fn check_style_manual_forms(lower: &str, text: &str, line: usize, findings: &mut
                 .as_deref()
                 .is_some_and(|n| n.starts_with(|c: char| c.is_ascii_digit()))
         {
+            let (before, previous) = tokens[i - 1];
+            let fix = (raw.starts_with('%') && previous.ends_with(|c: char| c.is_ascii_digit()))
+                .then(|| edit(before + previous.len(), at, String::new()))
+                .flatten();
             push(
                 at,
                 RuleId::SymbolSpace,
                 "no space before the percentage sign: write 12%",
+                fix,
             );
         }
         let currency = word
             .strip_suffix('$')
             .is_some_and(|code| code.chars().all(char::is_alphabetic));
         if currency && tokens.get(i + 1).is_some_and(|t| amount(t.1)) {
+            let fix = raw
+                .ends_with('$')
+                .then(|| edit(at + raw.len(), tokens[i + 1].0, String::new()))
+                .flatten();
             push(
                 at,
                 RuleId::SymbolSpace,
                 "no space after a currency symbol: write $27.99",
+                fix,
             );
         }
         // A year's possessive ('2020's budget') has a noun after it and no 'the' before it.
@@ -2061,7 +2271,15 @@ fn check_style_manual_forms(lower: &str, text: &str, line: usize, findings: &mut
                 .as_deref()
                 .is_some_and(|p| matches!(p, "the" | "early" | "mid" | "late" | "those" | "these"));
         if apostrophe_decade(&word) && (decade_word || !noun_follows) {
-            push(at, RuleId::Date, "decades take no apostrophe: write 1980s");
+            let start = core_at(i);
+            let old = original(start, start + word.len());
+            let new = old.replace("0's", "0s").replace("0\u{2019}s", "0s");
+            push(
+                at,
+                RuleId::Date,
+                "decades take no apostrophe: write 1980s",
+                edit(start, start + word.len(), new),
+            );
         }
         if MONTHS.contains(&word.trim_end_matches('.')) {
             let month = word.trim_end_matches('.');
@@ -2082,10 +2300,27 @@ fn check_style_manual_forms(lower: &str, text: &str, line: usize, findings: &mut
                     .nth(i)
                     .is_some_and(|w| w.contains("may"));
             if (prev_day.is_some_and(ordinal) && !modal) || ordinal_of {
+                // '19th' or '19th of' becomes '19'; with 'of', only when nothing (such as an
+                // emphasis mark) stands between the 2 words.
+                let day = if ordinal_of { i - 2 } else { i - 1 };
+                let start = core_at(day);
+                let ends_at_core = |j: usize| {
+                    tokens[j].0 + tokens[j].1.len() == core_at(j) + core(tokens[j].1).len()
+                };
+                let plain = !ordinal_of || (ends_at_core(day) && tokens[i - 1].1 == "of");
+                let end = if ordinal_of {
+                    tokens[i - 1].0 + tokens[i - 1].1.len()
+                } else {
+                    start + core(tokens[day].1).len()
+                };
+                let digits = core(tokens[day].1)
+                    .trim_end_matches(char::is_alphabetic)
+                    .to_owned();
                 push(
                     at,
                     RuleId::Date,
                     "no ordinal in dates: write 19 October 2026",
+                    edit(start, end, digits).filter(|_| plain),
                 );
             }
             if prev_day.is_some()
@@ -2095,10 +2330,12 @@ fn check_style_manual_forms(lower: &str, text: &str, line: usize, findings: &mut
                     digits(n) && n.len() == 4
                 })
             {
+                let comma = at + raw.len() - 1;
                 push(
                     at,
                     RuleId::Date,
                     "no comma before the year: write 19 October 2026",
+                    edit(comma, comma + 1, String::new()),
                 );
             }
             // 'Wednesday 22 October 2026' names a weekday the calendar can check.
@@ -2118,6 +2355,7 @@ fn check_style_manual_forms(lower: &str, text: &str, line: usize, findings: &mut
                 if let Some(actual) = weekday(year, month_index, day)
                     && actual != named
                 {
+                    // No fix: the calendar cannot tell whether the weekday or the date is wrong.
                     push(
                         tokens[i - 2].0,
                         RuleId::Weekday,
@@ -2127,6 +2365,7 @@ fn check_style_manual_forms(lower: &str, text: &str, line: usize, findings: &mut
                             capitalise(WEEKDAYS[actual]),
                             capitalise(WEEKDAYS[named])
                         ),
+                        None,
                     );
                 }
             }
@@ -2136,7 +2375,25 @@ fn check_style_manual_forms(lower: &str, text: &str, line: usize, findings: &mut
                     (digits(n) && n.len() <= 2) || ordinal(n)
                 })
             {
-                push(at, RuleId::Date, "day before month: write 19 October 2026");
+                // 'October 19' or 'October 19th' becomes '19 October', when nothing (a comma or
+                // an emphasis mark) stands between the 2 words.
+                let start = core_at(i);
+                let plain =
+                    at + raw.len() == start + word.len() && core_at(i + 1) == tokens[i + 1].0;
+                let day = core(tokens[i + 1].1);
+                let day = day.trim_end_matches(['.', ',']);
+                let end = core_at(i + 1) + day.len();
+                let new = format!(
+                    "{} {}",
+                    day.trim_end_matches(char::is_alphabetic),
+                    original(start, start + month.len())
+                );
+                push(
+                    at,
+                    RuleId::Date,
+                    "day before month: write 19 October 2026",
+                    edit(start, end, new).filter(|_| plain),
+                );
             }
         }
     }
@@ -3204,6 +3461,38 @@ mod tests {
     fn reports_line_and_column() {
         let f = &lint("ok\nThe color.")[0];
         assert_eq!((f.line, f.column, f.rule.name()), (2, 5, "us-spelling"));
+    }
+
+    #[test]
+    fn columns_hold_after_a_character_whose_lower_case_is_longer() {
+        // 'İ' lower-cases to 2 characters.
+        let columns = |text: &str| -> Vec<(usize, &'static str)> {
+            lint(text)
+                .iter()
+                .map(|f| (f.column, f.rule.house().unwrap().name()))
+                .collect()
+        };
+        assert_eq!(
+            columns("\u{130} color, e.g. 9am."),
+            [(3, "us-spelling"), (10, "latin"), (15, "time")]
+        );
+        assert_eq!(columns("\u{130} oaicite"), [(3, "residue")]);
+    }
+
+    #[test]
+    fn a_fix_replaces_text_the_line_holds() {
+        let fix = |text: &str| lint(text).into_iter().find_map(|f| f.fix);
+        let wanted = |column, old: &str, new: &str| {
+            Some(Fix {
+                column,
+                old: old.into(),
+                new: new.into(),
+            })
+        };
+        assert_eq!(fix("ok\n  The color."), wanted(7, "color", "colour"));
+        // Columns on a wrapped line count from that line's start.
+        assert_eq!(fix("The road\n   is five."), wanted(7, "five", "5"));
+        assert_eq!(fix("No `color` here."), None);
     }
 
     #[test]

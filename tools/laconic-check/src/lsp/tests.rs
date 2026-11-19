@@ -388,3 +388,710 @@ fn a_project_rule_is_a_warning_with_its_name_and_no_reference_link() {
         "{diagnostic:?}"
     );
 }
+
+/// `initialize` for a client that applies versioned edits, offering `utf-8` when `utf8`.
+fn init_edits(utf8: bool) -> String {
+    let encodings = if utf8 {
+        r#","general":{"positionEncodings":["utf-8"]}"#
+    } else {
+        ""
+    };
+    format!(
+        r#"{{"jsonrpc":"2.0","id":1,"method":"initialize","params":{{"capabilities":{{"workspace":{{"workspaceEdit":{{"documentChanges":true}}}}{encodings}}}}}}}"#
+    )
+}
+
+/// A `codeAction` request `id` for `uri` from one line and character to another, for the
+/// `only` kinds when given.
+fn ask(id: usize, uri: &str, from: (usize, usize), to: (usize, usize), only: &[&str]) -> String {
+    let position = |(line, character): (usize, usize)| {
+        object(vec![
+            ("line", number(line)),
+            ("character", number(character)),
+        ])
+    };
+    let mut context = vec![("diagnostics", Json::Array(Vec::new()))];
+    if !only.is_empty() {
+        context.push(("only", Json::Array(only.iter().map(|k| text(k)).collect())));
+    }
+    mcp::to_string(&object(vec![
+        ("jsonrpc", text("2.0")),
+        ("id", number(id)),
+        ("method", text("textDocument/codeAction")),
+        (
+            "params",
+            object(vec![
+                ("textDocument", object(vec![("uri", text(uri))])),
+                (
+                    "range",
+                    object(vec![("start", position(from)), ("end", position(to))]),
+                ),
+                ("context", object(context)),
+            ]),
+        ),
+    ]))
+}
+
+fn n(json: &Json) -> usize {
+    mcp::to_string(json).parse().unwrap()
+}
+
+/// The actions answering request `id`.
+fn actions(replies: &[Json], id: usize) -> Vec<Json> {
+    let reply = replies
+        .iter()
+        .find(|r| r.get("id").is_some_and(|i| n(i) == id))
+        .unwrap_or_else(|| panic!("no reply {id} in {replies:?}"));
+    match at(reply, "result") {
+        Json::Array(actions) => actions.clone(),
+        other => panic!("not a list of actions: {other:?}"),
+    }
+}
+
+/// `body` after `action`'s edit, which must be one edit of `uri` at `version`; positions count
+/// UTF-8 bytes when `utf8`, else UTF-16 units, and may not split a character or pass a line end.
+fn apply(body: &str, action: &Json, uri: &str, version: usize, utf8: bool) -> String {
+    assert_eq!(at(action, "kind").as_str(), Some("quickfix"));
+    assert!(at(action, "edit").get("changes").is_none(), "{action:?}");
+    let change = at(action, "edit.documentChanges.0");
+    assert_eq!(at(change, "textDocument.uri").as_str(), Some(uri));
+    assert_eq!(n(at(change, "textDocument.version")), version);
+    let Json::Array(edits) = at(change, "edits") else {
+        panic!("edits is not an array");
+    };
+    assert_eq!(edits.len(), 1, "{action:?}");
+    let offset = |p: &Json| {
+        let (line, character) = (n(at(p, "line")), n(at(p, "character")));
+        let start: usize = body.split_inclusive('\n').take(line).map(str::len).sum();
+        let mut units = 0;
+        for (i, c) in body[start..].char_indices() {
+            assert!(units <= character, "{line}:{character} splits a character");
+            if units == character {
+                return start + i;
+            }
+            assert!(
+                !matches!(c, '\r' | '\n'),
+                "{line}:{character} passes the line end"
+            );
+            units += if utf8 { c.len_utf8() } else { c.len_utf16() };
+        }
+        assert_eq!(units, character, "{line}:{character} passes the end");
+        body.len()
+    };
+    let edit = &edits[0];
+    let (from, to) = (
+        offset(at(edit, "range.start")),
+        offset(at(edit, "range.end")),
+    );
+    let new = at(edit, "newText").as_str().unwrap();
+    format!("{}{new}{}", &body[..from], &body[to..])
+}
+
+/// The quick fixes for the whole of `body`, opened as Markdown after `init`: each one's title,
+/// its diagnostic's code and the text its edit makes.
+fn fixes_after(init: &str, body: &str, utf8: bool) -> Vec<(String, String, String)> {
+    let uri = "untitled:fix.md";
+    let end = (body.lines().count() + 1, 0);
+    let (replies, _) = session(&[
+        init,
+        &open(uri, "markdown", body),
+        &ask(7, uri, (0, 0), end, &[]),
+    ]);
+    actions(&replies, 7)
+        .iter()
+        .map(|a| {
+            let title = at(a, "title").as_str().unwrap().to_owned();
+            let code = at(a, "diagnostics.0.code").as_str().unwrap().to_owned();
+            (title, code, apply(body, a, uri, 1, utf8))
+        })
+        .collect()
+}
+
+fn fixes(body: &str) -> Vec<(String, String, String)> {
+    fixes_after(&init_edits(false), body, false)
+}
+
+/// The codes of the diagnostics published for `body`.
+fn codes(body: &str) -> Vec<String> {
+    let (replies, _) = session(&[INIT, &open("untitled:x.md", "markdown", body)]);
+    published(&replies[1]).into_iter().map(|r| r.0).collect()
+}
+
+#[test]
+fn the_server_offers_quick_fixes_and_no_other_kind() {
+    let (replies, _) = session(&[INIT]);
+    assert_eq!(
+        mcp::to_string(at(&replies[0], "result.capabilities.codeActionProvider")),
+        r#"{"codeActionKinds":["quickfix"]}"#
+    );
+}
+
+#[test]
+fn each_fix_replaces_its_finding_and_the_diagnostic_goes() {
+    for (body, rule, title, fixed) in [
+        (
+            "The color is red.",
+            "us-spelling",
+            "Replace 'color' with 'colour'",
+            "The colour is red.",
+        ),
+        (
+            "Color is red.",
+            "us-spelling",
+            "Replace 'Color' with 'Colour'",
+            "Colour is red.",
+        ),
+        (
+            "COLOR is red.",
+            "us-spelling",
+            "Replace 'COLOR' with 'COLOUR'",
+            "COLOUR is red.",
+        ),
+        (
+            "It rose 5 percent.",
+            "us-spelling",
+            "Replace 'percent' with 'per cent'",
+            "It rose 5 per cent.",
+        ),
+        (
+            "It ran while we slept.",
+            "word-choice",
+            "Replace 'while' with 'whilst'",
+            "It ran whilst we slept.",
+        ),
+        (
+            "We use open-source code.",
+            "hyphen",
+            "Replace 'open-source' with 'open source'",
+            "We use open source code.",
+        ),
+        (
+            "Send an E-mail.",
+            "hyphen",
+            "Replace 'E-mail' with 'Email'",
+            "Send an Email.",
+        ),
+        (
+            "We ran five tests.",
+            "number-word",
+            "Replace 'five' with '5'",
+            "We ran 5 tests.",
+        ),
+        (
+            "Use a tool, e.g. a linter.",
+            "latin",
+            "Replace 'e.g.' with 'for example'",
+            "Use a tool, for example a linter.",
+        ),
+        (
+            "Use a tool, ie a linter.",
+            "latin",
+            "Replace 'ie' with 'that is'",
+            "Use a tool, that is a linter.",
+        ),
+        (
+            "We meet at 9am today.",
+            "time",
+            "Replace '9am' with '9 am'",
+            "We meet at 9 am today.",
+        ),
+        (
+            "We meet at 9.30PM today.",
+            "time",
+            "Replace '9.30PM' with '9:30 pm'",
+            "We meet at 9:30 pm today.",
+        ),
+        (
+            "We meet at 9 a.m. today.",
+            "time",
+            "Replace 'a.m.' with 'am'",
+            "We meet at 9 am today.",
+        ),
+        (
+            "We meet at 9.30 am today.",
+            "time",
+            "Replace '9.30' with '9:30'",
+            "We meet at 9:30 am today.",
+        ),
+        (
+            "It rose 5 % today.",
+            "symbol-space",
+            "Delete ' '",
+            "It rose 5% today.",
+        ),
+        (
+            "It costs $ 27.99 now.",
+            "symbol-space",
+            "Delete ' '",
+            "It costs $27.99 now.",
+        ),
+        (
+            "It shipped on 19th October 2026.",
+            "date",
+            "Replace '19th' with '19'",
+            "It shipped on 19 October 2026.",
+        ),
+        (
+            "It shipped on the 19th of October 2026.",
+            "date",
+            "Replace '19th of' with '19'",
+            "It shipped on the 19 October 2026.",
+        ),
+        (
+            "It shipped on 19 October, 2026.",
+            "date",
+            "Delete ','",
+            "It shipped on 19 October 2026.",
+        ),
+        (
+            "It shipped October 19 2026.",
+            "date",
+            "Replace 'October 19' with '19 October'",
+            "It shipped 19 October 2026.",
+        ),
+        (
+            "Music of the 1980's was loud.",
+            "date",
+            "Replace '1980's' with '1980s'",
+            "Music of the 1980s was loud.",
+        ),
+        (
+            "He said \"stop now\" and left.",
+            "double-quotes",
+            "Replace '\"stop now\"' with ''stop now''",
+            "He said 'stop now' and left.",
+        ),
+        (
+            "He said \u{201c}don't\u{201d} twice.",
+            "double-quotes",
+            "Replace '\u{201c}don't\u{201d}' with '\u{2018}don't\u{2019}'",
+            "He said \u{2018}don't\u{2019} twice.",
+        ),
+        (
+            "Approve\u{200b} it.",
+            "residue",
+            "Delete '\\u{200b}'",
+            "Approve it.",
+        ),
+        (
+            "Approve\u{202e} it.",
+            "residue",
+            "Delete '\\u{202e}'",
+            "Approve it.",
+        ),
+        (
+            "Go\u{e0041}\u{e0042} now.",
+            "residue",
+            "Delete '\\u{e0041}\\u{e0042}'",
+            "Go now.",
+        ),
+    ] {
+        let found = fixes(body);
+        let offered: Vec<_> = found.iter().filter(|(_, code, _)| code == rule).collect();
+        assert_eq!(offered.len(), 1, "{body}: {found:?}");
+        assert_eq!(
+            (offered[0].0.as_str(), offered[0].2.as_str()),
+            (title, fixed),
+            "{body}"
+        );
+        let after = codes(fixed);
+        assert!(!after.iter().any(|c| c == rule), "{fixed}: {after:?}");
+    }
+}
+
+#[test]
+fn rules_without_one_known_replacement_offer_nothing() {
+    for body in [
+        "It failed \u{2014} twice.",
+        "We need red, green, and blue.",
+        "We met on Wednesday 22 October 2026.",
+        "It may possibly rain.",
+        "Hope this helps.",
+        "It's not a tool, it's a platform.",
+        // A joiner inside an emoji sequence.
+        "Go \u{1F468}\u{200d}\u{1F469} now.",
+        // The full stop may also end the sentence.
+        "Start at 9 a.m. Then rest.",
+        "Read a book, e.g. Dune.",
+    ] {
+        assert!(!codes(body).is_empty(), "{body}");
+        let found = fixes(body);
+        assert!(found.is_empty(), "{body}: {found:?}");
+    }
+}
+
+#[test]
+fn fixes_count_positions_in_the_encoding_the_client_offers() {
+    // 'İ' lower-cases to 2 characters, which once moved every later column on its line.
+    let body = "\u{130}stanbul \u{1F600} Caf\u{e9} color, \u{1F600}\u{1F600} five at 9am.\n";
+    for utf8 in [false, true] {
+        let texts: Vec<String> = fixes_after(&init_edits(utf8), body, utf8)
+            .into_iter()
+            .map(|f| f.2)
+            .collect();
+        assert_eq!(
+            texts,
+            [
+                "\u{130}stanbul \u{1F600} Caf\u{e9} colour, \u{1F600}\u{1F600} five at 9am.\n",
+                "\u{130}stanbul \u{1F600} Caf\u{e9} color, \u{1F600}\u{1F600} 5 at 9am.\n",
+                "\u{130}stanbul \u{1F600} Caf\u{e9} color, \u{1F600}\u{1F600} five at 9 am.\n",
+            ],
+            "utf8 {utf8}"
+        );
+    }
+}
+
+#[test]
+fn fixes_keep_crlf_line_ends() {
+    let texts: Vec<String> = fixes("The color\r\nis five.\r\n")
+        .into_iter()
+        .map(|f| f.2)
+        .collect();
+    assert_eq!(
+        texts,
+        ["The colour\r\nis five.\r\n", "The color\r\nis 5.\r\n"]
+    );
+}
+
+#[test]
+fn fixes_follow_the_latest_text_at_its_version() {
+    let uri = "untitled:s.md";
+    let init = init_edits(false);
+    let (replies, _) = session(&[
+        &init,
+        &open(uri, "markdown", "color"),
+        &change(uri, "The red color"),
+        // Where version 1 had its finding, version 2 has none.
+        &ask(7, uri, (0, 0), (0, 1), &[]),
+        &ask(8, uri, (0, 8), (0, 13), &[]),
+        &close(uri),
+        &ask(9, uri, (0, 0), (0, 13), &[]),
+    ]);
+    assert!(actions(&replies, 7).is_empty());
+    let found = actions(&replies, 8);
+    assert_eq!(found.len(), 1, "{found:?}");
+    assert_eq!(
+        apply("The red color", &found[0], uri, 2, false),
+        "The red colour"
+    );
+    assert!(actions(&replies, 9).is_empty());
+
+    // No fix for a client that cannot refuse a stale edit, or for a document with no version.
+    let (replies, _) = session(&[
+        INIT,
+        &open(uri, "markdown", "color"),
+        &ask(7, uri, (0, 0), (0, 5), &[]),
+    ]);
+    assert!(actions(&replies, 7).is_empty());
+    let unversioned = notice(
+        "textDocument/didOpen",
+        vec![(
+            "textDocument",
+            object(vec![
+                ("uri", text(uri)),
+                ("languageId", text("markdown")),
+                ("text", text("color")),
+            ]),
+        )],
+    );
+    let (replies, _) = session(&[&init, &unversioned, &ask(7, uri, (0, 0), (0, 5), &[])]);
+    assert_eq!(published(&replies[1]).len(), 1);
+    assert!(actions(&replies, 7).is_empty());
+
+    // Neovim 0.12 takes versioned edits without advertising them, but checks none at version
+    // 0, which it opens a document with: no fix until the first change.
+    let neovim = |changes: &str| {
+        format!(
+            r#"{{"jsonrpc":"2.0","id":1,"method":"initialize","params":{{"clientInfo":{{"name":"Neovim","version":"0.12.6"}},"capabilities":{{{changes}}}}}}}"#
+        )
+    };
+    let at_zero = notice(
+        "textDocument/didOpen",
+        vec![(
+            "textDocument",
+            object(vec![
+                ("uri", text(uri)),
+                ("languageId", text("markdown")),
+                ("version", number(0)),
+                ("text", text("color")),
+            ]),
+        )],
+    );
+    let (replies, _) = session(&[
+        &neovim(""),
+        &at_zero,
+        &ask(7, uri, (0, 0), (0, 5), &[]),
+        &change(uri, "The red color"),
+        &ask(8, uri, (0, 8), (0, 13), &[]),
+    ]);
+    assert!(actions(&replies, 7).is_empty());
+    let found = actions(&replies, 8);
+    assert_eq!(found.len(), 1, "{found:?}");
+    assert_eq!(
+        apply("The red color", &found[0], uri, 2, false),
+        "The red colour"
+    );
+    // A Neovim that says it takes no versioned edits gets none.
+    let refuses = neovim(r#""workspace":{"workspaceEdit":{"documentChanges":false}}"#);
+    let (replies, _) = session(&[
+        &refuses,
+        &open(uri, "markdown", "color"),
+        &ask(7, uri, (0, 0), (0, 5), &[]),
+    ]);
+    assert!(actions(&replies, 7).is_empty());
+}
+
+#[test]
+fn a_request_gets_the_fixes_of_the_diagnostics_it_touches_and_kinds_it_asks_for() {
+    let uri = "untitled:r.md";
+    let (replies, _) = session(&[
+        &init_edits(false),
+        &open(uri, "markdown", "The color is five."),
+        &ask(7, uri, (0, 4), (0, 4), &[]),
+        &ask(8, uri, (0, 13), (0, 13), &["quickfix"]),
+        &ask(9, uri, (0, 0), (0, 18), &["source.fixAll"]),
+        &ask(10, uri, (0, 0), (0, 18), &["refactor", "quickfix"]),
+    ]);
+    let titles = |id| -> Vec<String> {
+        actions(&replies, id)
+            .iter()
+            .map(|a| at(a, "title").as_str().unwrap().to_owned())
+            .collect()
+    };
+    assert_eq!(titles(7), ["Replace 'color' with 'colour'"]);
+    assert_eq!(titles(8), ["Replace 'five' with '5'"]);
+    assert!(titles(9).is_empty());
+    assert_eq!(titles(10).len(), 2);
+    let found = actions(&replies, 7);
+    assert_eq!(
+        mcp::to_string(at(&found[0], "diagnostics.0.range")),
+        r#"{"start":{"line":0,"character":4},"end":{"line":0,"character":5}}"#
+    );
+}
+
+#[test]
+fn protected_and_wrapped_text_gets_no_fix() {
+    let fixed = |body| -> Vec<String> { fixes(body).into_iter().map(|f| f.2).collect() };
+    assert_eq!(
+        fixed("The `color` and 'color' and [color](https://x.org/color) and color.\n"),
+        ["The `color` and 'color' and [color](https://x.org/color) and colour.\n"]
+    );
+    assert_eq!(
+        fixed("Say `\"stop\"` and \"stop\" now.\n"),
+        ["Say `\"stop\"` and 'stop' now.\n"]
+    );
+    // The swap would leave the inner quotation in the same marks as the outer.
+    let nested = "He said \"it's 'fine'\" today.\n";
+    assert!(codes(nested).contains(&"double-quotes".to_owned()));
+    assert!(fixed(nested).is_empty());
+    // A finding whose text runs across a line wrap.
+    let wrapped = "It shipped October\n19 2026.\n";
+    assert!(codes(wrapped).contains(&"date".to_owned()));
+    assert!(fixed(wrapped).is_empty());
+    // An alert's body is prose, read with its marker as a space.
+    assert_eq!(
+        fixed("> [!NOTE]\n> The color is red.\n"),
+        ["> [!NOTE]\n> The colour is red.\n"]
+    );
+}
+
+#[test]
+fn overlapping_fixes_are_separate_actions_each_applied_alone() {
+    // Under the crate's target folder: scratch that only this test writes.
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("target")
+        .join(format!("lsp-fixes-{}", std::process::id()));
+    fs::create_dir_all(&root).unwrap();
+    fs::write(
+        root.join(PROJECT_FILE),
+        "[rules]\nplain: color = hue\nwords: open source = OSS\n",
+    )
+    .unwrap();
+    let init = format!(
+        r#"{{"jsonrpc":"2.0","id":1,"method":"initialize","params":{{"rootUri":"{}","capabilities":{{"workspace":{{"workspaceEdit":{{"documentChanges":true}}}}}}}}}}"#,
+        file_uri(&root)
+    );
+    let uri = file_uri(&root.join("a.md"));
+    let body = "The color is red.";
+    let (replies, _) = session(&[
+        &init,
+        &open(&uri, "markdown", body),
+        &ask(7, &uri, (0, 0), (0, 17), &[]),
+    ]);
+    let found = actions(&replies, 7);
+    let applied: Vec<(String, String)> = found
+        .iter()
+        .map(|a| {
+            let code = at(a, "diagnostics.0.code").as_str().unwrap().to_owned();
+            (code, apply(body, a, &uri, 1, false))
+        })
+        .collect();
+    let after = |text: &str| {
+        let (replies, _) = session(&[&init, &open(&uri, "markdown", text)]);
+        published(&replies[1])
+    };
+    let hue = after("The hue is red.");
+    // The phrase matches across the blanked code span, whose text the fix would overwrite.
+    let spanned = "We use open `x` source.";
+    let (replies, _) = session(&[
+        &init,
+        &open(&uri, "markdown", spanned),
+        &ask(7, &uri, (0, 0), (0, 23), &[]),
+    ]);
+    fs::remove_dir_all(&root).unwrap();
+    assert_eq!(published(&replies[1]), [row("project/words", 0, 7, 8, 2)]);
+    assert!(actions(&replies, 7).is_empty());
+    assert_eq!(
+        applied,
+        [
+            ("us-spelling".to_owned(), "The colour is red.".to_owned()),
+            ("project/plain".to_owned(), "The hue is red.".to_owned()),
+        ]
+    );
+    assert!(hue.is_empty(), "{hue:?}");
+}
+
+#[test]
+fn fixes_change_only_the_flagged_words_of_prose() {
+    let fixed = |body| -> Vec<String> { fixes(body).into_iter().map(|f| f.2).collect() };
+    for body in [
+        // The closing mark sits inside the code span, whose text the swap would change.
+        "Run \"`echo \"hi\"`\" now.\n",
+        // Emphasis or a comma between the flagged words would be lost.
+        "It shipped **October** 19 2026.\n",
+        "It shipped October **19** 2026.\n",
+        "In October, 19 people came.\n",
+        "It shipped **19th** of October.\n",
+        // Indented code.
+        "Text.\n\n    let color = five;\n",
+        // Proper nouns, an acronym, a bidirectional isolate.
+        "We met the Five Eyes partners.\n",
+        "Test it in IE today.\n",
+        "Go \u{2067}left\u{2069} now.\n",
+        // Code indented with a tab, and under a list item's content.
+        "Text.\n\n\tlet color = five;\n",
+        "- Item.\n\n      let color = five;\n",
+        // The closing mark sits in an HTML attribute or a link title.
+        "He said \"see <a href=\"x\">docs</a>\" twice.\n",
+        "He said \"read [docs](https://x.org \"the title\")\" today.\n",
+    ] {
+        assert!(!codes(body).is_empty(), "{body:?}");
+        assert!(fixed(body).is_empty(), "{body:?}: {:?}", fixed(body));
+    }
+    assert_eq!(fixed("Meet at 10.am today.\n"), ["Meet at 10 am today.\n"]);
+    // The fix would delete the code span beside the space.
+    let spanned = "It rose 12 `x` % today.\n";
+    assert!(codes(spanned).contains(&"symbol-space".to_owned()));
+    assert!(fixed(spanned).is_empty());
+}
+
+#[test]
+fn a_project_replacement_takes_the_case_of_a_sentence_start() {
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("target")
+        .join(format!("lsp-case-{}", std::process::id()));
+    fs::create_dir_all(&root).unwrap();
+    fs::write(
+        root.join(PROJECT_FILE),
+        "[rules]\nplain: utilise = use\nnames: github = GitHub\n",
+    )
+    .unwrap();
+    let init = format!(
+        r#"{{"jsonrpc":"2.0","id":1,"method":"initialize","params":{{"rootUri":"{}","capabilities":{{"workspace":{{"workspaceEdit":{{"documentChanges":true}}}}}}}}}}"#,
+        file_uri(&root)
+    );
+    let uri = file_uri(&root.join("a.md"));
+    let body = "Utilise it. Github hosts it.";
+    let (replies, _) = session(&[
+        &init,
+        &open(&uri, "markdown", body),
+        &ask(7, &uri, (0, 0), (0, 28), &[]),
+    ]);
+    fs::remove_dir_all(&root).unwrap();
+    let applied: Vec<String> = actions(&replies, 7)
+        .iter()
+        .map(|a| apply(body, a, &uri, 1, false))
+        .collect();
+    assert_eq!(
+        applied,
+        ["Use it. Github hosts it.", "Utilise it. GitHub hosts it."]
+    );
+}
+
+#[test]
+fn neovim_gets_no_fix_at_a_version_it_does_not_check() {
+    let uri = "untitled:n.md";
+    let opened = |version: &str| {
+        format!(
+            r#"{{"jsonrpc":"2.0","method":"textDocument/didOpen","params":{{"textDocument":{{"uri":"{uri}","languageId":"markdown","version":{version},"text":"color"}}}}}}"#
+        )
+    };
+    for capabilities in [
+        "",
+        r#""workspace":{"workspaceEdit":{"documentChanges":true}}"#,
+    ] {
+        let neovim = format!(
+            r#"{{"jsonrpc":"2.0","id":1,"method":"initialize","params":{{"clientInfo":{{"name":"Neovim"}},"capabilities":{{{capabilities}}}}}}}"#
+        );
+        // Neovim checks an edit's version only when it is above 0.
+        for version in ["0", "-0", "-1", "0.0", "1e0"] {
+            let (replies, _) =
+                session(&[&neovim, &opened(version), &ask(7, uri, (0, 0), (0, 5), &[])]);
+            assert!(actions(&replies, 7).is_empty(), "{capabilities} {version}");
+        }
+        let (replies, _) = session(&[&neovim, &opened("3"), &ask(7, uri, (0, 0), (0, 5), &[])]);
+        let found = actions(&replies, 7);
+        assert_eq!(found.len(), 1, "{capabilities}");
+        assert_eq!(apply("color", &found[0], uri, 3, false), "colour");
+    }
+}
+
+#[test]
+fn text_the_server_cannot_place_gets_no_fix() {
+    let uri = "untitled:t.md";
+    let init = init_edits(false);
+    // A lone CR ends a line for the client but not for `lint`.
+    let (replies, _) = session(&[
+        &init,
+        &open(uri, "markdown", "Hello.\rThe color is red."),
+        &ask(7, uri, (0, 0), (2, 0), &[]),
+    ]);
+    assert!(actions(&replies, 7).is_empty());
+    // The server asks for whole texts; a change with a range leaves it without one.
+    let ranged = notice(
+        "textDocument/didChange",
+        vec![
+            (
+                "textDocument",
+                object(vec![("uri", text(uri)), ("version", number(2))]),
+            ),
+            (
+                "contentChanges",
+                Json::Array(vec![object(vec![
+                    (
+                        "range",
+                        object(vec![
+                            (
+                                "start",
+                                object(vec![("line", number(0)), ("character", number(0))]),
+                            ),
+                            (
+                                "end",
+                                object(vec![("line", number(0)), ("character", number(0))]),
+                            ),
+                        ]),
+                    ),
+                    ("text", text("The color ")),
+                ])]),
+            ),
+        ],
+    );
+    let (replies, _) = session(&[
+        &init,
+        &open(uri, "markdown", "color"),
+        &ranged,
+        &ask(7, uri, (0, 0), (0, 15), &[]),
+    ]);
+    assert!(published(&replies[2]).is_empty(), "{replies:?}");
+    assert!(actions(&replies, 7).is_empty());
+}

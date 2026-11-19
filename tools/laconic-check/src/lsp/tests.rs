@@ -968,6 +968,12 @@ fn fixes_change_only_the_flagged_words_of_prose() {
         "We met the Five Eyes partners.\n",
         "Test it in IE today.\n",
         "Go \u{2067}left\u{2069} now.\n",
+        // Code indented with a tab, and under a list item's content.
+        "Text.\n\n\tlet color = five;\n",
+        "- Item.\n\n      let color = five;\n",
+        // The closing mark sits in an HTML attribute or a link title.
+        "He said \"see <a href=\"x\">docs</a>\" twice.\n",
+        "He said \"read [docs](https://x.org \"the title\")\" today.\n",
     ] {
         assert!(!codes(body).is_empty(), "{body:?}");
         assert!(fixed(body).is_empty(), "{body:?}: {:?}", fixed(body));

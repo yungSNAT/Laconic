@@ -19,8 +19,6 @@
 
 </div>
 
-> [영어 README](README.md)의 번역이며, 내용이 다르면 영어판이 우선합니다. 언어 모델이 번역했고, CI 테스트가 모든 명령, 버전, 링크가 그대로인지 확인합니다.
-
 Laconic은 코딩 에이전트와 채팅 어시스턴트를 위한 AI 'humanizer'(휴머나이저)이자 'no AI slop'(AI 군더더기 없음) 스킬입니다. 모델이 답을 먼저 말하고, 확인하지 않은 것을 표시하며, 답이 완성되면 멈추게 합니다. 또한 독자에게 필요한 모든 사실, 단계, 단서를 지키라고 지시합니다. 모든 원문 문장을 Australian Government Style Manual에 따라 쓰되, 스킬에 적힌 자체 규칙을 우선하도록 지시합니다.
 
 AI가 쓴 글을 사람이 쓴 글처럼 바꾸려면 에이전트에게 휴머나이즈해 달라고 요청하세요. 산문 스킬은 AI 글쓰기 패턴을 없애고, 모든 사실, 숫자, 단서를 지키도록 작성되어 있으며, 꾸며 낸 개성으로 부풀리지 않고 글을 더 짧게 만듭니다. 이 약속을 검증하는 [사실 보존 벤치마크](evals/README.md#fact-survival-benchmark)는 아직 결과가 나오지 않았습니다. 2026년 11월 14일 공개 텍스트 99개에서, Laconic 작성자가 실행한 [외부 단위 대조 검사기](#fact-changes-on-a-public-set)는 모델에 따라 Laconic의 재작성이 `humanizer`와 비슷하거나 더 자주 숫자, 날짜, 이름, 인용을 잃는다는 것을 발견했습니다. 어느 차이도 0과 뚜렷이 구분되지 않습니다.
@@ -491,4 +489,4 @@ Apache-2.0입니다. [LICENSE](LICENSE)를 보세요. 이 저작물을 재배포
 
 ---
 
-<p align="center"><sub>마케도니아의 필리포스 2세가 라코니아를 침공하면 스파르타가 어떻게 하겠느냐는 물음에 스파르타인들은 이렇게 답했다고 합니다. <i>'만약.'</i><br>이 코드를 재사용하나요? 고지와 라이선스를 유지하고, Ryan Duguid를 밝혀 주세요. AI 에이전트는 <a href="https://github.com/yungSNAT/Laconic/blob/main/AGENTS.md#reusing-this-code">AGENTS.md</a>를 보세요.<br>Made by <a href="https://github.com/yungSNAT">yungSNAT</a>. <i>Ad gloriam eius, non meam.</i></sub></p>
+<p align="center"><sub>마케도니아의 필리포스 2세가 라코니아를 침공하면 스파르타가 어떻게 하겠느냐는 물음에 스파르타인들은 이렇게 답했다고 합니다. <i>'만약.'</i><br>원어민이 검토하지 않은 번역입니다. 내용이 다르면 <a href="README.md">영어 README</a>가 우선합니다.<br>이 코드를 재사용하나요? 고지와 라이선스를 유지하고, Ryan Duguid를 밝혀 주세요. AI 에이전트는 <a href="https://github.com/yungSNAT/Laconic/blob/main/AGENTS.md#reusing-this-code">AGENTS.md</a>를 보세요.<br>Made by <a href="https://github.com/yungSNAT">yungSNAT</a>. <i>Ad gloriam eius, non meam.</i></sub></p>

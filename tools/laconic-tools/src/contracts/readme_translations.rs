@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 //! The README's translations, `README.<language>.md` beside it, carry the English README's
-//! commands (its fenced code blocks, in order), links and version numbers. A change to any of
-//! them in README.md fails here until every translation has it too.
+//! commands (its fenced code blocks, in order), links, version numbers and every number written
+//! in digits. A change to any of them in README.md fails here until every translation has it too.
 
 use super::{read, root};
 use regex::Regex;
@@ -36,6 +36,8 @@ struct Carried {
     links: Vec<String>,
     /// Version numbers outside code blocks, sorted.
     versions: Vec<String>,
+    /// Numbers written in digits outside code blocks and link targets, sorted.
+    numbers: Vec<String>,
 }
 
 static LINK: LazyLock<Regex> = LazyLock::new(|| {
@@ -43,6 +45,8 @@ static LINK: LazyLock<Regex> = LazyLock::new(|| {
 });
 static VERSION: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"\bv?\d+\.\d+\.\d+(?:-[0-9A-Za-z.]+)?\b").unwrap());
+static NUMBER: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"[+-]?[0-9][0-9,.]*[0-9]|[0-9]").unwrap());
 
 fn carried(text: &str) -> Carried {
     let mut commands = Vec::new();
@@ -77,10 +81,17 @@ fn carried(text: &str) -> Carried {
         .map(|m| m.as_str().to_owned())
         .collect();
     versions.sort();
+    let unlinked = LINK.replace_all(&prose, "").replace('\u{2212}', "-");
+    let mut numbers: Vec<String> = NUMBER
+        .find_iter(&unlinked)
+        .map(|m| m.as_str().to_owned())
+        .collect();
+    numbers.sort();
     Carried {
         commands,
         links,
         versions,
+        numbers,
     }
 }
 
@@ -126,6 +137,9 @@ fn problems(english: &str, translation: &str) -> Vec<String> {
         problems.extend(missing.iter().map(|m| format!("{kind} missing: {m}")));
         problems.extend(extra.iter().map(|e| format!("{kind} not in README.md: {e}")));
     }
+    // Extra numbers are allowed: a translation may write in digits what English writes in words.
+    let (missing, _) = differences(&want.numbers, &got.numbers);
+    problems.extend(missing.iter().map(|m| format!("number missing: {m}")));
     for target in got.links.iter().filter_map(|l| l.strip_prefix('#')) {
         let anchor = format!(r#"id="{target}""#);
         if !translation.contains(&anchor) {
@@ -153,13 +167,14 @@ fn every_translation_carries_the_readmes_commands_links_and_versions() {
 
 #[test]
 fn a_change_to_a_command_link_or_version_fails_until_translated() {
-    let english = "Run:\n\n```bash\nlaconic-check lint README.md\n```\n\nSee [the guide](INSTALL.md), [rules](#rules) and 0.6.0.\n";
-    let translated = "Ejecute:\n\n```bash\nlaconic-check lint README.md\n```\n\nVea [la guía](INSTALL.md), [reglas](#rules) y 0.6.0.\n<a id=\"rules\"></a>\n";
+    let english = "Run:\n\n```bash\nlaconic-check lint README.md\n```\n\nSee [the guide](INSTALL.md), [rules](#rules) and 0.6.0; it scored 4.92 of 5.\n";
+    let translated = "Ejecute:\n\n```bash\nlaconic-check lint README.md\n```\n\nVea [la guía](INSTALL.md), [reglas](#rules) y 0.6.0; obtuvo 4.92 de 5 en 2 pruebas.\n<a id=\"rules\"></a>\n";
     assert_eq!(problems(english, translated), Vec::<String>::new());
     for (changed, problem) in [
         (english.replace("lint README", "lint --warn README"), "code blocks differ at block 1"),
         (english.replace("(INSTALL.md)", "(docs/INSTALL.md)"), "link missing: docs/INSTALL.md"),
         (english.replace("0.6.0", "0.7.0"), "version missing: 0.7.0"),
+        (english.replace("4.92", "4.95"), "number missing: 4.95"),
     ] {
         let found = problems(&changed, translated);
         assert!(found.iter().any(|p| p.starts_with(problem)), "{found:?}");

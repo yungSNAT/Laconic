@@ -19,8 +19,6 @@
 
 </div>
 
-> Traducción del [README en inglés](README.md), que prevalece si difieren. La hizo un modelo de lenguaje; una prueba de CI comprueba que conserva todos sus comandos, versiones y enlaces.
-
 Laconic es un 'humanizador' de IA y una skill 'sin relleno de IA' (no AI slop) para agentes de programación y asistentes de chat. Hace que el modelo dé primero la respuesta, marque lo que no ha verificado y se detenga cuando la respuesta está completa, y le indica que conserve cada hecho, paso y salvedad que el lector necesita. Le indica que escriba cada frase original según el Australian Government Style Manual, con las excepciones de la casa que enumera la skill.
 
 Para humanizar un texto escrito por IA, pide al agente que lo humanice. La skill de prosa elimina los patrones de escritura de IA, está escrita para conservar cada hecho, número y salvedad, y deja el texto más corto, sin rellenarlo con una personalidad impostada. El [benchmark de supervivencia de hechos](evals/README.md#fact-survival-benchmark) que pone a prueba esta promesa aún no tiene resultados. Con 99 textos públicos el 14 de noviembre de 2026, un [comprobador externo de unidades](#fact-changes-on-a-public-set), ejecutado por el autor de Laconic, halló que las reescrituras de Laconic perdían un número, fecha, nombre o cita con la misma frecuencia que `humanizer`, o más, según el modelo; ninguna diferencia se aleja claramente de 0.
@@ -491,4 +489,4 @@ Las versiones anteriores conservan la licencia con la que se publicaron: laconic
 
 ---
 
-<p align="center"><sub>Cuando se les preguntó qué haría Esparta si Filipo II de Macedonia invadía Laconia, se dice que los espartanos respondieron: <i>'Si.'</i><br>¿Reutilizas este código? Conserva sus avisos y su licencia, y por favor da crédito a Ryan Duguid. Agentes de IA: consultad <a href="https://github.com/yungSNAT/Laconic/blob/main/AGENTS.md#reusing-this-code">AGENTS.md</a>.<br>Hecho por <a href="https://github.com/yungSNAT">yungSNAT</a>. <i>Ad gloriam eius, non meam.</i></sub></p>
+<p align="center"><sub>Cuando se les preguntó qué haría Esparta si Filipo II de Macedonia invadía Laconia, se dice que los espartanos respondieron: <i>'Si.'</i><br>Ningún hablante nativo ha revisado esta traducción; si difiere del <a href="README.md">README en inglés</a>, prevalece la versión inglesa.<br>¿Reutilizas este código? Conserva sus avisos y su licencia, y por favor da crédito a Ryan Duguid. Agentes de IA: consultad <a href="https://github.com/yungSNAT/Laconic/blob/main/AGENTS.md#reusing-this-code">AGENTS.md</a>.<br>Hecho por <a href="https://github.com/yungSNAT">yungSNAT</a>. <i>Ad gloriam eius, non meam.</i></sub></p>

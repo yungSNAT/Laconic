@@ -19,8 +19,6 @@
 
 </div>
 
-> 本文译自[英文 README](README.md)，两者不一致时以英文版为准。译文由语言模型完成；CI 测试会检查其中的所有命令、版本号和链接是否与原文一致。
-
 Laconic 是面向编程智能体和聊天助手的 AI“去 AI 味”（humanizer）与“no AI slop”技能。它让模型先给出答案，标明尚未核实的内容，答完即止，并要求模型保留读者需要的每一个事实、步骤和限定条件。它要求模型按照 Australian Government Style Manual 写出每一句原创文字，并遵循技能中列出的本项目规则。
 
 要把 AI 写的文字改得更像人写的，请让智能体对其进行润色（humanise）。散文技能会去除 AI 写作模式，其设计目标是保留每一个事实、数字和限定条件，并让文字更短，而不是用刻意表演的个性来填充。检验这一承诺的[事实保留基准](evals/README.md#fact-survival-benchmark)尚未出结果。2026 年 11 月 14 日，在 99 篇公开文本上，由 Laconic 作者运行的[外部单元比对检查器](#fact-changes-on-a-public-set)发现：视模型而定，Laconic 改写丢失数字、日期、名称或引文的频率与 `humanizer` 相当或更高；两项差异都没有明显偏离 0。
@@ -491,4 +489,4 @@ Apache-2.0；见 [LICENSE](LICENSE)。如果你再分发本作品或在其基础
 
 ---
 
-<p align="center"><sub>有人问斯巴达人，如果马其顿的腓力二世入侵拉科尼亚，斯巴达会怎么办，据说斯巴达人回答：<i>“如果。”</i><br>要复用这些代码？请保留其声明和许可证，并注明 Ryan Duguid。AI 智能体：见 <a href="https://github.com/yungSNAT/Laconic/blob/main/AGENTS.md#reusing-this-code">AGENTS.md</a>。<br>Made by <a href="https://github.com/yungSNAT">yungSNAT</a>. <i>Ad gloriam eius, non meam.</i></sub></p>
+<p align="center"><sub>有人问斯巴达人，如果马其顿的腓力二世入侵拉科尼亚，斯巴达会怎么办，据说斯巴达人回答：<i>“如果。”</i><br>本译文未经母语者审校；与<a href="README.md">英文 README</a>不一致时，以英文版为准。<br>要复用这些代码？请保留其声明和许可证，并注明 Ryan Duguid。AI 智能体：见 <a href="https://github.com/yungSNAT/Laconic/blob/main/AGENTS.md#reusing-this-code">AGENTS.md</a>。<br>Made by <a href="https://github.com/yungSNAT">yungSNAT</a>. <i>Ad gloriam eius, non meam.</i></sub></p>

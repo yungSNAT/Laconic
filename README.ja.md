@@ -19,8 +19,6 @@
 
 </div>
 
-> [英語版 README](README.md) の翻訳です。内容が食い違う場合は英語版が優先します。翻訳は言語モデルが行い、CI のテストですべてのコマンド、バージョン、リンクが英語版と同じであることを確認しています。
-
 Laconic は、コーディングエージェントとチャットアシスタント向けの AI「ヒューマナイザー」（humanizer）であり、「no AI slop」（AI っぽい水増しをなくす）スキルです。モデルに答えを先に述べさせ、未確認の点を明示させ、答え終えたら止めさせます。また、読み手に必要な事実、手順、注意点をすべて残すよう指示します。すべてのオリジナルの文を Australian Government Style Manual に従って書き、スキルに記載された独自ルールで上書きするよう指示します。
 
 AI が書いた文章を人が書いたように直すには、エージェントにヒューマナイズを頼んでください。散文スキルは AI の文章パターンを取り除き、事実、数値、注意点をすべて残すように書かれており、演出された個性で水増しせず文章を短くします。この約束を検証する[事実保持ベンチマーク](evals/README.md#fact-survival-benchmark)はまだ結果が出ていません。2026 年 11 月 14 日、公開テキスト 99 本について、Laconic の作者が実行した[外部の単位照合チェッカー](#fact-changes-on-a-public-set)は、モデルによっては Laconic の書き換えが `humanizer` と同程度か、それ以上の頻度で数値、日付、名前、引用を失うことを見つけました。どちらの差もはっきりと 0 から離れてはいません。
@@ -491,4 +489,4 @@ Apache-2.0 です。[LICENSE](LICENSE) を参照してください。この著�
 
 ---
 
-<p align="center"><sub>マケドニアのフィリッポス 2 世がラコニアに攻め入ったらスパルタはどうするのかと問われ、スパルタ人は <i>「もしも」</i> と答えたと言われています。<br>このコードを再利用しますか？ 告知とライセンスを残し、Ryan Duguid をクレジットしてください。AI エージェントは <a href="https://github.com/yungSNAT/Laconic/blob/main/AGENTS.md#reusing-this-code">AGENTS.md</a> を参照してください。<br>Made by <a href="https://github.com/yungSNAT">yungSNAT</a>. <i>Ad gloriam eius, non meam.</i></sub></p>
+<p align="center"><sub>マケドニアのフィリッポス 2 世がラコニアに攻め入ったらスパルタはどうするのかと問われ、スパルタ人は <i>「もしも」</i> と答えたと言われています。<br>この翻訳はネイティブスピーカーによる確認を受けていません。<a href="README.md">英語版 README</a> と食い違う場合は英語版が優先します。<br>このコードを再利用しますか？ 告知とライセンスを残し、Ryan Duguid をクレジットしてください。AI エージェントは <a href="https://github.com/yungSNAT/Laconic/blob/main/AGENTS.md#reusing-this-code">AGENTS.md</a> を参照してください。<br>Made by <a href="https://github.com/yungSNAT">yungSNAT</a>. <i>Ad gloriam eius, non meam.</i></sub></p>

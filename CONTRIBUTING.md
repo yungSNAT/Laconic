@@ -97,6 +97,8 @@ For behaviour changes, add or update representative eval cases when needed, run 
 
 Keep examples safe to copy: use harmless fixtures, explicit placeholders and read-only previews. Never include real secrets, personal paths, production identifiers or commands that could damage a reader's environment. Distinguish required behaviour from suggestions and avoid unsupported medical, accessibility, platform or performance claims.
 
+The README has translations beside it (`README.<language>.md`). A change to `README.md`'s code (fenced or inline) or link targets, or a new or changed number in digits (versions included), fails the `readme_translations` test until each translation has it; a removed number and a changed sentence do not, so update the translations in the same PR or they lag behind. A translation adds no code spans or links of its own and keeps every figure in English notation (`1,360`, `4.92`, `2026-10`).
+
 A PR is ready when:
 
 - one authorship category is selected and agent involvement is disclosed accurately;

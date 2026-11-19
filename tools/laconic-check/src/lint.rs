@@ -633,7 +633,8 @@ pub fn lint_counting(text: &str, project: &[Rc<ProjectRule>]) -> (Vec<Finding>, 
         // Four columns beyond the current list item's content start form indented code.
         let indent = raw.len() - trimmed.len();
         let columns = indent_columns(&raw[..indent]);
-        let names = if paragraph.lines.is_empty() && columns >= list_indent.unwrap_or(0) + 4 {
+        let code_line = paragraph.lines.is_empty() && columns >= list_indent.unwrap_or(0) + 4;
+        let names = if code_line {
             None
         } else {
             suppression_names(trimmed)
@@ -704,7 +705,7 @@ pub fn lint_counting(text: &str, project: &[Rc<ProjectRule>]) -> (Vec<Finding>, 
             || trimmed.starts_with('<')
             || is_break_line(trimmed)
             || indented_code;
-        if indented_code {
+        if code_line {
             code_lines.push(line_no);
         }
         if single_line || list_item {
@@ -1123,11 +1124,11 @@ impl Paragraph {
 
 /// A double-quoted span with single marks, straight for straight and curly for curly; `None`
 /// when it holds a single quotation mark other than an apostrophe inside a word, as the swap
-/// would leave that quotation's marks the same as the outer ones, or a backtick, as its marks
-/// may then belong to code.
+/// would leave that quotation's marks the same as the outer ones, or code, an HTML tag or a
+/// link, whose marks may then belong to it.
 fn single_marks(span: &[char]) -> Option<String> {
     let inner = &span[1..span.len() - 1];
-    if inner.contains(&'`') {
+    if inner.iter().any(|c| matches!(c, '`' | '<')) || inner.windows(2).any(|w| w == [']', '(']) {
         return None;
     }
     let in_word = |k: usize| {

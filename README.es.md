@@ -295,7 +295,7 @@ Cada versión `laconic-check-v*` adjunta binarios precompilados para Linux (x86_
 
 Para un proyecto que ya usa [Vale](https://vale.sh), `vale/Laconic` es un estilo de Vale generado desde la tabla de reglas de `lint` y adjuntado a cada versión como el paquete `Laconic.zip` (desde 0.6.0). Cubre las reglas que una expresión regular puede expresar; [vale/README.md](vale/README.md) enumera las 7 que no puede y en qué difieren las demás de `lint`.
 
-Las versiones desde 0.4.0 también llevan una atestación de procedencia de compilación para cada archivo comprimido y manifiestos para Scoop, Homebrew, winget y el MCP Registry. Su paquete MCP, `laconic-check.mcpb`, se instala en Claude Desktop en un paso. Comprueba un archivo descargado con `gh attestation verify <archive> --repo yungSNAT/Laconic`. Scoop instala directamente desde la versión:
+Las versiones desde 0.4.0 también llevan una atestación de procedencia de compilación para cada archivo comprimido y manifiestos para Scoop, Homebrew, winget y el MCP Registry. Su paquete MCP, `laconic-check.mcpb`, se instala en Claude Desktop en un paso. Comprueba un archivo comprimido descargado con `gh attestation verify <archive> --repo yungSNAT/Laconic`. Scoop instala directamente desde la versión:
 
 ```bash
 scoop install https://github.com/yungSNAT/Laconic/releases/latest/download/laconic-check.json

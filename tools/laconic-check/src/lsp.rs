@@ -30,8 +30,8 @@ struct Server {
     /// Whether the client takes a versioned edit, which it refuses once the document has
     /// changed. Without it, no fix is offered.
     versioned: bool,
-    /// Whether the client checks no edit at version 0 (Neovim 0.12), so a document still at
-    /// that version gets no fix.
+    /// Whether the client checks an edit's version only when it is above 0 (Neovim), so only a
+    /// document at a positive whole version gets a fix.
     zero_unchecked: bool,
     /// Workspace folders as paths, from `initialize`.
     folders: Vec<PathBuf>,
@@ -167,8 +167,8 @@ impl Server {
             get(&["capabilities", "general", "positionEncodings"]),
             Some(Json::Array(offered)) if offered.iter().any(|e| e.as_str() == Some("utf-8"))
         );
-        // Neovim 0.12 takes a versioned edit without advertising it, but checks none at version
-        // 0, the version it opens a document with.
+        // Neovim 0.5 to 0.12 take a versioned edit without advertising it, but check its version
+        // only when it is above 0, and open a document at version 0.
         let neovim = get(&["clientInfo", "name"]).and_then(Json::as_str) == Some("Neovim");
         let changes = get(&[
             "capabilities",
@@ -254,6 +254,14 @@ impl Server {
                     Some(Json::Array(changes)) => changes.last(),
                     _ => None,
                 };
+                // A change with a range is part of a text, so the server no longer holds the
+                // document's text and drops it, with its diagnostics.
+                if changed.is_some_and(|c| c.get("range").is_some()) {
+                    return match self.open.remove(&uri) {
+                        Some(_) => vec![publish(&uri, Vec::new())],
+                        None => Vec::new(),
+                    };
+                }
                 match changed.and_then(|c| c.get("text")).and_then(Json::as_str) {
                     Some(body) if self.open.contains_key(&uri) => body,
                     _ => return Vec::new(),
@@ -331,9 +339,16 @@ impl Server {
         let document = uri
             .and_then(|uri| self.open.get(uri))
             .filter(|d| match &d.version {
-                Json::Number(n) => quickfix && self.versioned && !(self.zero_unchecked && n == "0"),
+                Json::Number(n) => {
+                    quickfix
+                        && self.versioned
+                        && (!self.zero_unchecked || n.parse::<u64>().is_ok_and(|v| v > 0))
+                }
                 _ => false,
-            });
+            })
+            // A lone CR ends a line for the client but not for `lint`, so an edit would land on
+            // the wrong line.
+            .filter(|d| !d.text.split("\r\n").any(|part| part.contains('\r')));
         let (Some(uri), Some((from, to)), Some(document)) = (uri, range, document) else {
             return Json::Array(Vec::new());
         };

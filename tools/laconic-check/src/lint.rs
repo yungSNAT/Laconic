@@ -299,7 +299,7 @@ impl Fix {
         let old = chars.get(start..start + len)?;
         let new = if old.len() > 1 && old.iter().all(|c| !c.is_lowercase()) {
             new.to_uppercase()
-        } else if old[0].is_uppercase() {
+        } else if old.first().is_some_and(|c| c.is_uppercase()) {
             capitalise(new)
         } else {
             new.to_owned()
@@ -596,6 +596,7 @@ pub fn lint_counting(text: &str, project: &[Rc<ProjectRule>]) -> (Vec<Finding>, 
     let mut suppressions: Vec<Suppression> = Vec::new();
     let mut paragraph = Paragraph::default();
     let mut document = Document::default();
+    let mut code_lines = Vec::new();
     let mut fence: Option<&str> = None;
     let mut list_indent = None;
     // The indent and length of the current run of bold-label bullets.
@@ -703,6 +704,9 @@ pub fn lint_counting(text: &str, project: &[Rc<ProjectRule>]) -> (Vec<Finding>, 
             || trimmed.starts_with('<')
             || is_break_line(trimmed)
             || indented_code;
+        if indented_code {
+            code_lines.push(line_no);
+        }
         if single_line || list_item {
             paragraph.flush(&mut findings, &mut document, project);
         }
@@ -735,6 +739,13 @@ pub fn lint_counting(text: &str, project: &[Rc<ProjectRule>]) -> (Vec<Finding>, 
     paragraph.flush(&mut findings, &mut document, project);
     // Rules that compare paragraphs report once the whole document is read.
     findings.extend(document.findings());
+    // An indented code line is read as prose, as it may be a paragraph indented by mistake;
+    // its code is not for an editor to change.
+    for finding in &mut findings {
+        if code_lines.contains(&finding.line) {
+            finding.fix = None;
+        }
+    }
     let before = findings.len();
     findings.retain(|f| {
         let hit = suppressions
@@ -1112,9 +1123,13 @@ impl Paragraph {
 
 /// A double-quoted span with single marks, straight for straight and curly for curly; `None`
 /// when it holds a single quotation mark other than an apostrophe inside a word, as the swap
-/// would leave that quotation's marks the same as the outer ones.
+/// would leave that quotation's marks the same as the outer ones, or a backtick, as its marks
+/// may then belong to code.
 fn single_marks(span: &[char]) -> Option<String> {
     let inner = &span[1..span.len() - 1];
+    if inner.contains(&'`') {
+        return None;
+    }
     let in_word = |k: usize| {
         k > 0
             && inner[k - 1].is_alphanumeric()
@@ -1393,9 +1408,10 @@ fn check_residue(chars: &[char], line: usize, findings: &mut Vec<Finding>) {
                 rule: RuleId::Residue.into(),
                 message: format!("{kind} U+{:04X}", c as u32),
                 // A joiner has its uses (inside an emoji sequence, or in Persian and Indic
-                // scripts), so deleting one is left to the writer.
+                // scripts), as does an isolate in mixed-direction text, so deleting one is left
+                // to the writer.
                 fix: Fix::of(&text, k, 1, String::new())
-                    .filter(|_| !matches!(c, '\u{200c}' | '\u{200d}')),
+                    .filter(|_| !matches!(c, '\u{200c}' | '\u{200d}' | '\u{2066}'..='\u{2069}')),
             });
         }
         k += 1;
@@ -1757,7 +1773,9 @@ fn check_line(masked: &[char], line: usize, findings: &mut Vec<Finding>) {
                         column: s + 1,
                         rule: RuleId::NumberWord.into(),
                         message: format!("'{word}': use the numeral {numeral} (words only at the start of a sentence)"),
-                        fix: Fix::of(masked, s, k - s, numeral.to_string()),
+                        // A capital marks a name ('the Five Eyes'), which keeps its word.
+                        fix: Fix::of(masked, s, k - s, numeral.to_string())
+                            .filter(|_| !proper_noun),
                     });
                 }
                 start = None;
@@ -2147,8 +2165,11 @@ fn check_style_manual_forms(lower: &str, text: &str, line: usize, findings: &mut
             } else {
                 "that is"
             };
-            let fix = Fix::cased(&chars, column(start), len, new)
-                .filter(|f| !(f.old.ends_with('.') && may_end_sentence(i)));
+            // 'IE' in capitals may be the browser.
+            let fix = Fix::cased(&chars, column(start), len, new).filter(|f| {
+                f.old.chars().any(char::is_lowercase)
+                    && !(f.old.ends_with('.') && may_end_sentence(i))
+            });
             push(
                 at,
                 RuleId::Latin,
@@ -2180,7 +2201,10 @@ fn check_style_manual_forms(lower: &str, text: &str, line: usize, findings: &mut
                 edit(
                     start,
                     start + bare.len(),
-                    format!("{} {half}", clock.replace('.', ":")),
+                    format!(
+                        "{} {half}",
+                        clock.trim_end_matches(['.', ':']).replace('.', ":")
+                    ),
                 )
             } else if dotted {
                 edit(start, start + word.len(), format!("{}m", &word[..1]))
@@ -2270,9 +2294,14 @@ fn check_style_manual_forms(lower: &str, text: &str, line: usize, findings: &mut
                     .nth(i)
                     .is_some_and(|w| w.contains("may"));
             if (prev_day.is_some_and(ordinal) && !modal) || ordinal_of {
-                // '19th' or '19th of' becomes '19'.
+                // '19th' or '19th of' becomes '19'; with 'of', only when nothing (such as an
+                // emphasis mark) stands between the 2 words.
                 let day = if ordinal_of { i - 2 } else { i - 1 };
                 let start = core_at(day);
+                let ends_at_core = |j: usize| {
+                    tokens[j].0 + tokens[j].1.len() == core_at(j) + core(tokens[j].1).len()
+                };
+                let plain = !ordinal_of || (ends_at_core(day) && tokens[i - 1].1 == "of");
                 let end = if ordinal_of {
                     tokens[i - 1].0 + tokens[i - 1].1.len()
                 } else {
@@ -2285,7 +2314,7 @@ fn check_style_manual_forms(lower: &str, text: &str, line: usize, findings: &mut
                     at,
                     RuleId::Date,
                     "no ordinal in dates: write 19 October 2026",
-                    edit(start, end, digits),
+                    edit(start, end, digits).filter(|_| plain),
                 );
             }
             if prev_day.is_some()
@@ -2340,8 +2369,11 @@ fn check_style_manual_forms(lower: &str, text: &str, line: usize, findings: &mut
                     (digits(n) && n.len() <= 2) || ordinal(n)
                 })
             {
-                // 'October 19' or 'October 19th' becomes '19 October'.
+                // 'October 19' or 'October 19th' becomes '19 October', when nothing (a comma or
+                // an emphasis mark) stands between the 2 words.
                 let start = core_at(i);
+                let plain =
+                    at + raw.len() == start + word.len() && core_at(i + 1) == tokens[i + 1].0;
                 let day = core(tokens[i + 1].1);
                 let day = day.trim_end_matches(['.', ',']);
                 let end = core_at(i + 1) + day.len();
@@ -2354,7 +2386,7 @@ fn check_style_manual_forms(lower: &str, text: &str, line: usize, findings: &mut
                     at,
                     RuleId::Date,
                     "day before month: write 19 October 2026",
-                    edit(start, end, new),
+                    edit(start, end, new).filter(|_| plain),
                 );
             }
         }

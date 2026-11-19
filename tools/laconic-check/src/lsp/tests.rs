@@ -1020,17 +1020,17 @@ fn neovim_gets_no_fix_at_a_version_it_does_not_check() {
             r#"{{"jsonrpc":"2.0","method":"textDocument/didOpen","params":{{"textDocument":{{"uri":"{uri}","languageId":"markdown","version":{version},"text":"color"}}}}}}"#
         )
     };
-    for capabilities in ["", r#""workspace":{"workspaceEdit":{"documentChanges":true}}"#] {
+    for capabilities in [
+        "",
+        r#""workspace":{"workspaceEdit":{"documentChanges":true}}"#,
+    ] {
         let neovim = format!(
             r#"{{"jsonrpc":"2.0","id":1,"method":"initialize","params":{{"clientInfo":{{"name":"Neovim"}},"capabilities":{{{capabilities}}}}}}}"#
         );
         // Neovim checks an edit's version only when it is above 0.
         for version in ["0", "-0", "-1", "0.0", "1e0"] {
-            let (replies, _) = session(&[
-                &neovim,
-                &opened(version),
-                &ask(7, uri, (0, 0), (0, 5), &[]),
-            ]);
+            let (replies, _) =
+                session(&[&neovim, &opened(version), &ask(7, uri, (0, 0), (0, 5), &[])]);
             assert!(actions(&replies, 7).is_empty(), "{capabilities} {version}");
         }
         let (replies, _) = session(&[&neovim, &opened("3"), &ask(7, uri, (0, 0), (0, 5), &[])]);

@@ -515,14 +515,20 @@ pub fn handle_line(line: &str) -> Option<String> {
     };
     if stateless
         && method != "server/discover"
-        && !matches!(meta.and_then(|m| m.get(META_CAPABILITIES)), Some(Json::Object(_)))
+        && !matches!(
+            meta.and_then(|m| m.get(META_CAPABILITIES)),
+            Some(Json::Object(_))
+        )
     {
         let message = format!("invalid params: _meta has no {META_CAPABILITIES} object");
         return Some(reply(id, Err((-32602, message))));
     }
     let outcome = match method {
         "server/discover" => Ok(object(vec![
-            ("supportedVersions", Json::Array(STATELESS_VERSIONS.map(text).into())),
+            (
+                "supportedVersions",
+                Json::Array(STATELESS_VERSIONS.map(text).into()),
+            ),
             ("capabilities", object(vec![("tools", object(vec![]))])),
             (
                 "_meta",
@@ -589,7 +595,10 @@ fn unsupported_version(id: Json, requested: &str) -> String {
         (
             "data",
             object(vec![
-                ("supported", Json::Array(STATELESS_VERSIONS.map(text).into())),
+                (
+                    "supported",
+                    Json::Array(STATELESS_VERSIONS.map(text).into()),
+                ),
                 ("requested", text(requested)),
             ]),
         ),
@@ -828,7 +837,10 @@ mod tests {
         let other_meta = result(
             r#"{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{"_meta":{"progressToken":1}}}"#,
         );
-        assert_eq!(other_meta, list, "a _meta naming no version is not stateless");
+        assert_eq!(
+            other_meta, list,
+            "a _meta naming no version is not stateless"
+        );
     }
 
     #[test]
@@ -865,7 +877,10 @@ mod tests {
 
     #[test]
     fn an_unspoken_meta_version_names_the_versions_spoken() {
-        for (method, version) in [("tools/list", "1900-01-01"), ("server/discover", "2025-11-25")] {
+        for (method, version) in [
+            ("tools/list", "1900-01-01"),
+            ("server/discover", "2025-11-25"),
+        ] {
             let line = format!(
                 r#"{{"jsonrpc":"2.0","id":7,"method":"{method}","params":{{"_meta":{{"io.modelcontextprotocol/protocolVersion":"{version}","io.modelcontextprotocol/clientCapabilities":{{}}}}}}}}"#
             );

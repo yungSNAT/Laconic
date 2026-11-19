@@ -143,8 +143,9 @@ fn initialise_then_list_tools() {
 #[test]
 fn stateless_discover_list_and_call() {
     let meta = r#""_meta": {"io.modelcontextprotocol/protocolVersion": "2026-07-28", "io.modelcontextprotocol/clientCapabilities": {}}"#;
-    let discover =
-        format!(r#"{{"jsonrpc": "2.0", "id": 1, "method": "server/discover", "params": {{{meta}}}}}"#);
+    let discover = format!(
+        r#"{{"jsonrpc": "2.0", "id": 1, "method": "server/discover", "params": {{{meta}}}}}"#
+    );
     let list =
         format!(r#"{{"jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {{{meta}}}}}"#);
     let call = format!(

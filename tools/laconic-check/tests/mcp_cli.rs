@@ -193,6 +193,63 @@ fn stateless_discover_list_and_call() {
     }
 }
 
+/// Each request's error code from both servers, or `None` for a result.
+fn error_codes(requests: &[&str]) -> Vec<Vec<Option<String>>> {
+    exchange(requests)
+        .into_iter()
+        .map(|replies| {
+            replies
+                .iter()
+                .map(|reply| match member(reply, "error") {
+                    Some(error) => match at(error, &["code"]) {
+                        Json::Number(code) => Some(code.clone()),
+                        code => panic!("code {code:?}"),
+                    },
+                    None => None,
+                })
+                .collect()
+        })
+        .collect()
+}
+
+#[test]
+fn stateless_requests_the_version_does_not_allow_are_errors() {
+    let meta = r#""_meta": {"io.modelcontextprotocol/protocolVersion": "2026-07-28", "io.modelcontextprotocol/clientCapabilities": {}}"#;
+    let ping = format!(r#"{{"jsonrpc": "2.0", "id": 1, "method": "ping", "params": {{{meta}}}}}"#);
+    let initialize = format!(
+        r#"{{"jsonrpc": "2.0", "id": 2, "method": "initialize", "params": {{{meta}, "protocolVersion": "2025-11-25"}}}}"#
+    );
+    let numeric = r#"{"jsonrpc": "2.0", "id": 3, "method": "tools/list", "params": {"_meta": {"io.modelcontextprotocol/protocolVersion": 20260728, "io.modelcontextprotocol/clientCapabilities": {}}}}"#;
+    let no_version = r#"{"jsonrpc": "2.0", "id": 4, "method": "tools/list", "params": {"_meta": {"io.modelcontextprotocol/clientCapabilities": {}}}}"#;
+    let handshake_ping = r#"{"jsonrpc": "2.0", "id": 5, "method": "ping"}"#;
+    let progress = r#"{"jsonrpc": "2.0", "id": 6, "method": "tools/list", "params": {"_meta": {"progressToken": 1}}}"#;
+    let want = [
+        Some("-32601"),
+        Some("-32601"),
+        Some("-32602"),
+        Some("-32602"),
+        None,
+        None,
+    ]
+    .map(|code| code.map(String::from));
+    let requests = [
+        ping.as_str(),
+        &initialize,
+        numeric,
+        no_version,
+        handshake_ping,
+        progress,
+    ];
+    for codes in error_codes(&requests) {
+        assert_eq!(codes, want);
+    }
+    for replies in exchange(&[progress]) {
+        let result = at(&replies[0], &["result"]);
+        assert!(member(result, "resultType").is_none(), "{result:?}");
+        assert_eq!(items(at(result, &["tools"])).len(), 2);
+    }
+}
+
 #[test]
 fn lint_reports_a_finding_by_line() {
     for result in call(

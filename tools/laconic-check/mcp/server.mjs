@@ -20,6 +20,8 @@ const MAX_INPUT = 200_000; // characters per text argument
 const STATELESS_VERSIONS = ["2026-07-28"]; // spoken without a handshake, newest first
 const META_VERSION = "io.modelcontextprotocol/protocolVersion";
 const META_CAPABILITIES = "io.modelcontextprotocol/clientCapabilities";
+// The other per-request fields of 2026-07-28; earlier versions define none of them.
+const META_FIELDS = [META_CAPABILITIES, "io.modelcontextprotocol/clientInfo", "io.modelcontextprotocol/logLevel"];
 const TTL_MS = 3_600_000; // the description and tools change only with the server
 const SERVER_INFO = { name: "laconic-check", version: "0.1.0" };
 
@@ -134,6 +136,9 @@ lines.on("line", (line) => {
   const meta = params?._meta;
   const requested = meta?.[META_VERSION];
   const stateless = requested !== undefined;
+  if (!stateless && META_FIELDS.some((field) => meta?.[field] !== undefined)) {
+    return reply(id, undefined, { code: -32602, message: `invalid params: _meta has no ${META_VERSION}` });
+  }
   if (stateless && typeof requested !== "string") {
     return reply(id, undefined, { code: -32602, message: `invalid params: _meta ${META_VERSION} is not a string` });
   }
@@ -167,8 +172,9 @@ lines.on("line", (line) => {
         capabilities: { tools: {} },
         serverInfo: SERVER_INFO,
       });
-    case "ping":
-      return reply(id, complete({}));
+    case "ping": // 2026-07-28 removed ping
+      if (stateless) break;
+      return reply(id, {});
     case "tools/list":
       return reply(id, complete(stateless ? { tools: TOOLS, ttlMs: TTL_MS, cacheScope: "public" } : { tools: TOOLS }));
     case "tools/call":

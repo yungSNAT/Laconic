@@ -20,6 +20,12 @@ const PROTOCOL_VERSIONS: [&str; 4] = ["2025-11-25", "2025-06-18", "2025-03-26", 
 /// The MCP versions this server speaks without a handshake, newest first: each request names
 /// one in `_meta`. A request naming none is served as the handshake versions are.
 const STATELESS_VERSIONS: [&str; 1] = ["2026-07-28"];
+/// The other per-request fields of 2026-07-28; earlier versions define none of them.
+const META_FIELDS: [&str; 3] = [
+    META_CAPABILITIES,
+    "io.modelcontextprotocol/clientInfo",
+    "io.modelcontextprotocol/logLevel",
+];
 const META_VERSION: &str = "io.modelcontextprotocol/protocolVersion";
 const META_CAPABILITIES: &str = "io.modelcontextprotocol/clientCapabilities";
 /// How long a stateless client may cache the server's description and tool list, which change
@@ -505,6 +511,15 @@ pub fn handle_line(line: &str) -> Option<String> {
     let params = request.get("params");
     let meta = params.and_then(|p| p.get("_meta"));
     let stateless = match meta.and_then(|m| m.get(META_VERSION)) {
+        // A field of the 2026-07-28 envelope without its version is a malformed request of
+        // that version, not a handshake-era one.
+        None if META_FIELDS
+            .iter()
+            .any(|field| meta.and_then(|m| m.get(field)).is_some()) =>
+        {
+            let message = format!("invalid params: _meta has no {META_VERSION}");
+            return Some(reply(id, Err((-32602, message))));
+        }
         None => false,
         Some(Json::String(v)) if STATELESS_VERSIONS.contains(&v.as_str()) => true,
         Some(Json::String(v)) => return Some(unsupported_version(id, v)),
@@ -552,7 +567,8 @@ pub fn handle_line(line: &str) -> Option<String> {
                 ("serverInfo", server_info()),
             ]))
         }
-        "ping" => Ok(object(vec![])),
+        // 2026-07-28 removed `ping`.
+        "ping" if !stateless => Ok(object(vec![])),
         "tools/list" if stateless => Ok(object(vec![
             ("tools", tools()),
             ("ttlMs", Json::Number(TTL_MS.into())),
@@ -824,10 +840,6 @@ mod tests {
         ));
         assert_eq!(called.get("resultType"), Some(&text("complete")));
         assert_eq!(called.get("content"), Some(&content("No findings.")));
-        let pinged = result(&format!(
-            r#"{{"jsonrpc":"2.0","id":3,"method":"ping","params":{{{META}}}}}"#
-        ));
-        assert_eq!(pinged, object(vec![("resultType", text("complete"))]));
     }
 
     #[test]
@@ -903,7 +915,11 @@ mod tests {
                 "invalid params: _meta has no io.modelcontextprotocol/clientCapabilities object",
             ),
             (
-                r#"{"jsonrpc":"2.0","id":1,"method":"ping","params":{"_meta":{"io.modelcontextprotocol/protocolVersion":20260728}}}"#,
+                r#"{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{"_meta":{"io.modelcontextprotocol/clientCapabilities":{}}}}"#,
+                "invalid params: _meta has no io.modelcontextprotocol/protocolVersion",
+            ),
+            (
+                r#"{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{"_meta":{"io.modelcontextprotocol/protocolVersion":20260728}}}"#,
                 "invalid params: _meta io.modelcontextprotocol/protocolVersion is not a string",
             ),
         ] {
@@ -915,12 +931,21 @@ mod tests {
     }
 
     #[test]
-    fn a_stateless_initialize_is_not_a_method() {
-        let line = format!(
-            r#"{{"jsonrpc":"2.0","id":1,"method":"initialize","params":{{{META},"protocolVersion":"2025-11-25"}}}}"#
-        );
-        let want = r#"{"jsonrpc":"2.0","id":1,"error":{"code":-32601,"message":"method not found: initialize"}}"#;
-        assert_eq!(handle_line(&line).as_deref(), Some(want));
+    fn stateless_initialize_and_ping_are_not_methods() {
+        for (method, extra) in [
+            ("initialize", r#","protocolVersion":"2025-11-25""#),
+            ("ping", ""),
+        ] {
+            let line = format!(
+                r#"{{"jsonrpc":"2.0","id":1,"method":"{method}","params":{{{META}{extra}}}}}"#
+            );
+            let want = format!(
+                r#"{{"jsonrpc":"2.0","id":1,"error":{{"code":-32601,"message":"method not found: {method}"}}}}"#
+            );
+            assert_eq!(handle_line(&line), Some(want), "{line}");
+        }
+        let ping = result(r#"{"jsonrpc":"2.0","id":1,"method":"ping"}"#);
+        assert_eq!(ping, object(vec![]), "a handshake ping still answers");
     }
 
     #[test]

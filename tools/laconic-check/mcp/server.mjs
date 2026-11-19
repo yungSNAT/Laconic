@@ -136,7 +136,7 @@ lines.on("line", (line) => {
   const meta = params?._meta;
   const requested = meta?.[META_VERSION];
   const stateless = requested !== undefined;
-  if (!stateless && META_FIELDS.some((field) => meta?.[field] !== undefined)) {
+  if (!stateless && method !== "server/discover" && META_FIELDS.some((field) => meta?.[field] !== undefined)) {
     return reply(id, undefined, { code: -32602, message: `invalid params: _meta has no ${META_VERSION}` });
   }
   if (stateless && typeof requested !== "string") {

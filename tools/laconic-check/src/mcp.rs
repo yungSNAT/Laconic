@@ -512,10 +512,11 @@ pub fn handle_line(line: &str) -> Option<String> {
     let meta = params.and_then(|p| p.get("_meta"));
     let stateless = match meta.and_then(|m| m.get(META_VERSION)) {
         // A field of the 2026-07-28 envelope without its version is a malformed request of
-        // that version, not a handshake-era one.
-        None if META_FIELDS
-            .iter()
-            .any(|field| meta.and_then(|m| m.get(field)).is_some()) =>
+        // that version, not a handshake-era one; `server/discover` makes every field optional.
+        None if method != "server/discover"
+            && META_FIELDS
+                .iter()
+                .any(|field| meta.and_then(|m| m.get(field)).is_some()) =>
         {
             let message = format!("invalid params: _meta has no {META_VERSION}");
             return Some(reply(id, Err((-32602, message))));
@@ -880,11 +881,17 @@ mod tests {
     }
 
     #[test]
-    fn discover_needs_no_client_capabilities() {
-        let r = result(
+    fn discover_needs_no_client_capabilities_or_version() {
+        for line in [
             r#"{"jsonrpc":"2.0","id":1,"method":"server/discover","params":{"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28"}}}"#,
-        );
-        assert_eq!(r.get("resultType"), Some(&text("complete")));
+            r#"{"jsonrpc":"2.0","id":1,"method":"server/discover","params":{"_meta":{"io.modelcontextprotocol/clientCapabilities":{}}}}"#,
+        ] {
+            assert_eq!(
+                result(line).get("resultType"),
+                Some(&text("complete")),
+                "{line}"
+            );
+        }
     }
 
     #[test]

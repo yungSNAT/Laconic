@@ -223,11 +223,17 @@ fn stateless_requests_the_version_does_not_allow_are_errors() {
     let no_version = r#"{"jsonrpc": "2.0", "id": 4, "method": "tools/list", "params": {"_meta": {"io.modelcontextprotocol/clientCapabilities": {}}}}"#;
     let handshake_ping = r#"{"jsonrpc": "2.0", "id": 5, "method": "ping"}"#;
     let progress = r#"{"jsonrpc": "2.0", "id": 6, "method": "tools/list", "params": {"_meta": {"progressToken": 1}}}"#;
+    // 2025-11-25 defines this field; it does not make a request a 2026-07-28 one.
+    let related_task = r#"{"jsonrpc": "2.0", "id": 7, "method": "tools/list", "params": {"_meta": {"io.modelcontextprotocol/related-task": {"taskId": "t"}}}}"#;
+    // server/discover makes every `_meta` field optional.
+    let discover = r#"{"jsonrpc": "2.0", "id": 8, "method": "server/discover", "params": {"_meta": {"io.modelcontextprotocol/clientCapabilities": {}}}}"#;
     let want = [
         Some("-32601"),
         Some("-32601"),
         Some("-32602"),
         Some("-32602"),
+        None,
+        None,
         None,
         None,
     ]
@@ -239,14 +245,22 @@ fn stateless_requests_the_version_does_not_allow_are_errors() {
         no_version,
         handshake_ping,
         progress,
+        related_task,
+        discover,
     ];
     for codes in error_codes(&requests) {
         assert_eq!(codes, want);
     }
-    for replies in exchange(&[progress]) {
-        let result = at(&replies[0], &["result"]);
-        assert!(member(result, "resultType").is_none(), "{result:?}");
-        assert_eq!(items(at(result, &["tools"])).len(), 2);
+    for replies in exchange(&[progress, related_task, discover]) {
+        for reply in &replies[..2] {
+            let result = at(reply, &["result"]);
+            assert!(member(result, "resultType").is_none(), "{result:?}");
+            assert_eq!(items(at(result, &["tools"])).len(), 2);
+        }
+        assert_eq!(
+            string(at(&replies[2], &["result", "resultType"])),
+            "complete"
+        );
     }
 }
 

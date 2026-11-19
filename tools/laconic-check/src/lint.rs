@@ -1059,15 +1059,24 @@ impl Paragraph {
         let (masked, doubles) = mask(&self.chars);
         document.collect(&masked, |column| self.at(column));
         let mut found = Vec::new();
+        // Once a span holds code, an HTML tag or a link, its marks may belong to them, and so
+        // may the pairing of every later mark in the paragraph: none of those gets a fix.
+        let mut paired = true;
         for (open, close) in doubles {
             let span = &self.chars[open..=close];
-            found.push(self.place(Finding {
-                line: 0,
-                column: open + 1,
-                rule: RuleId::DoubleQuotes.into(),
-                message: "double quotation marks in prose; use single marks".into(),
-                fix: single_marks(span).and_then(|new| Fix::of(&self.chars, open, span.len(), new)),
-            }));
+            paired &= !span.iter().any(|c| matches!(c, '`' | '<'))
+                && !span.windows(2).any(|w| w == [']', '(']);
+            found.push(
+                self.place(Finding {
+                    line: 0,
+                    column: open + 1,
+                    rule: RuleId::DoubleQuotes.into(),
+                    message: "double quotation marks in prose; use single marks".into(),
+                    fix: single_marks(span)
+                        .filter(|_| paired)
+                        .and_then(|new| Fix::of(&self.chars, open, span.len(), new)),
+                }),
+            );
         }
         for (line, chars) in &self.lines {
             check_residue(chars, *line, &mut found);
@@ -1124,13 +1133,9 @@ impl Paragraph {
 
 /// A double-quoted span with single marks, straight for straight and curly for curly; `None`
 /// when it holds a single quotation mark other than an apostrophe inside a word, as the swap
-/// would leave that quotation's marks the same as the outer ones, or code, an HTML tag or a
-/// link, whose marks may then belong to it.
+/// would leave that quotation's marks the same as the outer ones.
 fn single_marks(span: &[char]) -> Option<String> {
     let inner = &span[1..span.len() - 1];
-    if inner.iter().any(|c| matches!(c, '`' | '<')) || inner.windows(2).any(|w| w == [']', '(']) {
-        return None;
-    }
     let in_word = |k: usize| {
         k > 0
             && inner[k - 1].is_alphanumeric()

@@ -139,6 +139,131 @@ fn initialise_then_list_tools() {
     }
 }
 
+/// MCP 2026-07-28: no handshake; each request names its version in `_meta`.
+#[test]
+fn stateless_discover_list_and_call() {
+    let meta = r#""_meta": {"io.modelcontextprotocol/protocolVersion": "2026-07-28", "io.modelcontextprotocol/clientCapabilities": {}}"#;
+    let discover = format!(
+        r#"{{"jsonrpc": "2.0", "id": 1, "method": "server/discover", "params": {{{meta}}}}}"#
+    );
+    let list =
+        format!(r#"{{"jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {{{meta}}}}}"#);
+    let call = format!(
+        r#"{{"jsonrpc": "2.0", "id": 3, "method": "tools/call", "params": {{{meta}, "name": "lint", "arguments": {{"text": "It worked.\n"}}}}}}"#
+    );
+    let unsupported = r#"{"jsonrpc": "2.0", "id": 4, "method": "tools/list", "params": {"_meta": {"io.modelcontextprotocol/protocolVersion": "1900-01-01", "io.modelcontextprotocol/clientCapabilities": {}}}}"#;
+    let no_capabilities = r#"{"jsonrpc": "2.0", "id": 5, "method": "tools/list", "params": {"_meta": {"io.modelcontextprotocol/protocolVersion": "2026-07-28"}}}"#;
+    for replies in exchange(&[&discover, &list, &call, unsupported, no_capabilities]) {
+        let [discovered, listed, called, unsupported, no_capabilities] =
+            <[Json; 5]>::try_from(replies).unwrap();
+        let discovered = at(&discovered, &["result"]);
+        assert_eq!(string(at(discovered, &["resultType"])), "complete");
+        let versions: Vec<&str> = items(at(discovered, &["supportedVersions"]))
+            .iter()
+            .map(string)
+            .collect();
+        assert_eq!(versions, ["2026-07-28"]);
+        assert_eq!(
+            string(at(
+                discovered,
+                &["_meta", "io.modelcontextprotocol/serverInfo", "name"]
+            )),
+            "laconic-check"
+        );
+        assert_eq!(string(at(discovered, &["cacheScope"])), "public");
+        let listed = at(&listed, &["result"]);
+        assert_eq!(string(at(listed, &["resultType"])), "complete");
+        assert_eq!(items(at(listed, &["tools"])).len(), 2);
+        assert!(matches!(at(listed, &["ttlMs"]), Json::Number(_)));
+        let called = at(&called, &["result"]);
+        assert_eq!(string(at(called, &["resultType"])), "complete");
+        assert_eq!(text(called), "No findings.");
+        assert_eq!(
+            at(&unsupported, &["error", "code"]),
+            &Json::Number("-32022".into())
+        );
+        assert_eq!(
+            string(at(&unsupported, &["error", "data", "requested"])),
+            "1900-01-01"
+        );
+        assert_eq!(
+            at(&no_capabilities, &["error", "code"]),
+            &Json::Number("-32602".into())
+        );
+    }
+}
+
+/// Each request's error code from both servers, or `None` for a result.
+fn error_codes(requests: &[&str]) -> Vec<Vec<Option<String>>> {
+    exchange(requests)
+        .into_iter()
+        .map(|replies| {
+            replies
+                .iter()
+                .map(|reply| match member(reply, "error") {
+                    Some(error) => match at(error, &["code"]) {
+                        Json::Number(code) => Some(code.clone()),
+                        code => panic!("code {code:?}"),
+                    },
+                    None => None,
+                })
+                .collect()
+        })
+        .collect()
+}
+
+#[test]
+fn stateless_requests_the_version_does_not_allow_are_errors() {
+    let meta = r#""_meta": {"io.modelcontextprotocol/protocolVersion": "2026-07-28", "io.modelcontextprotocol/clientCapabilities": {}}"#;
+    let ping = format!(r#"{{"jsonrpc": "2.0", "id": 1, "method": "ping", "params": {{{meta}}}}}"#);
+    let initialize = format!(
+        r#"{{"jsonrpc": "2.0", "id": 2, "method": "initialize", "params": {{{meta}, "protocolVersion": "2025-11-25"}}}}"#
+    );
+    let numeric = r#"{"jsonrpc": "2.0", "id": 3, "method": "tools/list", "params": {"_meta": {"io.modelcontextprotocol/protocolVersion": 20260728, "io.modelcontextprotocol/clientCapabilities": {}}}}"#;
+    let no_version = r#"{"jsonrpc": "2.0", "id": 4, "method": "tools/list", "params": {"_meta": {"io.modelcontextprotocol/clientCapabilities": {}}}}"#;
+    let handshake_ping = r#"{"jsonrpc": "2.0", "id": 5, "method": "ping"}"#;
+    let progress = r#"{"jsonrpc": "2.0", "id": 6, "method": "tools/list", "params": {"_meta": {"progressToken": 1}}}"#;
+    // 2025-11-25 defines this field; it does not make a request a 2026-07-28 one.
+    let related_task = r#"{"jsonrpc": "2.0", "id": 7, "method": "tools/list", "params": {"_meta": {"io.modelcontextprotocol/related-task": {"taskId": "t"}}}}"#;
+    // server/discover makes every `_meta` field optional.
+    let discover = r#"{"jsonrpc": "2.0", "id": 8, "method": "server/discover", "params": {"_meta": {"io.modelcontextprotocol/clientCapabilities": {}}}}"#;
+    let want = [
+        Some("-32601"),
+        Some("-32601"),
+        Some("-32602"),
+        Some("-32602"),
+        None,
+        None,
+        None,
+        None,
+    ]
+    .map(|code| code.map(String::from));
+    let requests = [
+        ping.as_str(),
+        &initialize,
+        numeric,
+        no_version,
+        handshake_ping,
+        progress,
+        related_task,
+        discover,
+    ];
+    for codes in error_codes(&requests) {
+        assert_eq!(codes, want);
+    }
+    for replies in exchange(&[progress, related_task, discover]) {
+        for reply in &replies[..2] {
+            let result = at(reply, &["result"]);
+            assert!(member(result, "resultType").is_none(), "{result:?}");
+            assert_eq!(items(at(result, &["tools"])).len(), 2);
+        }
+        assert_eq!(
+            string(at(&replies[2], &["result", "resultType"])),
+            "complete"
+        );
+    }
+}
+
 #[test]
 fn lint_reports_a_finding_by_line() {
     for result in call(

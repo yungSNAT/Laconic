@@ -798,18 +798,47 @@ fn fixes_follow_the_latest_text_at_its_version() {
     assert_eq!(published(&replies[1]).len(), 1);
     assert!(actions(&replies, 7).is_empty());
 
-    // Neovim 0.12 refuses a stale versioned edit but does not advertise documentChanges.
-    let neovim = r#"{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"clientInfo":{"name":"Neovim","version":"0.12.6"},"capabilities":{}}}"#;
+    // Neovim 0.12 takes versioned edits without advertising them, but checks none at version
+    // 0, which it opens a document with: no fix until the first change.
+    let neovim = |changes: &str| {
+        format!(
+            r#"{{"jsonrpc":"2.0","id":1,"method":"initialize","params":{{"clientInfo":{{"name":"Neovim","version":"0.12.6"}},"capabilities":{{{changes}}}}}}}"#
+        )
+    };
+    let at_zero = notice(
+        "textDocument/didOpen",
+        vec![(
+            "textDocument",
+            object(vec![
+                ("uri", text(uri)),
+                ("languageId", text("markdown")),
+                ("version", number(0)),
+                ("text", text("color")),
+            ]),
+        )],
+    );
     let (replies, _) = session(&[
-        neovim,
-        &open(uri, "markdown", "color"),
+        &neovim(""),
+        &at_zero,
         &ask(7, uri, (0, 0), (0, 5), &[]),
         &change(uri, "The red color"),
+        &ask(8, uri, (0, 8), (0, 13), &[]),
     ]);
-    // The edit asked for before the change names version 1, which a client at 2 refuses.
-    let found = actions(&replies, 7);
+    assert!(actions(&replies, 7).is_empty());
+    let found = actions(&replies, 8);
     assert_eq!(found.len(), 1, "{found:?}");
-    assert_eq!(apply("color", &found[0], uri, 1, false), "colour");
+    assert_eq!(
+        apply("The red color", &found[0], uri, 2, false),
+        "The red colour"
+    );
+    // A Neovim that says it takes no versioned edits gets none.
+    let refuses = neovim(r#""workspace":{"workspaceEdit":{"documentChanges":false}}"#);
+    let (replies, _) = session(&[
+        &refuses,
+        &open(uri, "markdown", "color"),
+        &ask(7, uri, (0, 0), (0, 5), &[]),
+    ]);
+    assert!(actions(&replies, 7).is_empty());
 }
 
 #[test]

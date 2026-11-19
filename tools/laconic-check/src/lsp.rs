@@ -30,6 +30,9 @@ struct Server {
     /// Whether the client takes a versioned edit, which it refuses once the document has
     /// changed. Without it, no fix is offered.
     versioned: bool,
+    /// Whether the client checks no edit at version 0 (Neovim 0.12), so a document still at
+    /// that version gets no fix.
+    zero_unchecked: bool,
     /// Workspace folders as paths, from `initialize`.
     folders: Vec<PathBuf>,
     /// Open Markdown documents by URI.
@@ -164,15 +167,17 @@ impl Server {
             get(&["capabilities", "general", "positionEncodings"]),
             Some(Json::Array(offered)) if offered.iter().any(|e| e.as_str() == Some("utf-8"))
         );
-        // Neovim 0.12 takes a versioned edit without advertising it, and refuses a stale one once
-        // the document has changed since it opened (it checks no edit at its opening version, 0).
-        self.versioned = get(&[
+        // Neovim 0.12 takes a versioned edit without advertising it, but checks none at version
+        // 0, the version it opens a document with.
+        let neovim = get(&["clientInfo", "name"]).and_then(Json::as_str) == Some("Neovim");
+        let changes = get(&[
             "capabilities",
             "workspace",
             "workspaceEdit",
             "documentChanges",
-        ]) == Some(&Json::Bool(true))
-            || get(&["clientInfo", "name"]).and_then(Json::as_str) == Some("Neovim");
+        ]);
+        self.versioned = changes == Some(&Json::Bool(true)) || (neovim && changes.is_none());
+        self.zero_unchecked = neovim;
         let uris: Vec<&str> = match get(&["workspaceFolders"]) {
             Some(Json::Array(folders)) => folders
                 .iter()
@@ -325,7 +330,10 @@ impl Server {
             .zip(get(&["range", "end"]).and_then(position));
         let document = uri
             .and_then(|uri| self.open.get(uri))
-            .filter(|d| quickfix && self.versioned && matches!(d.version, Json::Number(_)));
+            .filter(|d| match &d.version {
+                Json::Number(n) => quickfix && self.versioned && !(self.zero_unchecked && n == "0"),
+                _ => false,
+            });
         let (Some(uri), Some((from, to)), Some(document)) = (uri, range, document) else {
             return Json::Array(Vec::new());
         };

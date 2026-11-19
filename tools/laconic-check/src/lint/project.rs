@@ -7,7 +7,7 @@
 
 use std::rc::Rc;
 
-use super::{Finding, RuleRef};
+use super::{Finding, Fix, RuleRef};
 
 /// One rule: the phrases it flags under one name.
 #[derive(Debug, PartialEq)]
@@ -113,6 +113,11 @@ pub(super) fn check(text: &[char], rules: &[Rc<ProjectRule>], findings: &mut Vec
                     column: start + 1,
                     rule: RuleRef::Project(Rc::clone(rule)),
                     message,
+                    // The replacement as the project file writes it, whatever the match's case.
+                    fix: phrase
+                        .replacement
+                        .clone()
+                        .and_then(|new| Fix::of(text, start, end - start, new)),
                 });
             }
         }

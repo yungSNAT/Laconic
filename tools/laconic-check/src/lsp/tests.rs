@@ -468,14 +468,20 @@ fn apply(body: &str, action: &Json, uri: &str, version: usize, utf8: bool) -> St
             if units == character {
                 return start + i;
             }
-            assert!(!matches!(c, '\r' | '\n'), "{line}:{character} passes the line end");
+            assert!(
+                !matches!(c, '\r' | '\n'),
+                "{line}:{character} passes the line end"
+            );
             units += if utf8 { c.len_utf8() } else { c.len_utf16() };
         }
         assert_eq!(units, character, "{line}:{character} passes the end");
         body.len()
     };
     let edit = &edits[0];
-    let (from, to) = (offset(at(edit, "range.start")), offset(at(edit, "range.end")));
+    let (from, to) = (
+        offset(at(edit, "range.start")),
+        offset(at(edit, "range.end")),
+    );
     let new = at(edit, "newText").as_str().unwrap();
     format!("{}{new}{}", &body[..from], &body[to..])
 }
@@ -522,32 +528,162 @@ fn the_server_offers_quick_fixes_and_no_other_kind() {
 #[test]
 fn each_fix_replaces_its_finding_and_the_diagnostic_goes() {
     for (body, rule, title, fixed) in [
-        ("The color is red.", "us-spelling", "Replace 'color' with 'colour'", "The colour is red."),
-        ("Color is red.", "us-spelling", "Replace 'Color' with 'Colour'", "Colour is red."),
-        ("COLOR is red.", "us-spelling", "Replace 'COLOR' with 'COLOUR'", "COLOUR is red."),
-        ("It rose 5 percent.", "us-spelling", "Replace 'percent' with 'per cent'", "It rose 5 per cent."),
-        ("It ran while we slept.", "word-choice", "Replace 'while' with 'whilst'", "It ran whilst we slept."),
-        ("We use open-source code.", "hyphen", "Replace 'open-source' with 'open source'", "We use open source code."),
-        ("Send an E-mail.", "hyphen", "Replace 'E-mail' with 'Email'", "Send an Email."),
-        ("We ran five tests.", "number-word", "Replace 'five' with '5'", "We ran 5 tests."),
-        ("Use a tool, e.g. a linter.", "latin", "Replace 'e.g.' with 'for example'", "Use a tool, for example a linter."),
-        ("Use a tool, ie a linter.", "latin", "Replace 'ie' with 'that is'", "Use a tool, that is a linter."),
-        ("We meet at 9am today.", "time", "Replace '9am' with '9 am'", "We meet at 9 am today."),
-        ("We meet at 9.30PM today.", "time", "Replace '9.30PM' with '9:30 pm'", "We meet at 9:30 pm today."),
-        ("We meet at 9 a.m. today.", "time", "Replace 'a.m.' with 'am'", "We meet at 9 am today."),
-        ("We meet at 9.30 am today.", "time", "Replace '9.30' with '9:30'", "We meet at 9:30 am today."),
-        ("It rose 5 % today.", "symbol-space", "Delete ' '", "It rose 5% today."),
-        ("It costs $ 27.99 now.", "symbol-space", "Delete ' '", "It costs $27.99 now."),
-        ("It shipped on 19th October 2026.", "date", "Replace '19th' with '19'", "It shipped on 19 October 2026."),
-        ("It shipped on the 19th of October 2026.", "date", "Replace '19th of' with '19'", "It shipped on the 19 October 2026."),
-        ("It shipped on 19 October, 2026.", "date", "Delete ','", "It shipped on 19 October 2026."),
-        ("It shipped October 19 2026.", "date", "Replace 'October 19' with '19 October'", "It shipped 19 October 2026."),
-        ("Music of the 1980's was loud.", "date", "Replace '1980's' with '1980s'", "Music of the 1980s was loud."),
-        ("He said \"stop now\" and left.", "double-quotes", "Replace '\"stop now\"' with ''stop now''", "He said 'stop now' and left."),
-        ("He said \u{201c}don't\u{201d} twice.", "double-quotes", "Replace '\u{201c}don't\u{201d}' with '\u{2018}don't\u{2019}'", "He said \u{2018}don't\u{2019} twice."),
-        ("Approve\u{200b} it.", "residue", "Delete '\\u{200b}'", "Approve it."),
-        ("Approve\u{202e} it.", "residue", "Delete '\\u{202e}'", "Approve it."),
-        ("Go\u{e0041}\u{e0042} now.", "residue", "Delete '\\u{e0041}\\u{e0042}'", "Go now."),
+        (
+            "The color is red.",
+            "us-spelling",
+            "Replace 'color' with 'colour'",
+            "The colour is red.",
+        ),
+        (
+            "Color is red.",
+            "us-spelling",
+            "Replace 'Color' with 'Colour'",
+            "Colour is red.",
+        ),
+        (
+            "COLOR is red.",
+            "us-spelling",
+            "Replace 'COLOR' with 'COLOUR'",
+            "COLOUR is red.",
+        ),
+        (
+            "It rose 5 percent.",
+            "us-spelling",
+            "Replace 'percent' with 'per cent'",
+            "It rose 5 per cent.",
+        ),
+        (
+            "It ran while we slept.",
+            "word-choice",
+            "Replace 'while' with 'whilst'",
+            "It ran whilst we slept.",
+        ),
+        (
+            "We use open-source code.",
+            "hyphen",
+            "Replace 'open-source' with 'open source'",
+            "We use open source code.",
+        ),
+        (
+            "Send an E-mail.",
+            "hyphen",
+            "Replace 'E-mail' with 'Email'",
+            "Send an Email.",
+        ),
+        (
+            "We ran five tests.",
+            "number-word",
+            "Replace 'five' with '5'",
+            "We ran 5 tests.",
+        ),
+        (
+            "Use a tool, e.g. a linter.",
+            "latin",
+            "Replace 'e.g.' with 'for example'",
+            "Use a tool, for example a linter.",
+        ),
+        (
+            "Use a tool, ie a linter.",
+            "latin",
+            "Replace 'ie' with 'that is'",
+            "Use a tool, that is a linter.",
+        ),
+        (
+            "We meet at 9am today.",
+            "time",
+            "Replace '9am' with '9 am'",
+            "We meet at 9 am today.",
+        ),
+        (
+            "We meet at 9.30PM today.",
+            "time",
+            "Replace '9.30PM' with '9:30 pm'",
+            "We meet at 9:30 pm today.",
+        ),
+        (
+            "We meet at 9 a.m. today.",
+            "time",
+            "Replace 'a.m.' with 'am'",
+            "We meet at 9 am today.",
+        ),
+        (
+            "We meet at 9.30 am today.",
+            "time",
+            "Replace '9.30' with '9:30'",
+            "We meet at 9:30 am today.",
+        ),
+        (
+            "It rose 5 % today.",
+            "symbol-space",
+            "Delete ' '",
+            "It rose 5% today.",
+        ),
+        (
+            "It costs $ 27.99 now.",
+            "symbol-space",
+            "Delete ' '",
+            "It costs $27.99 now.",
+        ),
+        (
+            "It shipped on 19th October 2026.",
+            "date",
+            "Replace '19th' with '19'",
+            "It shipped on 19 October 2026.",
+        ),
+        (
+            "It shipped on the 19th of October 2026.",
+            "date",
+            "Replace '19th of' with '19'",
+            "It shipped on the 19 October 2026.",
+        ),
+        (
+            "It shipped on 19 October, 2026.",
+            "date",
+            "Delete ','",
+            "It shipped on 19 October 2026.",
+        ),
+        (
+            "It shipped October 19 2026.",
+            "date",
+            "Replace 'October 19' with '19 October'",
+            "It shipped 19 October 2026.",
+        ),
+        (
+            "Music of the 1980's was loud.",
+            "date",
+            "Replace '1980's' with '1980s'",
+            "Music of the 1980s was loud.",
+        ),
+        (
+            "He said \"stop now\" and left.",
+            "double-quotes",
+            "Replace '\"stop now\"' with ''stop now''",
+            "He said 'stop now' and left.",
+        ),
+        (
+            "He said \u{201c}don't\u{201d} twice.",
+            "double-quotes",
+            "Replace '\u{201c}don't\u{201d}' with '\u{2018}don't\u{2019}'",
+            "He said \u{2018}don't\u{2019} twice.",
+        ),
+        (
+            "Approve\u{200b} it.",
+            "residue",
+            "Delete '\\u{200b}'",
+            "Approve it.",
+        ),
+        (
+            "Approve\u{202e} it.",
+            "residue",
+            "Delete '\\u{202e}'",
+            "Approve it.",
+        ),
+        (
+            "Go\u{e0041}\u{e0042} now.",
+            "residue",
+            "Delete '\\u{e0041}\\u{e0042}'",
+            "Go now.",
+        ),
     ] {
         let found = fixes(body);
         let offered: Vec<_> = found.iter().filter(|(_, code, _)| code == rule).collect();
@@ -609,7 +745,10 @@ fn fixes_keep_crlf_line_ends() {
         .into_iter()
         .map(|f| f.2)
         .collect();
-    assert_eq!(texts, ["The colour\r\nis five.\r\n", "The color\r\nis 5.\r\n"]);
+    assert_eq!(
+        texts,
+        ["The colour\r\nis five.\r\n", "The color\r\nis 5.\r\n"]
+    );
 }
 
 #[test]
@@ -629,11 +768,18 @@ fn fixes_follow_the_latest_text_at_its_version() {
     assert!(actions(&replies, 7).is_empty());
     let found = actions(&replies, 8);
     assert_eq!(found.len(), 1, "{found:?}");
-    assert_eq!(apply("The red color", &found[0], uri, 2, false), "The red colour");
+    assert_eq!(
+        apply("The red color", &found[0], uri, 2, false),
+        "The red colour"
+    );
     assert!(actions(&replies, 9).is_empty());
 
     // No fix for a client that cannot refuse a stale edit, or for a document with no version.
-    let (replies, _) = session(&[INIT, &open(uri, "markdown", "color"), &ask(7, uri, (0, 0), (0, 5), &[])]);
+    let (replies, _) = session(&[
+        INIT,
+        &open(uri, "markdown", "color"),
+        &ask(7, uri, (0, 0), (0, 5), &[]),
+    ]);
     assert!(actions(&replies, 7).is_empty());
     let unversioned = notice(
         "textDocument/didOpen",

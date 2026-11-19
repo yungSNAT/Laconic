@@ -5,14 +5,14 @@
 //! findings as diagnostics for open Markdown documents. Messages use the Language Server
 //! Protocol's base framing, a `Content-Length` header and a JSON-RPC body, read and written with
 //! the JSON code in `mcp`, so the crate keeps no dependencies. It syncs whole documents and
-//! offers nothing beyond diagnostics.
+//! offers each fix `lint` knows as a quick fix.
 
-use std::collections::HashSet;
+use std::collections::HashMap;
 use std::fs;
 use std::io::{self, BufRead, Read, Write};
 use std::path::{Component, PathBuf};
 
-use crate::lint::{self, RuleRef};
+use crate::lint::{self, Finding, RuleRef};
 use crate::mcp::{self, Json, object, text};
 use crate::sarif;
 use crate::settings::{PROJECT_FILE, Settings};
@@ -27,11 +27,19 @@ struct Server {
     initialized: bool,
     shut_down: bool,
     utf8: bool,
+    /// Whether the client applies a versioned edit, which it refuses once the document has
+    /// changed. Without it, no fix is offered.
+    versioned: bool,
     /// Workspace folders as paths, from `initialize`.
     folders: Vec<PathBuf>,
-    /// The URIs of open Markdown documents. Their text is not kept, as full sync sends it whole
-    /// with each change.
-    open: HashSet<String>,
+    /// Open Markdown documents by URI.
+    open: HashMap<String, Document>,
+}
+
+/// An open document's text and the version the client gave it.
+struct Document {
+    version: Json,
+    text: String,
 }
 
 /// Answers messages from `input` until `exit` or the end of input. True when `exit` came after
@@ -145,6 +153,7 @@ impl Server {
                 self.shut_down = true;
                 Ok(Json::Null)
             }
+            "textDocument/codeAction" => Ok(self.code_actions(params)),
             _ => Err((-32601, format!("method not found: {method}"))),
         }
     }
@@ -155,6 +164,12 @@ impl Server {
             get(&["capabilities", "general", "positionEncodings"]),
             Some(Json::Array(offered)) if offered.iter().any(|e| e.as_str() == Some("utf-8"))
         );
+        self.versioned = get(&[
+            "capabilities",
+            "workspace",
+            "workspaceEdit",
+            "documentChanges",
+        ]) == Some(&Json::Bool(true));
         let uris: Vec<&str> = match get(&["workspaceFolders"]) {
             Some(Json::Array(folders)) => folders
                 .iter()
@@ -182,6 +197,13 @@ impl Server {
                         "textDocumentSync",
                         object(vec![("openClose", Json::Bool(true)), ("change", number(1))]),
                     ),
+                    (
+                        "codeActionProvider",
+                        object(vec![(
+                            "codeActionKinds",
+                            Json::Array(vec![text("quickfix")]),
+                        )]),
+                    ),
                 ]),
             ),
             (
@@ -200,6 +222,10 @@ impl Server {
             return Vec::new();
         };
         let uri = uri.to_owned();
+        let version = document
+            .and_then(|d| d.get("version"))
+            .cloned()
+            .unwrap_or(Json::Null);
         let body = match method {
             "textDocument/didOpen" => {
                 let markdown = document
@@ -212,7 +238,6 @@ impl Server {
                 if !markdown {
                     return Vec::new();
                 }
-                self.open.insert(uri.clone());
                 body
             }
             "textDocument/didChange" => {
@@ -222,36 +247,41 @@ impl Server {
                     _ => None,
                 };
                 match changed.and_then(|c| c.get("text")).and_then(Json::as_str) {
-                    Some(body) if self.open.contains(&uri) => body,
+                    Some(body) if self.open.contains_key(&uri) => body,
                     _ => return Vec::new(),
                 }
             }
             "textDocument/didClose" => {
-                if !self.open.remove(&uri) {
+                if self.open.remove(&uri).is_none() {
                     return Vec::new();
                 }
                 return vec![publish(&uri, Vec::new())];
             }
             _ => return Vec::new(),
         };
-        vec![publish(&uri, self.diagnostics(&uri, body))]
+        let diagnostics = self.diagnostics(&uri, body);
+        let text = body.to_owned();
+        self.open.insert(uri.clone(), Document { version, text });
+        vec![publish(&uri, diagnostics)]
     }
 
-    /// `lint`'s findings in the text of the document at `uri`, after the project file's
-    /// settings; or one error for a project file that cannot be read.
+    /// The diagnostics of the text of the document at `uri`; or one error for a project file
+    /// that cannot be read.
     fn diagnostics(&self, uri: &str, body: &str) -> Vec<Json> {
-        let settings = match self.settings(uri) {
-            Ok(settings) => settings,
-            Err(message) => return vec![diagnostic(0, 0, 0, 1, None, &message)],
-        };
+        match self.findings(uri, body) {
+            Ok(found) => found.iter().map(to_diagnostic).collect(),
+            Err(message) => vec![diagnostic(0, 0, 0, 1, None, &message)],
+        }
+    }
+
+    /// `lint`'s findings in `body` that the project file's settings keep, each with the start
+    /// and end of its diagnostic in the client's code units.
+    fn findings(&self, uri: &str, body: &str) -> Result<Vec<(Finding, usize, usize)>, String> {
+        let settings = self.settings(uri)?;
         let lines: Vec<&str> = body.lines().collect();
-        let width = if self.utf8 {
-            char::len_utf8
-        } else {
-            char::len_utf16
-        };
-        lint::lint_counting(body, &settings.rules)
-            .0
+        let width = self.width();
+        let found = lint::lint_counting(body, &settings.rules).0;
+        Ok(found
             .into_iter()
             .filter_map(|finding| {
                 let line = lines
@@ -262,17 +292,97 @@ impl Server {
                     return None;
                 }
                 let (start, end) = sarif::span(line, finding.column, width);
-                let severity = if finding.rule.advisory() { 3 } else { 2 };
-                Some(diagnostic(
-                    finding.line - 1,
-                    start,
-                    end,
-                    severity,
-                    Some(&finding.rule),
-                    &finding.message,
-                ))
+                Some((finding, start, end))
             })
-            .collect()
+            .collect())
+    }
+
+    fn width(&self) -> fn(char) -> usize {
+        if self.utf8 {
+            char::len_utf8
+        } else {
+            char::len_utf16
+        }
+    }
+
+    /// A quick fix for each finding with a fix whose diagnostic meets the requested range,
+    /// computed from the text the server holds, never from the diagnostics the client sends,
+    /// and edited at that text's version.
+    fn code_actions(&self, params: Option<&Json>) -> Json {
+        let get = |path: &[&str]| path.iter().try_fold(params?, |value, key| value.get(key));
+        let quickfix = match get(&["context", "only"]) {
+            Some(Json::Array(kinds)) => kinds
+                .iter()
+                .any(|k| matches!(k.as_str(), Some("quickfix" | ""))),
+            _ => true,
+        };
+        let uri = get(&["textDocument", "uri"]).and_then(Json::as_str);
+        let range = get(&["range", "start"])
+            .and_then(position)
+            .zip(get(&["range", "end"]).and_then(position));
+        let document = uri
+            .and_then(|uri| self.open.get(uri))
+            .filter(|d| quickfix && self.versioned && matches!(d.version, Json::Number(_)));
+        let (Some(uri), Some((from, to)), Some(document)) = (uri, range, document) else {
+            return Json::Array(Vec::new());
+        };
+        let Ok(found) = self.findings(uri, &document.text) else {
+            return Json::Array(Vec::new());
+        };
+        let lines: Vec<&str> = document.text.lines().collect();
+        let width = self.width();
+        let actions = found
+            .iter()
+            .filter(|(finding, start, end)| {
+                let line = finding.line - 1;
+                (line, *start) <= to && from <= (line, *end)
+            })
+            .filter_map(|placed| {
+                let (finding, _, _) = placed;
+                let fix = finding.fix.as_ref()?;
+                let line = lines.get(finding.line - 1)?;
+                let start = sarif::span(line, fix.column, width).0;
+                let end = sarif::span(line, fix.column + fix.old.chars().count(), width).0;
+                let at = |character| {
+                    object(vec![
+                        ("line", number(finding.line - 1)),
+                        ("character", number(character)),
+                    ])
+                };
+                let edit = object(vec![
+                    (
+                        "range",
+                        object(vec![("start", at(start)), ("end", at(end))]),
+                    ),
+                    ("newText", text(&fix.new)),
+                ]);
+                let change = object(vec![
+                    (
+                        "textDocument",
+                        object(vec![
+                            ("uri", text(uri)),
+                            ("version", document.version.clone()),
+                        ]),
+                    ),
+                    ("edits", Json::Array(vec![edit])),
+                ]);
+                let title = if fix.new.is_empty() {
+                    format!("Delete '{}'", fix.old.escape_debug())
+                } else {
+                    format!("Replace '{}' with '{}'", fix.old, fix.new)
+                };
+                Some(object(vec![
+                    ("title", text(&title)),
+                    ("kind", text("quickfix")),
+                    ("diagnostics", Json::Array(vec![to_diagnostic(placed)])),
+                    (
+                        "edit",
+                        object(vec![("documentChanges", Json::Array(vec![change]))]),
+                    ),
+                ]))
+            })
+            .collect();
+        Json::Array(actions)
     }
 
     /// The settings of the project file in the deepest workspace folder holding the document;
@@ -300,6 +410,27 @@ impl Server {
 
 fn number(n: usize) -> Json {
     Json::Number(n.to_string())
+}
+
+/// A position's line and character.
+fn position(json: &Json) -> Option<(usize, usize)> {
+    let field = |key| match json.get(key)? {
+        Json::Number(n) => n.parse().ok(),
+        _ => None,
+    };
+    Some((field("line")?, field("character")?))
+}
+
+fn to_diagnostic((finding, start, end): &(Finding, usize, usize)) -> Json {
+    let severity = if finding.rule.advisory() { 3 } else { 2 };
+    diagnostic(
+        finding.line - 1,
+        *start,
+        *end,
+        severity,
+        Some(&finding.rule),
+        &finding.message,
+    )
 }
 
 fn diagnostic(

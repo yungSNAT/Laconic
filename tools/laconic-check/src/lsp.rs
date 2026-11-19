@@ -28,7 +28,7 @@ struct Server {
     shut_down: bool,
     utf8: bool,
     /// Whether the client takes a versioned edit, which it refuses once the document has
-    /// changed. Others get a plain edit.
+    /// changed. Without it, no fix is offered.
     versioned: bool,
     /// Workspace folders as paths, from `initialize`.
     folders: Vec<PathBuf>,
@@ -164,12 +164,14 @@ impl Server {
             get(&["capabilities", "general", "positionEncodings"]),
             Some(Json::Array(offered)) if offered.iter().any(|e| e.as_str() == Some("utf-8"))
         );
+        // Neovim 0.12 takes a versioned edit, and refuses a stale one, without advertising it.
         self.versioned = get(&[
             "capabilities",
             "workspace",
             "workspaceEdit",
             "documentChanges",
-        ]) == Some(&Json::Bool(true));
+        ]) == Some(&Json::Bool(true))
+            || get(&["clientInfo", "name"]).and_then(Json::as_str) == Some("Neovim");
         let uris: Vec<&str> = match get(&["workspaceFolders"]) {
             Some(Json::Array(folders)) => folders
                 .iter()
@@ -306,10 +308,8 @@ impl Server {
     }
 
     /// A quick fix for each finding with a fix whose diagnostic meets the requested range,
-    /// computed from the text the server holds, never from the diagnostics the client sends.
-    /// The edit names that text's version when the client takes versioned edits. Others, such
-    /// as Neovim 0.12, which applies one but does not say so, get a plain edit: it lands in the
-    /// wrong place only if the text changes between this reply and the client applying it.
+    /// computed from the text the server holds, never from the diagnostics the client sends,
+    /// and edited at that text's version, so a client refuses the edit once the text changes.
     fn code_actions(&self, params: Option<&Json>) -> Json {
         let get = |path: &[&str]| path.iter().try_fold(params?, |value, key| value.get(key));
         let quickfix = match get(&["context", "only"]) {
@@ -322,7 +322,9 @@ impl Server {
         let range = get(&["range", "start"])
             .and_then(position)
             .zip(get(&["range", "end"]).and_then(position));
-        let document = uri.and_then(|uri| self.open.get(uri)).filter(|_| quickfix);
+        let document = uri
+            .and_then(|uri| self.open.get(uri))
+            .filter(|d| quickfix && self.versioned && matches!(d.version, Json::Number(_)));
         let (Some(uri), Some((from, to)), Some(document)) = (uri, range, document) else {
             return Json::Array(Vec::new());
         };
@@ -356,17 +358,14 @@ impl Server {
                     ),
                     ("newText", text(&fix.new)),
                 ]);
-                let edits = Json::Array(vec![edit]);
-                let change = if self.versioned && matches!(document.version, Json::Number(_)) {
-                    let document = object(vec![
-                        ("uri", text(uri)),
-                        ("version", document.version.clone()),
-                    ]);
-                    let change = object(vec![("textDocument", document), ("edits", edits)]);
-                    ("documentChanges", Json::Array(vec![change]))
-                } else {
-                    ("changes", object(vec![(uri, edits)]))
-                };
+                let version = object(vec![
+                    ("uri", text(uri)),
+                    ("version", document.version.clone()),
+                ]);
+                let change = object(vec![
+                    ("textDocument", version),
+                    ("edits", Json::Array(vec![edit])),
+                ]);
                 let title = if fix.new.is_empty() {
                     format!("Delete '{}'", fix.old.escape_debug())
                 } else {
@@ -376,7 +375,10 @@ impl Server {
                     ("title", text(&title)),
                     ("kind", text("quickfix")),
                     ("diagnostics", Json::Array(vec![to_diagnostic(placed)])),
-                    ("edit", object(vec![change])),
+                    (
+                        "edit",
+                        object(vec![("documentChanges", Json::Array(vec![change]))]),
+                    ),
                 ]))
             })
             .collect();

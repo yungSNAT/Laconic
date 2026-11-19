@@ -448,29 +448,15 @@ fn actions(replies: &[Json], id: usize) -> Vec<Json> {
     }
 }
 
-/// `body` after `action`'s edit, which must be one edit of `uri`, at `version` when given and
-/// else a plain one; positions count UTF-8 bytes when `utf8`, else UTF-16 units, and may not
-/// split a character or pass a line end.
-fn apply(body: &str, action: &Json, uri: &str, version: Option<usize>, utf8: bool) -> String {
+/// `body` after `action`'s edit, which must be one edit of `uri` at `version`; positions count
+/// UTF-8 bytes when `utf8`, else UTF-16 units, and may not split a character or pass a line end.
+fn apply(body: &str, action: &Json, uri: &str, version: usize, utf8: bool) -> String {
     assert_eq!(at(action, "kind").as_str(), Some("quickfix"));
-    let edit = at(action, "edit");
-    let edits = match version {
-        Some(version) => {
-            assert!(edit.get("changes").is_none(), "{edit:?}");
-            let change = at(edit, "documentChanges.0");
-            assert_eq!(at(change, "textDocument.uri").as_str(), Some(uri));
-            assert_eq!(n(at(change, "textDocument.version")), version);
-            at(change, "edits")
-        }
-        None => {
-            assert!(edit.get("documentChanges").is_none(), "{edit:?}");
-            // `at` would split the URI at its dots.
-            at(edit, "changes")
-                .get(uri)
-                .expect("no edit of the document")
-        }
-    };
-    let Json::Array(edits) = edits else {
+    assert!(at(action, "edit").get("changes").is_none(), "{action:?}");
+    let change = at(action, "edit.documentChanges.0");
+    assert_eq!(at(change, "textDocument.uri").as_str(), Some(uri));
+    assert_eq!(n(at(change, "textDocument.version")), version);
+    let Json::Array(edits) = at(change, "edits") else {
         panic!("edits is not an array");
     };
     assert_eq!(edits.len(), 1, "{action:?}");
@@ -516,7 +502,7 @@ fn fixes_after(init: &str, body: &str, utf8: bool) -> Vec<(String, String, Strin
         .map(|a| {
             let title = at(a, "title").as_str().unwrap().to_owned();
             let code = at(a, "diagnostics.0.code").as_str().unwrap().to_owned();
-            (title, code, apply(body, a, uri, Some(1), utf8))
+            (title, code, apply(body, a, uri, 1, utf8))
         })
         .collect()
 }
@@ -737,7 +723,7 @@ fn rules_without_one_known_replacement_offer_nothing() {
 #[test]
 fn fixes_count_positions_in_the_encoding_the_client_offers() {
     // 'İ' lower-cases to 2 characters, which once moved every later column on its line.
-    let body = "\u{130}stanbul \u{1F600} Caf\u{e9} color, \u{1F600}\u{1F600} five.\n";
+    let body = "\u{130}stanbul \u{1F600} Caf\u{e9} color, \u{1F600}\u{1F600} five at 9am.\n";
     for utf8 in [false, true] {
         let texts: Vec<String> = fixes_after(&init_edits(utf8), body, utf8)
             .into_iter()
@@ -746,8 +732,9 @@ fn fixes_count_positions_in_the_encoding_the_client_offers() {
         assert_eq!(
             texts,
             [
-                "\u{130}stanbul \u{1F600} Caf\u{e9} colour, \u{1F600}\u{1F600} five.\n",
-                "\u{130}stanbul \u{1F600} Caf\u{e9} color, \u{1F600}\u{1F600} 5.\n",
+                "\u{130}stanbul \u{1F600} Caf\u{e9} colour, \u{1F600}\u{1F600} five at 9am.\n",
+                "\u{130}stanbul \u{1F600} Caf\u{e9} color, \u{1F600}\u{1F600} 5 at 9am.\n",
+                "\u{130}stanbul \u{1F600} Caf\u{e9} color, \u{1F600}\u{1F600} five at 9 am.\n",
             ],
             "utf8 {utf8}"
         );
@@ -784,20 +771,18 @@ fn fixes_follow_the_latest_text_at_its_version() {
     let found = actions(&replies, 8);
     assert_eq!(found.len(), 1, "{found:?}");
     assert_eq!(
-        apply("The red color", &found[0], uri, Some(2), false),
+        apply("The red color", &found[0], uri, 2, false),
         "The red colour"
     );
     assert!(actions(&replies, 9).is_empty());
 
-    // A plain edit for a client that does not say it takes versioned ones, or for a document
-    // the client gave no version.
+    // No fix for a client that cannot refuse a stale edit, or for a document with no version.
     let (replies, _) = session(&[
         INIT,
         &open(uri, "markdown", "color"),
         &ask(7, uri, (0, 0), (0, 5), &[]),
     ]);
-    let found = actions(&replies, 7);
-    assert_eq!(apply("color", &found[0], uri, None, false), "colour");
+    assert!(actions(&replies, 7).is_empty());
     let unversioned = notice(
         "textDocument/didOpen",
         vec![(
@@ -810,8 +795,21 @@ fn fixes_follow_the_latest_text_at_its_version() {
         )],
     );
     let (replies, _) = session(&[&init, &unversioned, &ask(7, uri, (0, 0), (0, 5), &[])]);
+    assert_eq!(published(&replies[1]).len(), 1);
+    assert!(actions(&replies, 7).is_empty());
+
+    // Neovim 0.12 refuses a stale versioned edit but does not advertise documentChanges.
+    let neovim = r#"{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"clientInfo":{"name":"Neovim","version":"0.12.6"},"capabilities":{}}}"#;
+    let (replies, _) = session(&[
+        neovim,
+        &open(uri, "markdown", "color"),
+        &ask(7, uri, (0, 0), (0, 5), &[]),
+        &change(uri, "The red color"),
+    ]);
+    // The edit asked for before the change names version 1, which a client at 2 refuses.
     let found = actions(&replies, 7);
-    assert_eq!(apply("color", &found[0], uri, None, false), "colour");
+    assert_eq!(found.len(), 1, "{found:?}");
+    assert_eq!(apply("color", &found[0], uri, 1, false), "colour");
 }
 
 #[test]
@@ -875,7 +873,11 @@ fn overlapping_fixes_are_separate_actions_each_applied_alone() {
         .join("target")
         .join(format!("lsp-fixes-{}", std::process::id()));
     fs::create_dir_all(&root).unwrap();
-    fs::write(root.join(PROJECT_FILE), "[rules]\nplain: color = hue\n").unwrap();
+    fs::write(
+        root.join(PROJECT_FILE),
+        "[rules]\nplain: color = hue\nwords: open source = OSS\n",
+    )
+    .unwrap();
     let init = format!(
         r#"{{"jsonrpc":"2.0","id":1,"method":"initialize","params":{{"rootUri":"{}","capabilities":{{"workspace":{{"workspaceEdit":{{"documentChanges":true}}}}}}}}}}"#,
         file_uri(&root)
@@ -892,7 +894,7 @@ fn overlapping_fixes_are_separate_actions_each_applied_alone() {
         .iter()
         .map(|a| {
             let code = at(a, "diagnostics.0.code").as_str().unwrap().to_owned();
-            (code, apply(body, a, &uri, Some(1), false))
+            (code, apply(body, a, &uri, 1, false))
         })
         .collect();
     let after = |text: &str| {
@@ -900,7 +902,16 @@ fn overlapping_fixes_are_separate_actions_each_applied_alone() {
         published(&replies[1])
     };
     let hue = after("The hue is red.");
+    // The phrase matches across the blanked code span, whose text the fix would overwrite.
+    let spanned = "We use open `x` source.";
+    let (replies, _) = session(&[
+        &init,
+        &open(&uri, "markdown", spanned),
+        &ask(7, &uri, (0, 0), (0, 23), &[]),
+    ]);
     fs::remove_dir_all(&root).unwrap();
+    assert_eq!(published(&replies[1]), [row("project/words", 0, 7, 8, 2)]);
+    assert!(actions(&replies, 7).is_empty());
     assert_eq!(
         applied,
         [

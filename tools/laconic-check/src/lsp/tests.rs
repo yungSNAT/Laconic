@@ -950,3 +950,142 @@ fn overlapping_fixes_are_separate_actions_each_applied_alone() {
     );
     assert!(hue.is_empty(), "{hue:?}");
 }
+
+#[test]
+fn fixes_change_only_the_flagged_words_of_prose() {
+    let fixed = |body| -> Vec<String> { fixes(body).into_iter().map(|f| f.2).collect() };
+    for body in [
+        // The closing mark sits inside the code span, whose text the swap would change.
+        "Run \"`echo \"hi\"`\" now.\n",
+        // Emphasis or a comma between the flagged words would be lost.
+        "It shipped **October** 19 2026.\n",
+        "It shipped October **19** 2026.\n",
+        "In October, 19 people came.\n",
+        "It shipped **19th** of October.\n",
+        // Indented code.
+        "Text.\n\n    let color = five;\n",
+        // Proper nouns, an acronym, a bidirectional isolate.
+        "We met the Five Eyes partners.\n",
+        "Test it in IE today.\n",
+        "Go \u{2067}left\u{2069} now.\n",
+    ] {
+        assert!(!codes(body).is_empty(), "{body:?}");
+        assert!(fixed(body).is_empty(), "{body:?}: {:?}", fixed(body));
+    }
+    assert_eq!(fixed("Meet at 10.am today.\n"), ["Meet at 10 am today.\n"]);
+    // The fix would delete the code span beside the space.
+    let spanned = "It rose 12 `x` % today.\n";
+    assert!(codes(spanned).contains(&"symbol-space".to_owned()));
+    assert!(fixed(spanned).is_empty());
+}
+
+#[test]
+fn a_project_replacement_takes_the_case_of_a_sentence_start() {
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("target")
+        .join(format!("lsp-case-{}", std::process::id()));
+    fs::create_dir_all(&root).unwrap();
+    fs::write(
+        root.join(PROJECT_FILE),
+        "[rules]\nplain: utilise = use\nnames: github = GitHub\n",
+    )
+    .unwrap();
+    let init = format!(
+        r#"{{"jsonrpc":"2.0","id":1,"method":"initialize","params":{{"rootUri":"{}","capabilities":{{"workspace":{{"workspaceEdit":{{"documentChanges":true}}}}}}}}}}"#,
+        file_uri(&root)
+    );
+    let uri = file_uri(&root.join("a.md"));
+    let body = "Utilise it. Github hosts it.";
+    let (replies, _) = session(&[
+        &init,
+        &open(&uri, "markdown", body),
+        &ask(7, &uri, (0, 0), (0, 28), &[]),
+    ]);
+    fs::remove_dir_all(&root).unwrap();
+    let applied: Vec<String> = actions(&replies, 7)
+        .iter()
+        .map(|a| apply(body, a, &uri, 1, false))
+        .collect();
+    assert_eq!(
+        applied,
+        ["Use it. Github hosts it.", "Utilise it. GitHub hosts it."]
+    );
+}
+
+#[test]
+fn neovim_gets_no_fix_at_a_version_it_does_not_check() {
+    let uri = "untitled:n.md";
+    let opened = |version: &str| {
+        format!(
+            r#"{{"jsonrpc":"2.0","method":"textDocument/didOpen","params":{{"textDocument":{{"uri":"{uri}","languageId":"markdown","version":{version},"text":"color"}}}}}}"#
+        )
+    };
+    for capabilities in ["", r#""workspace":{"workspaceEdit":{"documentChanges":true}}"#] {
+        let neovim = format!(
+            r#"{{"jsonrpc":"2.0","id":1,"method":"initialize","params":{{"clientInfo":{{"name":"Neovim"}},"capabilities":{{{capabilities}}}}}}}"#
+        );
+        // Neovim checks an edit's version only when it is above 0.
+        for version in ["0", "-0", "-1", "0.0", "1e0"] {
+            let (replies, _) = session(&[
+                &neovim,
+                &opened(version),
+                &ask(7, uri, (0, 0), (0, 5), &[]),
+            ]);
+            assert!(actions(&replies, 7).is_empty(), "{capabilities} {version}");
+        }
+        let (replies, _) = session(&[&neovim, &opened("3"), &ask(7, uri, (0, 0), (0, 5), &[])]);
+        let found = actions(&replies, 7);
+        assert_eq!(found.len(), 1, "{capabilities}");
+        assert_eq!(apply("color", &found[0], uri, 3, false), "colour");
+    }
+}
+
+#[test]
+fn text_the_server_cannot_place_gets_no_fix() {
+    let uri = "untitled:t.md";
+    let init = init_edits(false);
+    // A lone CR ends a line for the client but not for `lint`.
+    let (replies, _) = session(&[
+        &init,
+        &open(uri, "markdown", "Hello.\rThe color is red."),
+        &ask(7, uri, (0, 0), (2, 0), &[]),
+    ]);
+    assert!(actions(&replies, 7).is_empty());
+    // The server asks for whole texts; a change with a range leaves it without one.
+    let ranged = notice(
+        "textDocument/didChange",
+        vec![
+            (
+                "textDocument",
+                object(vec![("uri", text(uri)), ("version", number(2))]),
+            ),
+            (
+                "contentChanges",
+                Json::Array(vec![object(vec![
+                    (
+                        "range",
+                        object(vec![
+                            (
+                                "start",
+                                object(vec![("line", number(0)), ("character", number(0))]),
+                            ),
+                            (
+                                "end",
+                                object(vec![("line", number(0)), ("character", number(0))]),
+                            ),
+                        ]),
+                    ),
+                    ("text", text("The color ")),
+                ])]),
+            ),
+        ],
+    );
+    let (replies, _) = session(&[
+        &init,
+        &open(uri, "markdown", "color"),
+        &ranged,
+        &ask(7, uri, (0, 0), (0, 15), &[]),
+    ]);
+    assert!(published(&replies[2]).is_empty(), "{replies:?}");
+    assert!(actions(&replies, 7).is_empty());
+}

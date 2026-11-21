@@ -126,7 +126,21 @@ fn sync_rules(root: &Path, check: bool) -> Result<String, String> {
 }
 
 fn main() -> ExitCode {
-    let args: Vec<String> = std::env::args().skip(1).collect();
+    // `env::args` panics on an argument that is not valid Unicode.
+    let args: Vec<String> = match std::env::args_os()
+        .skip(1)
+        .map(std::ffi::OsString::into_string)
+        .collect()
+    {
+        Ok(args) => args,
+        Err(arg) => {
+            eprintln!(
+                "laconic-tools: an argument is not valid Unicode: {}",
+                arg.to_string_lossy()
+            );
+            return ExitCode::FAILURE;
+        }
+    };
     let result = match args.iter().map(String::as_str).collect::<Vec<_>>()[..] {
         ["sync-rules"] => sync_rules(&root(), false),
         ["sync-rules", "--check"] => sync_rules(&root(), true),

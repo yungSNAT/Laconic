@@ -59,6 +59,7 @@ The manifests other than Claude Code's still declare plugin 0.5.0, so a build fr
 ### laconic-check: fixed
 
 - `lint` columns after a character whose lower case is longer, such as 'İ', no longer shift by one on that line.
+- An argument that is not valid Unicode, such as a Latin-1 file name on Linux, is a usage error (exit 2) naming it with replacement characters, where `laconic-check` panicked (exit 101).
 
 ## [laconic-check 0.6.0] - 2026-11-19
 

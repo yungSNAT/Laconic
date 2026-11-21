@@ -11,6 +11,7 @@
 //! input and output, and `lsp` publishes `lint`'s findings to an editor.
 
 use std::env;
+use std::ffi::OsString;
 use std::fs;
 use std::process::ExitCode;
 
@@ -250,7 +251,17 @@ fn run_lint(options: &Options) -> ExitCode {
 }
 
 fn main() -> ExitCode {
-    let args: Vec<String> = env::args().skip(1).collect();
+    // `env::args` panics on an argument that is not valid Unicode.
+    let args: Vec<String> = match env::args_os().skip(1).map(OsString::into_string).collect() {
+        Ok(args) => args,
+        Err(arg) => {
+            eprintln!(
+                "laconic-check: an argument is not valid Unicode: {}",
+                arg.to_string_lossy()
+            );
+            return ExitCode::from(2);
+        }
+    };
     match args.first().map(String::as_str) {
         Some("lint") => match options(&args[1..]) {
             Ok(options) if !options.files.is_empty() => run_lint(&options),

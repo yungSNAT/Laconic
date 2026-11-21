@@ -122,3 +122,31 @@ fn lsp_exit_statuses_follow_the_protocol() {
         );
     }
 }
+
+/// An argument that is not valid Unicode: 'caf' and '.md' around a lone Latin-1 byte on Unix,
+/// or around an unpaired surrogate on Windows.
+#[cfg(unix)]
+fn not_unicode() -> std::ffi::OsString {
+    std::os::unix::ffi::OsStringExt::from_vec(b"caf\xe9.md".to_vec())
+}
+
+#[cfg(windows)]
+fn not_unicode() -> std::ffi::OsString {
+    std::os::windows::ffi::OsStringExt::from_wide(&[0x63, 0x61, 0x66, 0xD800, 0x2E, 0x6D, 0x64])
+}
+
+/// An argument that is not valid Unicode is reported as a usage error, not a panic.
+#[test]
+fn an_argument_that_is_not_unicode_is_a_usage_error() {
+    let out = Command::new(env!("CARGO_BIN_EXE_laconic-check"))
+        .arg("lint")
+        .arg(not_unicode())
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(2));
+    assert!(out.stdout.is_empty());
+    assert_eq!(
+        String::from_utf8(out.stderr).unwrap(),
+        "laconic-check: an argument is not valid Unicode: caf\u{fffd}.md\n"
+    );
+}

@@ -255,6 +255,7 @@ pub fn write_manifests(version: &str, dist: &Path, out: &Path) -> Result<String,
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::pi_check::TempDir;
     use std::path::PathBuf;
 
     const FIXTURE: &str = "tests/packages";
@@ -265,19 +266,16 @@ mod tests {
         Path::new(env!("CARGO_MANIFEST_DIR")).join(FIXTURE)
     }
 
-    fn temp(name: &str) -> PathBuf {
-        let dir =
-            std::env::temp_dir().join(format!("laconic-packages-{name}-{}", std::process::id()));
-        let _ = fs::remove_dir_all(&dir);
-        fs::create_dir_all(&dir).unwrap();
-        dir
+    fn temp(name: &str) -> TempDir {
+        TempDir::new(&format!("laconic-packages-{name}-")).unwrap()
     }
 
     /// The committed manifests are the generator's output for the fixture's fake hashes, so a
     /// reviewer sees exactly what a release attaches.
     #[test]
     fn manifests_match_the_committed_examples() {
-        let out = temp("golden");
+        let dir = temp("golden");
+        let out = dir.0.clone();
         write_manifests("1.2.3", &fixture().join("dist"), &out).unwrap();
         let mut expected: Vec<_> = fs::read_dir(fixture().join("expected"))
             .unwrap()
@@ -324,7 +322,8 @@ mod tests {
 
     #[test]
     fn checksum_files_must_name_their_file_and_hold_one_hash() {
-        let dist = temp("sha");
+        let dir = temp("sha");
+        let dist = dir.0.clone();
         let hash = "AB".repeat(32);
         for (text, ok) in [
             (format!("{hash}  {WINDOWS}\n"), true),
@@ -359,7 +358,8 @@ mod tests {
         ] {
             assert!(check_version(bad).is_err(), "{bad}");
         }
-        let unused = std::env::temp_dir().join("laconic-packages-unused");
+        let dir = temp("unused");
+        let unused = dir.0.join("unused");
         assert!(write_manifests("0.3", &fixture().join("dist"), &unused).is_err());
         assert!(!unused.exists());
     }

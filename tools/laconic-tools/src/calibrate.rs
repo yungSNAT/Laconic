@@ -249,11 +249,10 @@ mod tests {
 
     #[test]
     fn refuses_a_file_other_than_the_pinned_corpus() {
-        let path =
-            std::env::temp_dir().join(format!("laconic-calibrate-{}.json", std::process::id()));
+        let dir = crate::pi_check::TempDir::new("laconic-calibrate-").unwrap();
+        let path = dir.0.join("corpus.json");
         fs::write(&path, "{}").unwrap();
         let err = run(Path::new("."), &path, true).unwrap_err();
-        fs::remove_file(&path).unwrap();
         assert!(err.contains(BLOB), "{err}");
     }
 }

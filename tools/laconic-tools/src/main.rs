@@ -232,7 +232,8 @@ mod tests {
 
     #[test]
     fn sync_rules_writes_reports_and_refuses() {
-        let dir = std::env::temp_dir().join(format!("laconic-tools-{}", std::process::id()));
+        let temp = pi_check::TempDir::new("laconic-tools-").unwrap();
+        let dir = temp.0.clone();
         fs::create_dir_all(dir.join("rules")).unwrap();
         fs::write(dir.join("rules/laconic.md"), "# Title\n\nKeep it short.\n").unwrap();
         let stale = (0..SNIPPETS)

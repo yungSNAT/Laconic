@@ -1,12 +1,16 @@
 # Opengrep's subprocess audit rules fire on every test that runs a script, a
-# hook or Node with an argument list, so it does not scan tests (tests/ and
-# laconic-tools' contract tests); shipped code, scripts and the eval tool are still
-# scanned. Lizard's file-size check skips Cargo lockfiles, which Cargo generates.
+# hook or Node with an argument list, so it does not scan tests (tests/ folders and
+# tests.rs modules at any depth, and laconic-tools' contract tests); shipped code,
+# scripts and the eval tool are still scanned. Lizard's file-size check skips
+# lockfiles, which Cargo and npm generate.
 engines:
   opengrep:
     exclude_paths:
       - "tests/**"
+      - "**/tests/**"
+      - "**/tests.rs"
       - "tools/laconic-tools/src/contracts/**"
   lizard:
     exclude_paths:
       - "**/Cargo.lock"
+      - "**/package-lock.json"

@@ -93,6 +93,18 @@ cargo run --quiet --locked --manifest-path tools/laconic-evals/Cargo.toml -- val
 
 For behaviour changes, add or update representative eval cases when needed, run paired baseline/candidate evaluations under the same conditions and apply the release gate. For hook or plugin changes, verify loading in an isolated configuration directory. If a check was not run, say so and explain why; never invent results or treat inspection as execution.
 
+## Prepare a laconic-check release
+
+1. Bump the version in `tools/laconic-check/Cargo.toml` and refresh the lockfiles for laconic-check, its fuzz targets, laconic-tools and laconic-web. Update the version in the changelog, the composite Action's default and the affected documentation examples.
+2. Regenerate the Vale style from the repository root. The generated files in `vale/Laconic` include the checker version, so a version bump alone requires regeneration. Include the regenerated files in the PR.
+
+   ```sh
+   cargo run --locked --manifest-path tools/laconic-tools/Cargo.toml -- vale-style
+   cargo run --locked --manifest-path tools/laconic-tools/Cargo.toml -- vale-style --check
+   ```
+
+3. Check that the PR's [laconic-check release workflow](.github/workflows/laconic-check-release.yml) built the Linux, Windows and macOS archives and packaged the Vale style. After the preparation PR merges, the maintainer can tag the verified commit as `laconic-check-v<version>`.
+
 ## Documentation and checklist
 
 Keep examples safe to copy: use harmless fixtures, explicit placeholders and read-only previews. Never include real secrets, personal paths, production identifiers or commands that could damage a reader's environment. Distinguish required behaviour from suggestions and avoid unsupported medical, accessibility, platform or performance claims.

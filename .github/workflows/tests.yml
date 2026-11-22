@@ -51,7 +51,7 @@ jobs:
           cargo fmt --check
           cargo clippy --locked --all-targets -- -D warnings
       - name: Install cargo-llvm-cov
-        uses: taiki-e/install-action@cfdb7ed4ccc7c7dce37759eae89dc5674b469b39 # v2.90.3
+        uses: taiki-e/install-action@4a76afe23f9e08d2d9550fb56e556444e8611d21 # v2.90.4
         with:
           tool: cargo-llvm-cov@0.9.1
       # laconic-evals (the evaluation harness, judge and benchmarks) must keep 100% line

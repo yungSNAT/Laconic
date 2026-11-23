@@ -134,6 +134,19 @@ jobs:
           cargo run --locked --quiet --manifest-path tools/laconic-tools/Cargo.toml -- vale-style --check
           (cd vale && zip -qr "$RUNNER_TEMP/packages/Laconic.zip" Laconic)
           (cd "$RUNNER_TEMP/packages" && sha256sum Laconic.zip > Laconic.zip.sha256)
+      - name: Generate the SPDX SBOM for laconic-check
+        uses: anchore/sbom-action@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
+        with:
+          path: tools/laconic-check
+          format: spdx-json
+          syft-version: v1.51.0
+          output-file: ${{ runner.temp }}/packages/laconic-check.spdx.json
+          upload-artifact: false
+          upload-release-assets: false
+      - name: Hash the SPDX SBOM
+        run: |
+          set -euo pipefail
+          (cd "$RUNNER_TEMP/packages" && sha256sum laconic-check.spdx.json > laconic-check.spdx.json.sha256)
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: laconic-check-packages
@@ -161,6 +174,14 @@ jobs:
             dist/*.tar.gz
             dist/*.zip
             dist/*.mcpb
+      - name: Attest the SPDX SBOM for laconic-check
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: |
+            dist/laconic-check-*.tar.gz
+            dist/laconic-check-*.zip
+            dist/laconic-check.mcpb
+          sbom-path: dist/laconic-check.spdx.json
 
   release:
     # A tag push only: a manual run on a tag leaves its artefacts unpublished.
@@ -186,7 +207,7 @@ jobs:
           gh release create "${GITHUB_REF_NAME}" dist/* \
             --repo "${GITHUB_REPOSITORY}" \
             --title "${GITHUB_REF_NAME}" \
-            --notes "Prebuilt laconic-check binaries for Linux (x86_64, static), Windows (x86_64) and macOS (Apple silicon), each with a SHA-256 checksum and a build provenance attestation; an MCP bundle (laconic-check.mcpb); Scoop, Homebrew, winget and MCP Registry manifests for them; and Laconic.zip, a Vale package of the rules a regular expression can express (vale/README.md)."
+            --notes "Prebuilt laconic-check binaries for Linux (x86_64, static), Windows (x86_64) and macOS (Apple silicon), each with a SHA-256 checksum, an SPDX SBOM (laconic-check.spdx.json) and a build provenance attestation; an MCP bundle (laconic-check.mcpb); Scoop, Homebrew, winget and MCP Registry manifests for them; and Laconic.zip, a Vale package of the rules a regular expression can express (vale/README.md)."
 
   # The Action's self-test against the release just published. A release made with the
   # workflow's token starts no other workflow, so this job calls it.

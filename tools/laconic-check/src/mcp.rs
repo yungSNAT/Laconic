@@ -437,15 +437,16 @@ fn call_tool(params: Option<&Json>) -> Result<String, String> {
             let text = arg("text").ok_or("text is required")?;
             let settings = Settings::current_dir()?;
             let source: Vec<&str> = text.lines().collect();
-            let lines: Vec<String> = lint::lint_counting(text, &settings.rules)
-                .0
-                .iter()
-                .filter(|f| {
-                    let line = f.line.checked_sub(1).and_then(|i| source.get(i));
-                    settings.keeps(f, line.copied().unwrap_or(""))
-                })
-                .map(|f| format!("line {}:{}: {}: {}", f.line, f.column, f.rule, f.message))
-                .collect();
+            let lines: Vec<String> =
+                lint::lint_counting_with(text, &settings.rules, settings.needs_opt_in())
+                    .0
+                    .iter()
+                    .filter(|f| {
+                        let line = f.line.checked_sub(1).and_then(|i| source.get(i));
+                        settings.keeps(f, line.copied().unwrap_or(""))
+                    })
+                    .map(|f| format!("line {}:{}: {}: {}", f.line, f.column, f.rule, f.message))
+                    .collect();
             Ok(if lines.is_empty() {
                 "No findings.".into()
             } else {

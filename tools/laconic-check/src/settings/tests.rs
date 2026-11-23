@@ -162,3 +162,40 @@ fn disable_and_only_drop_findings_and_disable_wins() {
     assert_eq!(names("disable = project/plain"), ["em-dash", "us-spelling"]);
     assert!(names("only = em-dash\ndisable = em-dash").is_empty());
 }
+
+#[test]
+fn profile_and_opt_in_rules_follow_settings_and_accept_lists() {
+    let report = Settings::parse("f", "profile = report\n").unwrap();
+    assert_eq!(report.profile, Some(crate::profile::Profile::Report));
+    assert!(report.needs_opt_in());
+    assert!(!report.is_advisory(&RuleId::StackedHedge.into()));
+    assert!(report.is_advisory(&RuleId::UnglossedTerm.into()));
+
+    let bad = Settings::parse("f", "profile = memo\n").unwrap_err();
+    assert!(bad.contains("unknown profile 'memo'"), "{bad}");
+
+    let docs = Settings::parse("f", "profile = docs\n").unwrap();
+    assert!(!docs.needs_opt_in());
+    assert!(docs.is_advisory(&RuleId::NumberWord.into()));
+
+    let only_opt = Settings::parse("f", "only = unglossed-term\n").unwrap();
+    assert!(only_opt.needs_opt_in());
+    let disabled_opt =
+        Settings::parse("f", "only = unglossed-term\ndisable = unglossed-term\n").unwrap();
+    assert!(!disabled_opt.needs_opt_in());
+
+    let text = "The QBRs ran.\n";
+    let found = lint::lint_all(text);
+    assert_eq!(found.len(), 1);
+    assert!(!Settings::default().keeps(&found[0], text));
+    assert!(report.keeps(&found[0], text));
+    assert!(only_opt.keeps(&found[0], text));
+
+    let accepted = Settings::parse("f", "profile = report\naccept = QBR\n").unwrap();
+    assert!(!accepted.keeps(&found[0], text));
+
+    let bold = "- **One:** a\n- **Two:** b\n- **Three:** c\n";
+    let bold_findings = lint::lint(bold);
+    assert_eq!(bold_findings.len(), 1);
+    assert!(!docs.keeps(&bold_findings[0], "- **Three:** c"));
+}

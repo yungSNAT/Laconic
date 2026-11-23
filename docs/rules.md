@@ -27,6 +27,7 @@ To report a finding that should not have been flagged, use the [false-positive f
 | [`time`](#time) | yes | Dates and time | under 0.01 | 3 of 75 |
 | [`latin`](#latin) | yes | Shortened forms | under 0.01 | 0 of 75 |
 | [`acronym-before-definition`](#acronym-before-definition) | no (advisory) | Shortened forms | 0.07 | 0 of 75 |
+| [`unglossed-term`](#unglossed-term) | no (advisory, opt-in) | Shortened forms | 1.05 | 21 of 75 |
 | [`closer`](#closer) | yes | none | 0.00 | 0 of 75 |
 | [`stock-phrase`](#stock-phrase) | yes | none | 0.02 | 4 of 75 |
 | [`stacked-hedge`](#stacked-hedge) | no (advisory) | none | 0.04 | 0 of 75 |
@@ -50,7 +51,7 @@ To report a finding that should not have been flagged, use the [false-positive f
 | [Hyphens](../skills/laconic-prose/references/style-manual-rules.md#hyphens) | `hyphen`, `hyphen-consistency` |
 | [Numbers](../skills/laconic-prose/references/style-manual-rules.md#numbers) | `number-word` |
 | [Dates and time](../skills/laconic-prose/references/style-manual-rules.md#dates-and-time) | `date`, `weekday`, `time` |
-| [Shortened forms](../skills/laconic-prose/references/style-manual-rules.md#shortened-forms) | `latin`, `acronym-before-definition` |
+| [Shortened forms](../skills/laconic-prose/references/style-manual-rules.md#shortened-forms) | `latin`, `acronym-before-definition`, `unglossed-term` |
 
 The rules with no Style Manual section flag writing patterns from [patterns.md](../skills/laconic-prose/references/patterns.md), chat-tool residue or suppression comments: `closer`, `stock-phrase`, `stacked-hedge`, `bold-label`, `staged-contrast`, `reveal-question`, `residue`, `unused-suppression`.
 
@@ -175,6 +176,14 @@ An acronym of 2 to 6 capitals used before the parenthesised definition that intr
 Fails `lint`: no (advisory). Style Manual: [Shortened forms](../skills/laconic-prose/references/style-manual-rules.md#shortened-forms). Human prose: 14 findings, 0.07 per 1,000 words. Outside articles: flags 0 of 75 held out (0 findings) and 0 of 75 for calibration.
 
 Example: `The BOM forecast came from the Bureau of Meteorology (BOM), which`.
+
+### unglossed-term
+
+An unfamiliar uppercase acronym of 3 to 8 capitals used without an earlier gloss such as 'Full Name (ACR)' or 'ACR (Full Name)'. Enabled by --only, a project file or the email, report and essay profiles.
+
+Fails `lint`: no (advisory, opt-in). Style Manual: [Shortened forms](../skills/laconic-prose/references/style-manual-rules.md#shortened-forms). Human prose: 216 findings, 1.05 per 1,000 words. Outside articles: flags 21 of 75 held out (25 findings) and 30 of 75 for calibration.
+
+Example: `Each member gets a QBR plan.`.
 
 ### closer
 

@@ -7,7 +7,7 @@
 //! planting one known fault in it must produce exactly that rule, once. The rule reference,
 //! `docs/rules.md`, is generated here from the rule table, the seeds and the human corpus.
 
-use crate::lint::{RULES, lint};
+use crate::lint::{RULES, RuleId, lint, lint_all};
 use std::collections::BTreeMap;
 use std::fmt::Write;
 use std::path::Path;
@@ -143,6 +143,11 @@ const SEEDS: &[(&str, &str, &str)] = &[
         "The BOM forecast came from the Bureau of Meteorology (BOM), which",
     ),
     (
+        "unglossed-term",
+        "Each member gets a healthcare plan.",
+        "Each member gets a QBR plan.",
+    ),
+    (
         "residue",
         "after the go-ahead.",
         "after the go-ahead.\u{200b}",
@@ -163,8 +168,10 @@ fn corpus() -> String {
     CLEAN.join("\n\n")
 }
 
-fn rules(text: &str) -> Vec<&'static str> {
-    lint(text)
+fn rules_for(rule: &str, text: &str) -> Vec<&'static str> {
+    let opt_in = RuleId::named(rule).is_some_and(|id| id.rule().opt_in);
+    let found = if opt_in { lint_all(text) } else { lint(text) };
+    found
         .into_iter()
         .map(|f| f.rule.house().unwrap().name())
         .collect()
@@ -174,9 +181,9 @@ fn rules(text: &str) -> Vec<&'static str> {
 fn clean_corpus_has_no_findings() {
     for sentence in CLEAN {
         assert!(
-            rules(sentence).is_empty(),
+            lint_all(sentence).is_empty(),
             "false finding in {sentence:?}: {:?}",
-            lint(sentence)
+            lint_all(sentence)
         );
     }
 }
@@ -191,7 +198,7 @@ fn every_seeded_fault_is_caught_exactly_once() {
             1,
             "seed fragment {from:?} must occur once"
         );
-        let found = rules(&clean.replacen(from, to, 1));
+        let found = rules_for(rule, &clean.replacen(from, to, 1));
         if found != [rule] {
             failures.push(format!("{rule}: {to:?} gave {found:?}"));
         }
@@ -211,7 +218,7 @@ fn every_seeded_fault_is_caught_exactly_once() {
 fn every_example_flags_its_rule_on_its_own() {
     let missed: Vec<String> = SEEDS
         .iter()
-        .filter(|(rule, _, to)| !rules(to).contains(rule))
+        .filter(|(rule, _, to)| !rules_for(rule, to).contains(rule))
         .map(|(rule, _, to)| format!("{rule}: {to:?}"))
         .collect();
     assert!(
@@ -432,7 +439,7 @@ fn reference() -> String {
     let corpus = human_corpus();
     let words: usize = corpus.iter().map(|t| t.split_whitespace().count()).sum();
     let mut counts: BTreeMap<&str, usize> = BTreeMap::new();
-    for finding in corpus.iter().flat_map(|t| lint(t)) {
+    for finding in corpus.iter().flat_map(|t| lint_all(t)) {
         *counts
             .entry(finding.rule.house().unwrap().name())
             .or_default() += 1;
@@ -453,7 +460,11 @@ fn reference() -> String {
     let outside_rule = |name: &str| outside.get(name).copied().unwrap_or_default();
     let style_rules = format!("../{STYLE_RULES}");
     let section_link = |s: &str| format!("[{s}]({style_rules}#{})", anchor(s));
-    let fails = |advisory: bool| if advisory { "no (advisory)" } else { "yes" };
+    let fails = |advisory: bool, opt_in: bool| match (advisory, opt_in) {
+        (true, true) => "no (advisory, opt-in)",
+        (true, false) => "no (advisory)",
+        (false, _) => "yes",
+    };
 
     let mut out = String::new();
     let _ = writeln!(
@@ -476,7 +487,7 @@ fn reference() -> String {
             out,
             "| [`{0}`](#{0}) | {1} | {2} | {3} | {4} of {5} |",
             rule.name,
-            fails(rule.advisory),
+            fails(rule.advisory, rule.opt_in),
             rule.section.unwrap_or("none"),
             human(rule.name).1,
             outside_rule(rule.name)[2],
@@ -551,7 +562,7 @@ fn reference() -> String {
             "\n### {}\n\n{}\n\nFails `lint`: {}. {section} Human prose: {} {}, {rate} per 1,000 words. Outside articles: flags {ha} of {} held out ({hf} {}) and {ca} of {} for calibration.\n\n{}",
             rule.name,
             rule.checks,
-            fails(rule.advisory),
+            fails(rule.advisory, rule.opt_in),
             thousands(n),
             if n == 1 { "finding" } else { "findings" },
             totals[2],
@@ -585,7 +596,7 @@ fn advisory_rules_flag_under_5_percent_of_held_out_articles() {
     let held_out = outside[TOTALS][2];
     for rule in RULES
         .iter()
-        .filter(|r| r.advisory && !GRANDFATHERED.contains(&r.name))
+        .filter(|r| r.advisory && !r.opt_in && !GRANDFATHERED.contains(&r.name))
     {
         let flagged = outside[rule.name][2];
         assert!(

@@ -6,7 +6,8 @@
 
 use std::rc::Rc;
 
-use crate::lint::{self, Finding, Phrase, ProjectRule, RuleId};
+use crate::lint::{self, Finding, Phrase, ProjectRule, RuleId, RuleRef};
+use crate::profile::Profile;
 
 /// The project file `lint` and the MCP server read from the current directory, and the
 /// language server from the workspace folder that holds a document.
@@ -18,7 +19,9 @@ pub struct Settings {
     pub disable: Vec<String>,
     pub only: Vec<String>,
     pub max_findings: usize,
-    /// Words `us-spelling` does not flag, matched as written: same case, whole word.
+    /// Register preset adjusting rule enablement and severity; `None` keeps default `lint`.
+    pub profile: Option<Profile>,
+    /// Words `us-spelling` and `unglossed-term` do not flag, matched as written: whole word.
     pub accept: Vec<String>,
     /// The `[rules]` section's rules, in the order the file first names them.
     pub rules: Vec<Rc<ProjectRule>>,
@@ -86,6 +89,7 @@ impl Settings {
                     }
                 }
                 "max-findings" => settings.max_findings = count(value).map_err(at)?,
+                "profile" => settings.profile = Some(profile(value).map_err(at)?),
                 "accept" => settings.accept.extend(words(value).map_err(at)?),
                 key => return Err(at(format!("unknown key '{key}'"))),
             }
@@ -130,24 +134,64 @@ impl Settings {
         }
     }
 
+    /// True when the active profile or `--only` filter enables any opt-in rule.
+    pub fn needs_opt_in(&self) -> bool {
+        if !self.only.is_empty() {
+            return self.only.iter().any(|name| {
+                !self.disable.contains(name)
+                    && RuleId::named(name).is_some_and(|id| id.rule().opt_in)
+            });
+        }
+        self.profile.is_some_and(|p| p.enables_opt_in())
+    }
+
+    /// Effective advisory flag for `rule`, after any active register profile.
+    pub fn is_advisory(&self, rule: &RuleRef) -> bool {
+        match (self.profile, rule.house()) {
+            (Some(profile), Some(id)) => profile.is_advisory(id),
+            _ => rule.advisory(),
+        }
+    }
+
     /// Whether `lint` reports a finding, given the text of the line it is on.
     pub fn keeps(&self, finding: &Finding, line: &str) -> bool {
         let name = finding.rule.name();
         let listed = |names: &[String]| names.iter().any(|n| n == name);
-        if listed(&self.disable) || !(self.only.is_empty() || listed(&self.only)) {
+        if listed(&self.disable) {
             return false;
         }
-        // A `us-spelling` finding's column is the first letter of a whole run of letters
-        // (`lint`'s spelling check), so the letters from there are that word.
-        let accepted = || {
-            let word: String = line
-                .chars()
+        if !self.only.is_empty() {
+            if !listed(&self.only) {
+                return false;
+            }
+        } else if let Some(id) = finding.rule.house() {
+            if id.rule().opt_in {
+                if !self.profile.is_some_and(|p| p.enables(id)) {
+                    return false;
+                }
+            } else if self.profile.is_some_and(|p| p.disables(id)) {
+                return false;
+            }
+        }
+        // A `us-spelling` or `unglossed-term` finding's column is the first letter of a whole
+        // run of letters, so the letters from there are that word.
+        let word_at = || -> String {
+            line.chars()
                 .skip(finding.column.saturating_sub(1))
                 .take_while(|c| c.is_alphabetic())
-                .collect();
-            self.accept.contains(&word)
+                .collect()
         };
-        !(finding.rule == RuleId::UsSpelling && accepted())
+        if finding.rule == RuleId::UsSpelling && self.accept.contains(&word_at()) {
+            return false;
+        }
+        if finding.rule == RuleId::UnglossedTerm {
+            let word = word_at();
+            let base = word.strip_suffix('s').unwrap_or(&word);
+            if self.accept.iter().any(|a| a == &word || a == base) {
+                return false;
+            }
+        }
+        true
     }
 }
 
@@ -207,6 +251,16 @@ pub fn count(value: &str) -> Result<usize, String> {
     value
         .parse()
         .map_err(|_| format!("'{value}' is not a whole number"))
+}
+
+/// A register profile name (`email`, `report`, `docs`, `chat` or `essay`).
+pub fn profile(value: &str) -> Result<Profile, String> {
+    Profile::parse(value).ok_or_else(|| {
+        format!(
+            "unknown profile '{value}'; expected {}",
+            Profile::NAMES.join(", ")
+        )
+    })
 }
 
 /// A comma-separated list of words, each made of letters only.

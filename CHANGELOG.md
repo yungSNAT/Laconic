@@ -52,6 +52,7 @@ The manifests other than Claude Code's still declare plugin 0.5.0, so a build fr
 - Keep scenario prompts out of Claude CLI arguments and reject model values that could become options (#30).
 
 ### laconic-check: added
+- `laconic-check lint` adds register presets (`--profile <email|report|docs|chat|essay>` and `profile = <name>` in `.laconic-check`), the opt-in advisory `unglossed-term` rule for unfamiliar uppercase acronyms used without an earlier gloss, and `--metrics` for per-file and overall distributional prose metrics in text and JSON output (with matching shell completions).
 - `laconic-check completions <bash|zsh|fish|powershell>` prints shell completion scripts covering every subcommand, flag and built-in rule, with no external dependencies.
 
 - `laconic-check` release builds strip symbols (`strip = true`), declare `[package.metadata.binstall]` metadata for `cargo-binstall` and publish an attested SPDX SBOM (`laconic-check.spdx.json`).

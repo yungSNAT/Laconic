@@ -13,6 +13,7 @@ use std::rc::Rc;
 use std::sync::OnceLock;
 
 mod project;
+mod terms;
 pub use project::{Phrase, ProjectRule};
 
 /// One lint rule. `docs/rules.md` is generated from this table and the seeded-fault tests;
@@ -22,6 +23,9 @@ pub struct Rule {
     pub name: &'static str,
     /// Advisory findings report a pattern worth a look but never fail `lint`.
     pub advisory: bool,
+    /// Opt-in rules stay off in default `lint` until enabled via `--only`, a profile or a
+    /// project file.
+    pub opt_in: bool,
     /// The heading in `skills/laconic-prose/references/style-manual-rules.md` whose rules
     /// this one checks in part; `None` for writing patterns and chat-tool residue.
     pub section: Option<&'static str>,
@@ -33,6 +37,7 @@ const fn rule(name: &'static str, section: Option<&'static str>, checks: &'stati
     Rule {
         name,
         advisory: false,
+        opt_in: false,
         section,
         checks,
     }
@@ -42,6 +47,21 @@ const fn advisory(name: &'static str, section: Option<&'static str>, checks: &'s
     Rule {
         name,
         advisory: true,
+        opt_in: false,
+        section,
+        checks,
+    }
+}
+
+const fn opt_in_advisory(
+    name: &'static str,
+    section: Option<&'static str>,
+    checks: &'static str,
+) -> Rule {
+    Rule {
+        name,
+        advisory: true,
+        opt_in: true,
         section,
         checks,
     }
@@ -140,6 +160,11 @@ rules! {
         "acronym-before-definition",
         Some("Shortened forms"),
         "An acronym of 2 to 6 capitals used before the parenthesised definition that introduces it later in the document, as in 'The BOM said ... the Bureau of Meteorology (BOM)'.",
+    ),
+    UnglossedTerm = opt_in_advisory(
+        "unglossed-term",
+        Some("Shortened forms"),
+        "An unfamiliar uppercase acronym of 3 to 8 capitals used without an earlier gloss such as 'Full Name (ACR)' or 'ACR (Full Name)'. Enabled by --only, a project file or the email, report and essay profiles.",
     ),
     Closer = rule(
         "closer",
@@ -589,9 +614,41 @@ pub fn lint(text: &str) -> Vec<Finding> {
     lint_counting(text, &[]).0
 }
 
+/// Candidate findings in `text`, including opt-in rules such as `unglossed-term`, less those
+/// its suppression comments silence.
+pub fn lint_all(text: &str) -> Vec<Finding> {
+    lint_counting_with(text, &[], true).0
+}
+
 /// `lint`'s findings, with those of a project file's own rules, and how many findings
 /// suppression comments silenced.
 pub fn lint_counting(text: &str, project: &[Rc<ProjectRule>]) -> (Vec<Finding>, usize) {
+    lint_counting_with(text, project, false)
+}
+
+/// Masked original prose paragraphs of `text`, using the same Markdown exclusions as `lint`.
+pub(crate) fn prose_paragraphs(text: &str) -> Vec<String> {
+    let mut paragraphs = Vec::new();
+    let _ = scan(text, &[], false, Some(&mut paragraphs));
+    paragraphs
+}
+
+/// `lint`'s findings, with those of a project file's own rules and optional opt-in rules, and
+/// how many findings suppression comments silenced.
+pub fn lint_counting_with(
+    text: &str,
+    project: &[Rc<ProjectRule>],
+    include_opt_in: bool,
+) -> (Vec<Finding>, usize) {
+    scan(text, project, include_opt_in, None)
+}
+
+fn scan(
+    text: &str,
+    project: &[Rc<ProjectRule>],
+    include_opt_in: bool,
+    mut prose: Option<&mut Vec<String>>,
+) -> (Vec<Finding>, usize) {
     let mut findings = Vec::new();
     let mut suppressions: Vec<Suppression> = Vec::new();
     let mut paragraph = Paragraph::default();
@@ -655,7 +712,7 @@ pub fn lint_counting(text: &str, project: &[Rc<ProjectRule>]) -> (Vec<Finding>, 
             continue;
         }
         if trimmed.starts_with("```") || trimmed.starts_with("~~~") {
-            paragraph.flush(&mut findings, &mut document, project);
+            paragraph.flush(&mut findings, &mut document, project, prose.as_deref_mut());
             fence = Some(if trimmed.starts_with("```") {
                 "```"
             } else {
@@ -681,7 +738,7 @@ pub fn lint_counting(text: &str, project: &[Rc<ProjectRule>]) -> (Vec<Finding>, 
                         .collect(),
                 });
             }
-            paragraph.flush(&mut findings, &mut document, project);
+            paragraph.flush(&mut findings, &mut document, project, prose.as_deref_mut());
             continue;
         }
         let marker_width = if is_break_line(trimmed) {
@@ -709,7 +766,7 @@ pub fn lint_counting(text: &str, project: &[Rc<ProjectRule>]) -> (Vec<Finding>, 
             code_lines.push(line_no);
         }
         if single_line || list_item {
-            paragraph.flush(&mut findings, &mut document, project);
+            paragraph.flush(&mut findings, &mut document, project, prose.as_deref_mut());
         }
         // Bullets nested under a run leave it open; a sibling without a label ends it.
         if list_item && (labels.1 == 0 || indent <= labels.0) {
@@ -734,12 +791,15 @@ pub fn lint_counting(text: &str, project: &[Rc<ProjectRule>]) -> (Vec<Finding>, 
         paragraph.push(raw, line_no);
         // A hard line break (two trailing spaces or a backslash) also ends the run.
         if single_line || raw.ends_with("  ") || raw.trim_end().ends_with('\\') {
-            paragraph.flush(&mut findings, &mut document, project);
+            paragraph.flush(&mut findings, &mut document, project, prose.as_deref_mut());
         }
     }
-    paragraph.flush(&mut findings, &mut document, project);
+    paragraph.flush(&mut findings, &mut document, project, prose.as_deref_mut());
+    if prose.is_some() {
+        return (Vec::new(), 0);
+    }
     // Rules that compare paragraphs report once the whole document is read.
-    findings.extend(document.findings());
+    findings.extend(document.findings(include_opt_in));
     // An indented code line is read as prose, as it may be a paragraph indented by mistake;
     // its code is not for an editor to change.
     for finding in &mut findings {
@@ -1052,11 +1112,17 @@ impl Paragraph {
         findings: &mut Vec<Finding>,
         document: &mut Document,
         project: &[Rc<ProjectRule>],
+        prose: Option<&mut Vec<String>>,
     ) {
         if self.lines.is_empty() {
             return;
         }
-        let (masked, doubles) = mask(&self.chars);
+        if let Some(out) = prose {
+            out.push(mask(&self.chars, false).0.iter().collect());
+            *self = Self::default();
+            return;
+        }
+        let (masked, doubles) = mask(&self.chars, true);
         document.collect(&masked, |column| self.at(column));
         let mut found = Vec::new();
         // Once a span holds code, an HTML tag or a link, its marks may belong to them, and so
@@ -1168,6 +1234,10 @@ struct Document {
     defined: HashMap<String, (usize, usize)>,
     /// Each acronym's first use outside a definition.
     used: HashMap<String, (usize, usize)>,
+    /// Each 3-to-8-capital acronym's first gloss, either 'Full Name (ACR)' or 'ACR (Full Name)'.
+    glossed: HashMap<String, (usize, usize)>,
+    /// Each unfamiliar 3-to-8-capital acronym's first unglossed use outside all-caps runs.
+    term_used: HashMap<String, (usize, usize)>,
 }
 
 impl Document {
@@ -1212,12 +1282,12 @@ impl Document {
             }
             let word: String = masked[start..k].iter().collect();
             let place = at(start + 1);
+            let pre_glossed = start > 0
+                && masked[start - 1] == '('
+                && masked.get(k) == Some(&')')
+                && spells(&masked[..start - 1], &word);
             if let Some(capitals) = acronym(&word) {
-                let defines = start > 0
-                    && masked[start - 1] == '('
-                    && masked.get(k) == Some(&')')
-                    && spells(&masked[..start - 1], &word);
-                let first = if defines {
+                let first = if pre_glossed {
                     &mut self.defined
                 } else {
                     &mut self.used
@@ -1225,12 +1295,19 @@ impl Document {
                 // 'NGOs' is a use of 'NGO', and '(NGO)' defines both.
                 first.entry(capitals.to_owned()).or_insert(place);
             }
+            if let Some(base) = terms::candidate(&word) {
+                if pre_glossed || terms::is_post_glossed(&masked[k..], base) {
+                    self.glossed.entry(base.to_owned()).or_insert(place);
+                } else if !terms::is_exempt(base) && !terms::in_all_caps_run(masked, start, k) {
+                    self.term_used.entry(base.to_owned()).or_insert(place);
+                }
+            }
             self.words.entry(word.to_lowercase()).or_insert(place);
         }
     }
 
     /// The findings that need the whole document, in line and column order.
-    fn findings(&self) -> Vec<Finding> {
+    fn findings(&self, include_opt_in: bool) -> Vec<Finding> {
         let mut found = Vec::new();
         for (word, &hyphenated) in &self.words {
             let Some((a, b)) = word.split_once('-') else {
@@ -1279,6 +1356,30 @@ impl Document {
                     ),
                     fix: None,
                 });
+            }
+        }
+        if include_opt_in {
+            for (term, &used) in &self.term_used {
+                // `acronym-before-definition` already flags a term defined later via `Full Name (ACR)`.
+                let defined_later = self
+                    .defined
+                    .get(term)
+                    .is_some_and(|&defined| used < defined);
+                let glossed_earlier = self
+                    .glossed
+                    .get(term)
+                    .is_some_and(|&glossed| glossed <= used);
+                if !defined_later && !glossed_earlier {
+                    found.push(Finding {
+                        line: used.0,
+                        column: used.1,
+                        rule: RuleId::UnglossedTerm.into(),
+                        message: format!(
+                            "'{term}' is used without an earlier gloss (advisory); expand it at first use, as in 'Full Name ({term})' or '{term} (Full Name)'"
+                        ),
+                        fix: None,
+                    });
+                }
             }
         }
         found.sort_by_key(|f| (f.line, f.column));
@@ -1438,9 +1539,11 @@ fn check_residue(chars: &[char], line: usize, findings: &mut Vec<Finding>) {
     }
 }
 
-/// Replaces protected spans with spaces, keeping columns. Returns the masked line and
-/// the 0-based indexes of each double-quoted span's opening and closing marks.
-fn mask(chars: &[char]) -> (Vec<char>, Vec<(usize, usize)>) {
+/// Replaces protected spans with spaces, keeping columns. When `mask_quotes` is true, short
+/// quoted spans are also blanked (for style linting); prose metrics keep inline quotes so
+/// quoted sentences are counted accurately. Returns the masked line and the 0-based indexes of
+/// each double-quoted span's opening and closing marks.
+fn mask(chars: &[char], mask_quotes: bool) -> (Vec<char>, Vec<(usize, usize)>) {
     let mut out = chars.to_vec();
     let mut doubles = Vec::new();
     let mut i = 0;
@@ -1501,7 +1604,7 @@ fn mask(chars: &[char]) -> (Vec<char>, Vec<(usize, usize)>) {
             i = end;
             continue;
         }
-        if c == '"' || c == '\u{201c}' {
+        if mask_quotes && (c == '"' || c == '\u{201c}') {
             let close = if c == '"' { '"' } else { '\u{201d}' };
             if let Some(end) = find(chars, i + 1, |x| x == close)
                 && end > i + 1
@@ -1513,7 +1616,8 @@ fn mask(chars: &[char]) -> (Vec<char>, Vec<(usize, usize)>) {
                 continue;
             }
         }
-        if (c == '\'' || c == '\u{2018}')
+        if mask_quotes
+            && (c == '\'' || c == '\u{2018}')
             && opens_quote(chars, i)
             && let Some(end) = (i + 1..chars.len())
                 .find(|&j| (chars[j] == '\'' || chars[j] == '\u{2019}') && closes_quote(chars, j))
@@ -3592,6 +3696,46 @@ mod tests {
             large < small * 24,
             "8 times the definitions took {:.1} times as long ({small:?} to {large:?})",
             large.as_secs_f64() / small.as_secs_f64()
+        );
+    }
+
+    #[test]
+    fn flags_unglossed_acronyms_only_when_opt_in_is_enabled() {
+        let found = |text: &str| -> Vec<(usize, usize, String)> {
+            lint_all(text)
+                .into_iter()
+                .filter(|f| f.rule == RuleId::UnglossedTerm)
+                .map(|f| (f.line, f.column, f.message))
+                .collect()
+        };
+        assert!(RuleId::UnglossedTerm.rule().advisory);
+        assert!(RuleId::UnglossedTerm.rule().opt_in);
+        // Default `lint` skips opt-in rules.
+        assert!(lint("We reviewed the QBR.").is_empty());
+        // Opt-in flags unfamiliar acronyms once at first use.
+        let hits = found("We reviewed the QBR.\nThe QBRs passed.");
+        assert_eq!(hits.len(), 1);
+        assert_eq!((hits[0].0, hits[0].1), (1, 17));
+        assert!(hits[0].2.contains("'QBR'"), "{}", hits[0].2);
+        // Common allowlist, 2-letter acronyms, Roman numerals, code spans and all-caps runs pass.
+        assert!(
+            found("The API returns JSON over HTTPS via CLI, MCP and LSP for ATO GST.").is_empty()
+        );
+        assert!(found("AI and UI run in CI on OS.").is_empty());
+        assert!(found("Part III covers `QBR`.").is_empty());
+        assert!(found("Chapter XXII begins.").is_empty());
+        assert!(found("DO NOT EDIT THIS FILE.").is_empty());
+        // Pre-gloss `Full Name (ACR)` and post-gloss `ACR (Full Name)` both silence it.
+        assert!(found("The Quarterly Business Review (QBR) ran. QBR actions followed.").is_empty());
+        assert!(found("The QBR (Quarterly Business Review) ran. QBR actions followed.").is_empty());
+        // Used before a `Full Name (ACR)` definition is owned by `acronym-before-definition`.
+        let before_def = lint_all("The QBR ran.\nThe Quarterly Business Review (QBR) closed.");
+        assert_eq!(before_def.len(), 1);
+        assert_eq!(before_def[0].rule, RuleId::AcronymBeforeDefinition);
+        // Used before a post-gloss `ACR (Full Name)` is flagged at first use.
+        assert_eq!(
+            found("The QBR ran.\nLater QBR (Quarterly Business Review) closed.").len(),
+            1
         );
     }
 }

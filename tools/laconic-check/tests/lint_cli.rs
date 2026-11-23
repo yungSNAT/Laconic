@@ -533,3 +533,141 @@ fn golden_outputs_are_unchanged() {
     }
     assert!(changed.is_empty(), "golden outputs differ: {changed:?}");
 }
+
+#[test]
+fn profiles_adjust_rule_enablement_and_severity_without_changing_default_lint() {
+    let dir = folder(
+        "profiles",
+        &[
+            ("hedge.md", "It could potentially rain.\n"),
+            ("number.md", "We ran three tests.\n"),
+            ("term.md", "We reviewed the QBR.\n"),
+            (
+                "bold.md",
+                "- **One:** first.\n- **Two:** second.\n- **Three:** third.\n",
+            ),
+            (
+                "doc_rules.md",
+                "We track healthcare and health-care.\n\nThe BOM said Bureau of Meteorology (BOM) agrees.\n",
+            ),
+            ("dashes.md", "Supply rose - slowly. Demand fell - fast.\n"),
+        ],
+    );
+    // Default lint leaves advisory findings passing and opt-in rules off.
+    assert_eq!(lint(&dir, &["hedge.md"]).0, 0);
+    assert_eq!(lint(&dir, &["term.md"]), (0, String::new(), String::new()));
+
+    // `chat` tightens bold labels, stacked hedges and clause dashes to failing, and relaxes
+    // document-wide consistency rules.
+    assert_eq!(lint(&dir, &["--profile", "chat", "bold.md"]).0, 1);
+    assert_eq!(lint(&dir, &["--profile", "chat", "hedge.md"]).0, 1);
+    assert_eq!(lint(&dir, &["--profile", "chat", "dashes.md"]).0, 1);
+    assert_eq!(
+        lint(&dir, &["--profile=chat", "doc_rules.md"]),
+        (0, String::new(), String::new())
+    );
+
+    // `docs` relaxes bold labels, technical terms and number words.
+    assert_eq!(
+        lint(&dir, &["--profile", "docs", "bold.md"]),
+        (0, String::new(), String::new())
+    );
+    assert_eq!(lint(&dir, &["--profile", "docs", "number.md"]).0, 0);
+    assert_eq!(
+        lint(&dir, &["--profile", "docs", "term.md"]),
+        (0, String::new(), String::new())
+    );
+
+    // `email`, `report` and `essay` enable `unglossed-term` (advisory) and tighten register rules.
+    for profile in ["email", "report", "essay"] {
+        let (code, out, err) = lint(&dir, &["--profile", profile, "term.md"]);
+        assert_eq!((code, err.as_str()), (0, ""), "{profile}");
+        assert!(out.contains("unglossed-term"), "{profile}: {out}");
+    }
+    assert_eq!(lint(&dir, &["--profile", "email", "hedge.md"]).0, 1);
+    assert_eq!(lint(&dir, &["--profile", "report", "doc_rules.md"]).0, 1);
+    assert_eq!(lint(&dir, &["--profile", "essay", "dashes.md"]).0, 1);
+
+    // Explicit `--only` enables `unglossed-term` even without a profile, and `--disable` wins.
+    let (code, out, _) = lint(&dir, &["--only", "unglossed-term", "term.md"]);
+    assert_eq!(code, 0);
+    assert!(out.contains("unglossed-term"), "{out}");
+    assert_eq!(
+        lint(
+            &dir,
+            &[
+                "--profile",
+                "report",
+                "--disable",
+                "unglossed-term",
+                "term.md"
+            ]
+        ),
+        (0, String::new(), String::new())
+    );
+
+    // Invalid profile exits 2.
+    let (code, out, err) = lint(&dir, &["--profile", "memo", "term.md"]);
+    assert_eq!((code, out.as_str()), (2, ""));
+    assert!(err.contains("unknown profile 'memo'"), "{err}");
+
+    // SARIF respects profile severity promotion (`warning` instead of `note`).
+    let (code, out, _) = lint(&dir, &["--sarif", "--profile", "chat", "hedge.md"]);
+    assert_eq!(code, 1);
+    let log = parse(&out).unwrap();
+    let result = at(&log, &["runs", "0", "results", "0"]);
+    assert_eq!(string(at(result, &["level"])), "warning");
+}
+
+#[test]
+fn metrics_reports_per_file_and_overall_summaries_in_text_and_json() {
+    let dir = folder(
+        "metrics",
+        &[
+            (
+                "a.md",
+                "Bring logs, metrics and traces. The implementation improves clarity.\n",
+            ),
+            ("b.md", "Plain prose stays short.\n"),
+        ],
+    );
+    // Single file plain text: prints file metrics, no redundant overall line.
+    let (code, out, err) = lint(&dir, &["--metrics", "a.md"]);
+    assert_eq!((code, err.as_str()), (0, ""));
+    assert_eq!(out.lines().count(), 1, "{out}");
+    assert!(
+        out.starts_with("metrics: a.md: words=9 sentences=2 "),
+        "{out}"
+    );
+    assert!(out.contains("triads=1"), "{out}");
+
+    // Multi-file plain text: prints per-file lines plus overall summary.
+    let (code, out, err) = lint(&dir, &["--metrics", "a.md", "b.md"]);
+    assert_eq!((code, err.as_str()), (0, ""));
+    let lines: Vec<&str> = out.lines().collect();
+    assert_eq!(lines.len(), 3, "{out}");
+    assert!(lines[0].starts_with("metrics: a.md: "));
+    assert!(lines[1].starts_with("metrics: b.md: "));
+    assert!(lines[2].starts_with("metrics: overall: words=13 sentences=3 "));
+
+    // JSON output includes `metrics.files` and `metrics.overall`.
+    let (code, out, err) = lint(&dir, &["--json", "--metrics", "a.md", "b.md"]);
+    assert_eq!((code, err.as_str()), (0, ""));
+    let report = parse(&out).unwrap();
+    let files = array(at(&report, &["metrics", "files"]));
+    assert_eq!(files.len(), 2);
+    assert_eq!(string(at(&files[0], &["file"])), "a.md");
+    assert_eq!(
+        at(&report, &["metrics", "overall", "words"]),
+        &Json::Number("13".into())
+    );
+    assert_eq!(
+        at(&report, &["metrics", "overall", "triads"]),
+        &Json::Number("1".into())
+    );
+
+    // `--sarif` and `--metrics` cannot be combined.
+    let (code, out, err) = lint(&dir, &["--sarif", "--metrics", "a.md"]);
+    assert_eq!((code, out.as_str()), (2, ""));
+    assert!(err.contains("--sarif and --metrics"), "{err}");
+}

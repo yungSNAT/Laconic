@@ -4,6 +4,7 @@
 //! Shell completion scripts for `laconic-check`, built with no external dependencies.
 
 use crate::lint;
+use crate::profile::Profile;
 
 /// Supported shells for `laconic-check completions <shell>`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -40,6 +41,7 @@ pub fn script(shell: Shell) -> String {
 
 fn bash(rules: &[&str]) -> String {
     let rules = rules.join(" ");
+    let profiles = Profile::NAMES.join(" ");
     format!(
         r#"_laconic_check() {{
     local cur prev cmd
@@ -59,6 +61,10 @@ fn bash(rules: &[&str]) -> String {
                     COMPREPLY=( $(compgen -W "{rules}" -- "$cur") )
                     return
                     ;;
+                --profile)
+                    COMPREPLY=( $(compgen -W "{profiles}" -- "$cur") )
+                    return
+                    ;;
                 --config)
                     COMPREPLY=( $(compgen -f -- "$cur") )
                     return
@@ -68,7 +74,7 @@ fn bash(rules: &[&str]) -> String {
                     ;;
             esac
             if [[ "$cur" == -* ]]; then
-                COMPREPLY=( $(compgen -W "--json --sarif --disable --only --max-findings --warn --commit-msg --config" -- "$cur") )
+                COMPREPLY=( $(compgen -W "--json --sarif --metrics --profile --disable --only --max-findings --warn --commit-msg --config" -- "$cur") )
             else
                 COMPREPLY=( $(compgen -f -- "$cur") )
             fi
@@ -97,6 +103,7 @@ complete -F _laconic_check laconic-check
 
 fn zsh(rules: &[&str]) -> String {
     let rules = rules.join(" ");
+    let profiles = Profile::NAMES.join(" ");
     format!(
         r#"#compdef laconic-check
 
@@ -127,6 +134,8 @@ _laconic-check() {{
                     _arguments \
                         '--json[Print one JSON document instead of one line a finding]' \
                         '--sarif[Print a SARIF 2.1.0 log instead of one line a finding]' \
+                        '--metrics[Print distributional prose metrics per file and overall]' \
+                        '--profile=[Apply a register preset]:profile:({profiles})' \
                         '*--disable=[Drop findings for these rules]:rules:({rules})' \
                         '*--only=[Keep findings only for these rules]:rules:({rules})' \
                         '--max-findings=[Fail only on more than n failing findings]:count:' \
@@ -164,6 +173,7 @@ fi
 
 fn fish(rules: &[&str]) -> String {
     let rules = rules.join(" ");
+    let profiles = Profile::NAMES.join(" ");
     format!(
         r#"complete -c laconic-check -n "__fish_use_subcommand" -l help -d "Print usage information"
 complete -c laconic-check -n "__fish_use_subcommand" -l version -d "Print version information"
@@ -176,6 +186,8 @@ complete -c laconic-check -n "__fish_use_subcommand" -f -a "completions" -d "Pri
 
 complete -c laconic-check -n "__fish_seen_subcommand_from lint" -l json -d "Print one JSON document"
 complete -c laconic-check -n "__fish_seen_subcommand_from lint" -l sarif -d "Print a SARIF 2.1.0 log"
+complete -c laconic-check -n "__fish_seen_subcommand_from lint" -l metrics -d "Print distributional prose metrics"
+complete -c laconic-check -n "__fish_seen_subcommand_from lint" -l profile -r -f -a "{profiles}" -d "Apply a register preset"
 complete -c laconic-check -n "__fish_seen_subcommand_from lint" -l disable -r -f -a "{rules}" -d "Drop findings for these rules"
 complete -c laconic-check -n "__fish_seen_subcommand_from lint" -l only -r -f -a "{rules}" -d "Keep findings only for these rules"
 complete -c laconic-check -n "__fish_seen_subcommand_from lint" -l max-findings -r -f -d "Fail only on more than n failing findings"
@@ -195,6 +207,11 @@ complete -c laconic-check -n "__fish_seen_subcommand_from mcp lsp hook" -f
 fn powershell(rules: &[&str]) -> String {
     let quoted_rules: Vec<String> = rules.iter().map(|rule| format!("'{rule}'")).collect();
     let rules = quoted_rules.join(", ");
+    let quoted_profiles: Vec<String> = Profile::NAMES
+        .iter()
+        .map(|profile| format!("'{profile}'"))
+        .collect();
+    let profiles = quoted_profiles.join(", ");
     format!(
         r#"Register-ArgumentCompleter -Native -CommandName 'laconic-check' -ScriptBlock {{
     param($wordToComplete, $commandAst, $cursorPosition)
@@ -210,6 +227,7 @@ fn powershell(rules: &[&str]) -> String {
     }} else {{ '' }}
 
     $rules = @({rules})
+    $profiles = @({profiles})
 
     $candidates = @()
     if ($tokens.Count -eq 1 -or ($tokens.Count -eq 2 -and $wordToComplete)) {{
@@ -228,10 +246,16 @@ fn powershell(rules: &[&str]) -> String {
             $candidates = $rules | ForEach-Object {{
                 [System.Management.Automation.CompletionResult]::new($_, $_, [System.Management.Automation.CompletionResultType]::ParameterValue, 'Lint rule')
             }}
+        }} elseif ($prev -eq '--profile') {{
+            $candidates = $profiles | ForEach-Object {{
+                [System.Management.Automation.CompletionResult]::new($_, $_, [System.Management.Automation.CompletionResultType]::ParameterValue, 'Register profile')
+            }}
         }} elseif ($wordToComplete -like '-*' -or ($prev -ne '--config' -and $prev -ne '--max-findings')) {{
             $candidates = @(
                 [System.Management.Automation.CompletionResult]::new('--json', '--json', [System.Management.Automation.CompletionResultType]::ParameterName, 'Print one JSON document')
                 [System.Management.Automation.CompletionResult]::new('--sarif', '--sarif', [System.Management.Automation.CompletionResultType]::ParameterName, 'Print a SARIF 2.1.0 log')
+                [System.Management.Automation.CompletionResult]::new('--metrics', '--metrics', [System.Management.Automation.CompletionResultType]::ParameterName, 'Print distributional prose metrics')
+                [System.Management.Automation.CompletionResult]::new('--profile', '--profile', [System.Management.Automation.CompletionResultType]::ParameterName, 'Apply a register preset')
                 [System.Management.Automation.CompletionResult]::new('--disable', '--disable', [System.Management.Automation.CompletionResultType]::ParameterName, 'Drop findings for these rules')
                 [System.Management.Automation.CompletionResult]::new('--only', '--only', [System.Management.Automation.CompletionResultType]::ParameterName, 'Keep findings only for these rules')
                 [System.Management.Automation.CompletionResult]::new('--max-findings', '--max-findings', [System.Management.Automation.CompletionResultType]::ParameterName, 'Fail only on more than n failing findings')
@@ -283,6 +307,8 @@ mod tests {
         let flags = [
             "json",
             "sarif",
+            "metrics",
+            "profile",
             "disable",
             "only",
             "max-findings",
@@ -312,6 +338,9 @@ mod tests {
             }
             for target in shells {
                 assert!(out.contains(target), "{shell:?} missing shell {target}");
+            }
+            for profile in Profile::NAMES {
+                assert!(out.contains(profile), "{shell:?} missing profile {profile}");
             }
             for rule in lint::RULES {
                 assert!(

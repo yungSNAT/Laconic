@@ -16,6 +16,7 @@ use std::fs;
 use std::process::ExitCode;
 
 use laconic_check::mcp::Json;
+use laconic_check::metrics::ProseMetrics;
 use laconic_check::settings::{self, PROJECT_FILE, Settings};
 use laconic_check::{completions, hook, lint, lsp, mcp, preserve, sarif};
 
@@ -30,6 +31,8 @@ fn usage_text() -> String {
          lint options:\n  \
            --json              print one JSON document instead of a line a finding\n  \
            --sarif             print a SARIF 2.1.0 log instead of a line a finding\n  \
+           --metrics           print distributional prose metrics per file and overall\n  \
+           --profile <name>    apply a register preset (email, report, docs, chat, essay)\n  \
            --disable <rules>   drop these rules' findings (comma-separated, repeatable)\n  \
            --only <rules>      keep only these rules' findings (comma-separated, repeatable)\n  \
            --max-findings <n>  fail only on more than n failing findings (default 0)\n  \
@@ -87,6 +90,7 @@ struct Options {
     warn: bool,
     json: bool,
     sarif: bool,
+    metrics: bool,
     commit_msg: bool,
     settings: Settings,
     files: Vec<String>,
@@ -96,7 +100,7 @@ struct Options {
 /// after it, every argument is a file.
 fn options(args: &[String]) -> Result<Options, String> {
     let mut cli = Options::default();
-    let (mut config, mut max_findings, mut operands) = (None, None, false);
+    let (mut config, mut max_findings, mut profile, mut operands) = (None, None, None, false);
     let mut rest = args.iter();
     while let Some(arg) = rest.next() {
         if operands || arg == "-" || !arg.starts_with('-') {
@@ -107,11 +111,14 @@ fn options(args: &[String]) -> Result<Options, String> {
             Some((name, value)) => (name, Some(value)),
             None => (arg.as_str(), None),
         };
-        let takes_value = matches!(name, "--disable" | "--only" | "--max-findings" | "--config");
+        let takes_value = matches!(
+            name,
+            "--disable" | "--only" | "--max-findings" | "--config" | "--profile"
+        );
         if !takes_value
             && !matches!(
                 name,
-                "--" | "--warn" | "--json" | "--sarif" | "--commit-msg"
+                "--" | "--warn" | "--json" | "--sarif" | "--metrics" | "--commit-msg"
             )
         {
             return Err(format!("unknown option '{name}'"));
@@ -127,15 +134,20 @@ fn options(args: &[String]) -> Result<Options, String> {
             "--warn" => cli.warn = true,
             "--json" => cli.json = true,
             "--sarif" => cli.sarif = true,
+            "--metrics" => cli.metrics = true,
             "--commit-msg" => cli.commit_msg = true,
             "--disable" => cli.settings.disable.extend(settings::rule_names(value)),
             "--only" => cli.settings.only.extend(settings::rule_names(value)),
             "--max-findings" => max_findings = Some(settings::count(value)?),
+            "--profile" => profile = Some(settings::profile(value)?),
             _ => config = Some(value.to_owned()),
         }
     }
     if cli.json && cli.sarif {
         return Err("--json and --sarif cannot be combined".into());
+    }
+    if cli.sarif && cli.metrics {
+        return Err("--sarif and --metrics cannot be combined".into());
     }
     let path = config.or_else(|| {
         std::path::Path::new(PROJECT_FILE)
@@ -153,6 +165,7 @@ fn options(args: &[String]) -> Result<Options, String> {
     settings.disable.extend(cli.settings.disable);
     settings.only.extend(cli.settings.only);
     settings.max_findings = max_findings.unwrap_or(settings.max_findings);
+    settings.profile = profile.or(settings.profile);
     Ok(Options { settings, ..cli })
 }
 
@@ -174,6 +187,8 @@ fn commit_message(text: &str) -> String {
 
 fn run_lint(options: &Options) -> ExitCode {
     let (mut findings, mut failing, mut suppressed, mut unread) = (Vec::new(), 0, 0, false);
+    let (mut file_metrics, mut overall) = (Vec::new(), ProseMetrics::default());
+    let include_opt_in = options.settings.needs_opt_in();
     for file in &options.files {
         // `read` reports an unreadable file; the rest are still linted, and lint exits 2.
         let text = match read(file) {
@@ -184,6 +199,11 @@ fn run_lint(options: &Options) -> ExitCode {
                 continue;
             }
         };
+        if options.metrics {
+            let measured = ProseMetrics::measure(&text);
+            overall.merge(&measured);
+            file_metrics.push((file.clone(), measured));
+        }
         // SARIF and accepted words need the text of a finding's line.
         let lines: Vec<&str> = if options.sarif || !options.settings.accept.is_empty() {
             text.lines().collect()
@@ -195,7 +215,8 @@ fn run_lint(options: &Options) -> ExitCode {
         } else {
             String::new()
         };
-        let (found, silenced) = lint::lint_counting(&text, &options.settings.rules);
+        let (found, silenced) =
+            lint::lint_counting_with(&text, &options.settings.rules, include_opt_in);
         suppressed += silenced;
         for f in found {
             let line = f.line.checked_sub(1).and_then(|i| lines.get(i)).copied();
@@ -203,7 +224,7 @@ fn run_lint(options: &Options) -> ExitCode {
                 continue;
             }
             let name = f.rule.name().to_owned();
-            let advisory = f.rule.advisory();
+            let advisory = options.settings.is_advisory(&f.rule);
             if !advisory {
                 failing += 1;
             }
@@ -223,6 +244,7 @@ fn run_lint(options: &Options) -> ExitCode {
                     f,
                     line.unwrap_or(""),
                     &options.settings.rules,
+                    advisory,
                 ));
             } else {
                 println!("{file}:{}:{}: {name}: {}", f.line, f.column, f.message);
@@ -230,17 +252,37 @@ fn run_lint(options: &Options) -> ExitCode {
         }
     }
     if options.json {
-        let report = Json::Object(vec![
+        let mut fields = vec![
             ("findings".into(), Json::Array(findings)),
             ("failing".into(), Json::Number(failing.to_string())),
             ("suppressed".into(), Json::Number(suppressed.to_string())),
-        ]);
-        println!("{}", mcp::to_string(&report));
+        ];
+        if options.metrics {
+            let files_json = file_metrics
+                .iter()
+                .map(|(file, m)| m.to_json(Some(file)))
+                .collect();
+            fields.push((
+                "metrics".into(),
+                Json::Object(vec![
+                    ("files".into(), Json::Array(files_json)),
+                    ("overall".into(), overall.to_json(None)),
+                ]),
+            ));
+        }
+        println!("{}", mcp::to_string(&Json::Object(fields)));
     } else if options.sarif {
         println!(
             "{}",
             mcp::to_string(&sarif::log(findings, !unread, &options.settings.rules))
         );
+    } else if options.metrics {
+        for (file, m) in &file_metrics {
+            println!("{}", m.format_line(file));
+        }
+        if file_metrics.len() > 1 {
+            println!("{}", overall.format_line("overall"));
+        }
     }
     if unread {
         ExitCode::from(2)
@@ -428,10 +470,19 @@ mod tests {
             (&["--max-findings=-1"], "'-1' is not a whole number"),
             (&["--max-findings"], "--max-findings needs a value"),
             (&["--warn=yes"], "--warn takes no value"),
+            (&["--profile=memo"], "unknown profile 'memo'"),
+            (&["--profile"], "--profile needs a value"),
+            (&["--sarif", "--metrics"], "--sarif and --metrics"),
         ] {
             let error = options(&args(list)).unwrap_err();
             assert!(error.starts_with(wanted), "{list:?}: {error}");
         }
+        let with_profile = options(&args(&["--profile", "report", "--metrics", "a.md"])).unwrap();
+        assert!(with_profile.metrics);
+        assert_eq!(
+            with_profile.settings.profile,
+            Some(laconic_check::profile::Profile::Report)
+        );
     }
 
     #[test]

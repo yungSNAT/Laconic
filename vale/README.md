@@ -52,6 +52,7 @@ Not generated, and why:
 | `hyphen-consistency` | It compares every compound in the document |
 | `weekday` | It needs the calendar |
 | `acronym-before-definition` | It compares uses and definitions across the document |
+| `unglossed-term` | It checks whether each unfamiliar acronym is glossed earlier in the document |
 | `bold-label` | It counts consecutive list items |
 | `unused-suppression` | Vale has its own comments for turning rules off |
 

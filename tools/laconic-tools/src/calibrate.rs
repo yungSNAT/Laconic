@@ -9,7 +9,7 @@
 //! the file carries a fingerprint of its counts and of the sources they depend on, which a test
 //! checks, so a hand-edited count or a rule change without a rerun fails CI.
 
-use laconic_check::lint::{RULES, lint};
+use laconic_check::lint::{RULES, lint_all};
 use serde_json::Value;
 use std::collections::BTreeMap;
 use std::fs;
@@ -23,6 +23,7 @@ const BLOB: &str = "eb4030e4591de8fd687089b15bf86d6688b128eb";
 /// The sources whose changes can change the counts: the rules, their word list and this file.
 const SOURCES: &[&str] = &[
     "tools/laconic-check/src/lint.rs",
+    "tools/laconic-check/src/lint/terms.rs",
     "tools/laconic-check/src/us_words.txt",
     "tools/laconic-tools/src/calibrate.rs",
 ];
@@ -40,8 +41,8 @@ impl Split {
         self.articles += 1;
         self.words += text.split_whitespace().count();
         let mut seen = BTreeMap::new();
-        // `lint` without a project file reports house rules only.
-        for rule in lint(text).iter().filter_map(|f| f.rule.house()) {
+        // `lint_all` without a project file reports every house rule, including opt-in rules.
+        for rule in lint_all(text).iter().filter_map(|f| f.rule.house()) {
             *seen.entry(rule.name()).or_insert(0) += 1;
         }
         for (rule, n) in seen {

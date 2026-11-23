@@ -284,20 +284,23 @@ impl Server {
     /// The diagnostics of the text of the document at `uri`; or one error for a project file
     /// that cannot be read.
     fn diagnostics(&self, uri: &str, body: &str) -> Vec<Json> {
-        match self.findings(uri, body) {
-            Ok(found) => found.iter().map(to_diagnostic).collect(),
-            Err(message) => vec![diagnostic(0, 0, 0, 1, None, &message)],
-        }
+        let settings = match self.settings(uri) {
+            Ok(settings) => settings,
+            Err(message) => return vec![diagnostic(0, 0, 0, 1, None, &message)],
+        };
+        self.findings_with(&settings, body)
+            .iter()
+            .map(|item| to_diagnostic(item, &settings))
+            .collect()
     }
 
     /// `lint`'s findings in `body` that the project file's settings keep, each with the start
     /// and end of its diagnostic in the client's code units.
-    fn findings(&self, uri: &str, body: &str) -> Result<Vec<(Finding, usize, usize)>, String> {
-        let settings = self.settings(uri)?;
+    fn findings_with(&self, settings: &Settings, body: &str) -> Vec<(Finding, usize, usize)> {
         let lines: Vec<&str> = body.lines().collect();
         let width = self.width();
-        let found = lint::lint_counting(body, &settings.rules).0;
-        Ok(found
+        let found = lint::lint_counting_with(body, &settings.rules, settings.needs_opt_in()).0;
+        found
             .into_iter()
             .filter_map(|finding| {
                 let line = lines
@@ -310,7 +313,7 @@ impl Server {
                 let (start, end) = sarif::span(line, finding.column, width);
                 Some((finding, start, end))
             })
-            .collect())
+            .collect()
     }
 
     fn width(&self) -> fn(char) -> usize {
@@ -352,9 +355,10 @@ impl Server {
         let (Some(uri), Some((from, to)), Some(document)) = (uri, range, document) else {
             return Json::Array(Vec::new());
         };
-        let Ok(found) = self.findings(uri, &document.text) else {
+        let Ok(settings) = self.settings(uri) else {
             return Json::Array(Vec::new());
         };
+        let found = self.findings_with(&settings, &document.text);
         let lines: Vec<&str> = document.text.lines().collect();
         let width = self.width();
         let actions = found
@@ -398,7 +402,10 @@ impl Server {
                 Some(object(vec![
                     ("title", text(&title)),
                     ("kind", text("quickfix")),
-                    ("diagnostics", Json::Array(vec![to_diagnostic(placed)])),
+                    (
+                        "diagnostics",
+                        Json::Array(vec![to_diagnostic(placed, &settings)]),
+                    ),
                     (
                         "edit",
                         object(vec![("documentChanges", Json::Array(vec![change]))]),
@@ -445,8 +452,12 @@ fn position(json: &Json) -> Option<(usize, usize)> {
     Some((field("line")?, field("character")?))
 }
 
-fn to_diagnostic((finding, start, end): &(Finding, usize, usize)) -> Json {
-    let severity = if finding.rule.advisory() { 3 } else { 2 };
+fn to_diagnostic((finding, start, end): &(Finding, usize, usize), settings: &Settings) -> Json {
+    let severity = if settings.is_advisory(&finding.rule) {
+        3
+    } else {
+        2
+    };
     diagnostic(
         finding.line - 1,
         *start,

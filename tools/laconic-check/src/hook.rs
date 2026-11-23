@@ -62,23 +62,25 @@ fn failing(root: &Path, file: &Path, settings: &Settings) -> Result<Vec<String>,
     let path = file.display();
     let text = fs::read_to_string(root.join(file)).map_err(|e| format!("{path}: {e}"))?;
     let lines: Vec<&str> = text.lines().collect();
-    Ok(lint::lint_counting(&text, &settings.rules)
-        .0
-        .into_iter()
-        .filter(|f| {
-            let line = f.line.checked_sub(1).and_then(|i| lines.get(i)).copied();
-            !f.rule.advisory() && settings.keeps(f, line.unwrap_or(""))
-        })
-        .map(|f| {
-            format!(
-                "{path}:{}:{}: {}: {}",
-                f.line,
-                f.column,
-                f.rule.name(),
-                f.message
-            )
-        })
-        .collect())
+    Ok(
+        lint::lint_counting_with(&text, &settings.rules, settings.needs_opt_in())
+            .0
+            .into_iter()
+            .filter(|f| {
+                let line = f.line.checked_sub(1).and_then(|i| lines.get(i)).copied();
+                !settings.is_advisory(&f.rule) && settings.keeps(f, line.unwrap_or(""))
+            })
+            .map(|f| {
+                format!(
+                    "{path}:{}:{}: {}: {}",
+                    f.line,
+                    f.column,
+                    f.rule.name(),
+                    f.message
+                )
+            })
+            .collect(),
+    )
 }
 
 /// The block decision for these findings, listing the first LISTED.

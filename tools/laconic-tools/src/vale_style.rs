@@ -38,6 +38,10 @@ pub const NOT_GENERATED: &[(&str, &str)] = &[
         "acronym-before-definition",
         "compares uses and definitions across the document",
     ),
+    (
+        "unglossed-term",
+        "checks whether each unfamiliar acronym is glossed earlier in the document",
+    ),
     ("bold-label", "counts consecutive list items"),
     (
         "unused-suppression",

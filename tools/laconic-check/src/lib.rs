@@ -9,7 +9,9 @@ pub mod hook;
 pub mod lint;
 pub mod lsp;
 pub mod mcp;
+pub mod metrics;
 pub mod preserve;
+pub mod profile;
 pub mod sarif;
 #[cfg(test)]
 mod seeded_faults;

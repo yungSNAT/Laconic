@@ -33,8 +33,14 @@ pub(crate) fn span(line: &str, column: usize, width: fn(char) -> usize) -> (usiz
 /// One finding in the file at `uri`, whose text on the finding's line is `line`, as a region
 /// of the character at the finding. SARIF counts columns in UTF-16 code units by default;
 /// `lint` counts characters. `project` is the project file's rules, which `log` lists after
-/// the house rules.
-pub fn result(uri: &str, finding: Finding, line: &str, project: &[Rc<ProjectRule>]) -> Json {
+/// the house rules. `advisory` is the finding's effective severity after any active profile.
+pub fn result(
+    uri: &str,
+    finding: Finding,
+    line: &str,
+    project: &[Rc<ProjectRule>],
+    advisory: bool,
+) -> Json {
     let index = match &finding.rule {
         RuleRef::Builtin(id) => *id as usize,
         RuleRef::Project(rule) => {
@@ -51,7 +57,7 @@ pub fn result(uri: &str, finding: Finding, line: &str, project: &[Rc<ProjectRule
     object(vec![
         ("ruleId", text(finding.rule.name())),
         ("ruleIndex", number(index)),
-        ("level", level(finding.rule.advisory())),
+        ("level", level(advisory)),
         ("message", message(&finding.message)),
         (
             "locations",

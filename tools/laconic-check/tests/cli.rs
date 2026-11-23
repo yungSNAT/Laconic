@@ -29,6 +29,10 @@ fn help_prints_usage_to_standard_output_and_succeeds() {
     let (code, out, err) = run(&["--help"]);
     assert_eq!((code, err.as_str()), (0, ""));
     assert!(out.starts_with("usage:\n  laconic-check lint"), "{out}");
+    assert!(
+        out.contains("laconic-check completions <bash|zsh|fish|powershell>"),
+        "{out}"
+    );
     assert!(out.contains("--version prints the version"), "{out}");
 }
 
@@ -149,4 +153,37 @@ fn an_argument_that_is_not_unicode_is_a_usage_error() {
         String::from_utf8(out.stderr).unwrap(),
         "laconic-check: an argument is not valid Unicode: caf\u{fffd}.md\n"
     );
+}
+
+#[test]
+fn completions_prints_a_script_for_each_supported_shell() {
+    for (shell, marker) in [
+        ("bash", "complete -F _laconic_check laconic-check"),
+        ("zsh", "#compdef laconic-check"),
+        ("fish", "complete -c laconic-check"),
+        (
+            "powershell",
+            "Register-ArgumentCompleter -Native -CommandName 'laconic-check'",
+        ),
+    ] {
+        let (code, out, err) = run(&["completions", shell]);
+        assert_eq!((code, err.as_str()), (0, ""), "{shell}");
+        assert!(out.contains(marker), "{shell}: {out}");
+    }
+}
+
+#[test]
+fn completions_rejects_unknown_missing_and_extra_arguments() {
+    let (code, out, err) = run(&["completions", "tcsh"]);
+    assert_eq!((code, out.as_str()), (2, ""));
+    assert_eq!(
+        err,
+        "laconic-check: unknown shell 'tcsh' (expected bash, zsh, fish or powershell)\n"
+    );
+
+    for args in [&["completions"][..], &["completions", "bash", "extra"]] {
+        let (code, out, err) = run(args);
+        assert_eq!((code, out.as_str()), (2, ""), "{args:?}");
+        assert!(err.starts_with("usage:\n"), "{args:?}: {err}");
+    }
 }

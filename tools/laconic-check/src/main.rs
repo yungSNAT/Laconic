@@ -17,7 +17,7 @@ use std::process::ExitCode;
 
 use laconic_check::mcp::Json;
 use laconic_check::settings::{self, PROJECT_FILE, Settings};
-use laconic_check::{hook, lint, lsp, mcp, preserve, sarif};
+use laconic_check::{completions, hook, lint, lsp, mcp, preserve, sarif};
 
 fn usage_text() -> String {
     let advisory: Vec<&str> = lint::RULES
@@ -26,7 +26,7 @@ fn usage_text() -> String {
         .map(|r| r.name)
         .collect();
     format!(
-        "usage:\n  laconic-check lint [options] <file.md | ->...\n  laconic-check preserve [--strict] [--loose] <original> <edited>\n  laconic-check mcp\n  laconic-check lsp\n  laconic-check hook\n\n\
+        "usage:\n  laconic-check lint [options] <file.md | ->...\n  laconic-check preserve [--strict] [--loose] <original> <edited>\n  laconic-check mcp\n  laconic-check lsp\n  laconic-check hook\n  laconic-check completions <bash|zsh|fish|powershell>\n\n\
          lint options:\n  \
            --json              print one JSON document instead of a line a finding\n  \
            --sarif             print a SARIF 2.1.0 log instead of a line a finding\n  \
@@ -55,6 +55,7 @@ fn usage_text() -> String {
          hook reads a Claude Code or Codex Stop event on standard input and, once a turn,\n\
          asks the agent to look at lint's failing findings in the uncommitted Markdown of\n\
          the repository that holds the event's directory before it finishes.\n\
+         completions prints a shell completion script for bash, zsh, fish or powershell.\n\
          --version prints the version and --help this text.",
         advisory.join(", "),
         lint::RULES_URL
@@ -321,6 +322,19 @@ fn main() -> ExitCode {
             }
         }
         Some("hook") if args.len() == 1 => stop_hook(),
+        Some("completions") if args.len() == 2 => match completions::Shell::parse(&args[1]) {
+            Some(shell) => {
+                print!("{}", completions::script(shell));
+                ExitCode::SUCCESS
+            }
+            None => {
+                eprintln!(
+                    "laconic-check: unknown shell '{}' (expected bash, zsh, fish or powershell)",
+                    args[1]
+                );
+                ExitCode::from(2)
+            }
+        },
         Some("--help") if args.len() == 1 => {
             println!("{}", usage_text());
             ExitCode::SUCCESS

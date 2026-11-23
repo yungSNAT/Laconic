@@ -388,11 +388,7 @@ On the same documents, avoid-ai-writing's `validate.js` fails 23 of the 105 alte
 claude mcp add --scope user laconic-check -- laconic-check mcp
 ```
 
-It is in laconic-check 0.3.0 and later. A laconic-check 0.2.0 binary needs the earlier Node server, `tools/laconic-check/mcp/server.mjs`, which runs the binary once a call; it is deprecated and will be removed in a later release:
-
-```bash
-claude mcp add --scope user laconic-check -- node /path/to/laconic/tools/laconic-check/mcp/server.mjs
-```
+It is in laconic-check 0.3.0 and later.
 
 `laconic-check lsp` is a language server over standard input and output, so an editor shows `lint`'s findings as you type (from 0.6.0). It lints each open Markdown document whenever it changes and marks each finding as a warning, or a hint if advisory, linked to its rule. It applies the `.laconic-check` file of the workspace folder that holds the document, the innermost when folders nest, and shows a file it cannot read or parse as an error on the first line. After 0.6.0 it also offers a quick fix wherever the rule knows the one replacement, such as a US spelling, a number word, a Latin abbreviation, a time or date form, double quotation marks or an invisible character. A fix changes only the flagged text, and only when you choose it (`gra` in Neovim, `space a` in Helix). Rules that need a rewrite, such as em dashes, stock phrases and possible serial commas, offer none. A fix names the document's version, so the editor refuses one that arrives after the text has changed instead of applying it in the wrong place. An editor that does not say it takes such edits gets no fixes, except Neovim, which takes them without saying so. Neovim checks no fix made before a document's first change, so it gets fixes only once the document has changed since it was opened. In Neovim 0.11 or later, which makes the folder holding `.laconic-check` or `.git` the workspace folder:
 

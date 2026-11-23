@@ -4,11 +4,23 @@ version = "0.6.0"
 edition = "2024"
 rust-version = "1.100"
 license = "Apache-2.0"
+repository = "https://github.com/yungSNAT/Laconic"
 description = "Flags Australian English and house-style candidates in Markdown prose, and checks that an edit kept numbers, code, URLs and negations."
 publish = false
+
+# `cargo binstall laconic-check` installs the release archive's binary instead of building it.
+[package.metadata.binstall]
+pkg-url = "{ repo }/releases/download/laconic-check-v{ version }/laconic-check-{ target }.tar.gz"
+bin-dir = "{ bin }{ binary-ext }"
+pkg-fmt = "tgz"
+
+[package.metadata.binstall.overrides.'cfg(target_os = "windows")']
+pkg-url = "{ repo }/releases/download/laconic-check-v{ version }/laconic-check-{ target }.zip"
+pkg-fmt = "zip"
 
 [dependencies]
 
 [profile.release]
 lto = true
 codegen-units = 1
+strip = true

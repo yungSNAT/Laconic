@@ -205,15 +205,25 @@ fn ratio(numerator: usize, denominator: usize) -> f64 {
     }
 }
 
+fn is_closing_punct(c: char) -> bool {
+    matches!(c, '"' | '\'' | '\u{201d}' | '\u{2019}' | ')' | ']')
+}
+
 fn sentence_end(chars: &[char], start: usize) -> usize {
     let mut stop = start;
-    while stop < chars.len()
-        && !(matches!(chars[stop], '.' | '!' | '?')
-            && chars.get(stop + 1).is_none_or(|c| c.is_whitespace()))
-    {
+    while stop < chars.len() {
+        if matches!(chars[stop], '.' | '!' | '?') {
+            let mut after = stop + 1;
+            while after < chars.len() && is_closing_punct(chars[after]) {
+                after += 1;
+            }
+            if chars.get(after).is_none_or(|c| c.is_whitespace()) {
+                return after;
+            }
+        }
         stop += 1;
     }
-    (stop + 1).min(chars.len())
+    chars.len()
 }
 
 /// Alphabetic words in `sentence`, keeping internal hyphens and apostrophes inside one word.
@@ -444,5 +454,25 @@ mod tests {
         assert!(!is_triad_clause(", a and b"));
         assert!(!is_triad_clause("a, b"));
         assert!(!is_triad_clause("a, b, c"));
+    }
+
+    #[test]
+    fn counts_sentences_ending_before_closing_quotes_or_brackets() {
+        for sample in [
+            "He asked, \"Really?\" Then he left.",
+            "She shouted, \"Stop!\" He froze.",
+            "He asked, \u{201c}Really?\u{201d} Then he left.",
+            "He asked, 'Really?' Then he left.",
+            "He asked (really?) Then he left.",
+            "She called [Wait!] Then ran.",
+        ] {
+            let m = ProseMetrics::measure(sample);
+            assert_eq!(m.sentences(), 2, "{sample:?}");
+        }
+        assert_eq!(ProseMetrics::measure("Version 1.2 works.").sentences(), 1);
+        assert_eq!(
+            ProseMetrics::measure("Heading without punctuation").sentences(),
+            1
+        );
     }
 }

@@ -17,10 +17,24 @@ const COMMON_ACRONYMS: &[&str] = &[
     "XSS", "YAML", "ZIP",
 ];
 
-/// Pure Roman numerals of 3 or more capitals, kept sorted for binary search.
-const ROMAN_NUMERALS: &[&str] = &[
-    "III", "VII", "VIII", "XII", "XIII", "XIV", "XIX", "XVI", "XVII", "XVIII", "XXI",
-];
+/// True when `s` is a canonical uppercase Roman numeral (`I`..`MMMCMXCIX`).
+fn is_roman_numeral(mut s: &str) -> bool {
+    if s.is_empty() {
+        return false;
+    }
+    const GROUPS: &[&[&str]] = &[
+        &["MMM", "MM", "M"],
+        &["CM", "DCCC", "DCC", "DC", "D", "CD", "CCC", "CC", "C"],
+        &["XC", "LXXX", "LXX", "LX", "L", "XL", "XXX", "XX", "X"],
+        &["IX", "VIII", "VII", "VI", "V", "IV", "III", "II", "I"],
+    ];
+    for group in GROUPS {
+        if let Some(rest) = group.iter().find_map(|prefix| s.strip_prefix(prefix)) {
+            s = rest;
+        }
+    }
+    s.is_empty()
+}
 
 /// Returns the uppercase base of a candidate acronym of 3 to 8 ASCII capitals (allowing a
 /// trailing plural `s`, as in `QBRs`).
@@ -29,10 +43,9 @@ pub(super) fn candidate(word: &str) -> Option<&str> {
     ((3..=8).contains(&base.len()) && base.bytes().all(|b| b.is_ascii_uppercase())).then_some(base)
 }
 
-/// True when `acronym` is in the common allowlist or is a pure Roman numeral.
+/// True when `acronym` is in the common allowlist or is a canonical Roman numeral.
 pub(super) fn is_exempt(acronym: &str) -> bool {
-    COMMON_ACRONYMS.binary_search(&acronym).is_ok()
-        || ROMAN_NUMERALS.binary_search(&acronym).is_ok()
+    COMMON_ACRONYMS.binary_search(&acronym).is_ok() || is_roman_numeral(acronym)
 }
 
 /// True when the word at `masked[start..end]` sits next to another all-uppercase word
@@ -105,7 +118,26 @@ mod tests {
     #[test]
     fn allowlists_are_sorted_and_unique() {
         assert!(COMMON_ACRONYMS.windows(2).all(|w| w[0] < w[1]));
-        assert!(ROMAN_NUMERALS.windows(2).all(|w| w[0] < w[1]));
+    }
+
+    #[test]
+    fn roman_numeral_check_accepts_canonical_forms_and_rejects_invalid_ones() {
+        for valid in [
+            "III",
+            "VII",
+            "VIII",
+            "XIV",
+            "XIX",
+            "XXII",
+            "XLII",
+            "MCMXCIV",
+            "MMMCMXCIX",
+        ] {
+            assert!(is_exempt(valid), "{valid}");
+        }
+        for invalid in ["", "IIII", "VV", "IC", "XM", "MIXED", "QBR", "OKR"] {
+            assert!(!is_roman_numeral(invalid), "{invalid}");
+        }
     }
 
     #[test]

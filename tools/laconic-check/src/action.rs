@@ -329,7 +329,6 @@ mod tests {
         let args = [
             "--max-findings",
             "9",
-            "--only",
             "--max-findings",
             "+02",
             "--",
@@ -338,6 +337,11 @@ mod tests {
         ];
         assert_eq!(max_findings(&args), 2);
         assert_eq!(max_findings(&["--max-findings=3", "--max-findings=007"]), 7);
+        // An option's value is not an option, as in lint.
+        assert_eq!(
+            max_findings(&["--only", "--max-findings", "--max-findings", "4"]),
+            4
+        );
         assert_eq!(
             max_findings(&["--max-findings=99999999999999999999999"]),
             usize::MAX

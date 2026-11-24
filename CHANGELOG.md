@@ -56,8 +56,12 @@ The manifests other than Claude Code's still declare plugin 0.5.0, so a build fr
 - `laconic-check completions <bash|zsh|fish|powershell>` prints shell completion scripts covering every subcommand, flag and built-in rule, with no external dependencies.
 
 - `laconic-check` release builds strip symbols (`strip = true`), declare `[package.metadata.binstall]` metadata for `cargo-binstall` and publish an attested SPDX SBOM (`laconic-check.spdx.json`).
-- `laconic-check mcp` and the deprecated Node server speak MCP 2026-07-28 beside the handshake versions: a request naming `2026-07-28` in `_meta` is served with no `initialize`, `server/discover` names the versions spoken without a handshake, a request naming another version in `_meta` gets error -32022 listing them, and `ping`, which 2026-07-28 removed, is not served to it. A request with no version in `_meta` is served as before.
+- `laconic-check mcp` speaks MCP 2026-07-28 beside the handshake versions: a request naming `2026-07-28` in `_meta` is served with no `initialize`, `server/discover` names the versions spoken without a handshake, a request naming another version in `_meta` gets error -32022 listing them, and `ping`, which 2026-07-28 removed, is not served to it. A request with no version in `_meta` is served as before.
 - `laconic-check lsp` offers each fix `lint` knows as a quick fix: a code action of kind `quickfix` that replaces the flagged text, for US spellings, 'while' and 'among', unneeded hyphens, number words, Latin abbreviations, times, dates, a space beside a percentage or currency sign, double quotation marks around prose, invisible characters other than joiners and isolates, and a project rule's replacement. It offers none where the rule needs a rewrite or a judgement (em dashes, stock phrases, staged contrasts, possible serial commas, a weekday that does not match its date, the advisory rules), none in indented code or a name ('the Five Eyes'), none that would reach past the flagged words, no `source.fixAll`, and fixes only for clients that take versioned edits (Neovim amongst them, though it does not advertise them, once a document has changed since it opened), so a fix computed before the document changed is refused.
+
+### laconic-check: removed
+
+- The deprecated Node MCP server, `tools/laconic-check/mcp/server.mjs`, which only a laconic-check 0.2.0 binary needed. Upgrade to laconic-check 0.3.0 or later, then run `laconic-check mcp`.
 
 ### laconic-check: fixed
 

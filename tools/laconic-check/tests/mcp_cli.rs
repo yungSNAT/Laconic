@@ -1,8 +1,7 @@
 // Copyright 2026 Ryan Duguid
 // SPDX-License-Identifier: Apache-2.0
 
-//! The MCP servers over stdio: `laconic-check mcp` and the deprecated Node `mcp/server.mjs`,
-//! which runs the binary once a call. The Node server is tested only where `node` runs.
+//! The MCP server over stdio: `laconic-check mcp`.
 
 use std::io::Write;
 use std::process::{Command, Stdio};
@@ -11,20 +10,11 @@ use laconic_check::mcp::{Json, parse};
 
 const BINARY: &str = env!("CARGO_BIN_EXE_laconic-check");
 
-/// Each server's command: the binary, then the Node server when `node` runs.
+/// The server's command; a list, so each test reads one reply list per server.
 fn servers() -> Vec<Command> {
     let mut binary = Command::new(BINARY);
     binary.arg("mcp");
-    let mut servers = vec![binary];
-    let node = Command::new("node").arg("--version").output();
-    if node.is_ok_and(|out| out.status.success()) {
-        let mut node = Command::new("node");
-        node.arg(concat!(env!("CARGO_MANIFEST_DIR"), "/mcp/server.mjs"));
-        servers.push(node);
-    } else {
-        eprintln!("Node MCP server not tested: `node --version` did not run");
-    }
-    servers
+    vec![binary]
 }
 
 /// Sends the requests, one a line, to each server and returns each server's replies in order.
@@ -193,7 +183,7 @@ fn stateless_discover_list_and_call() {
     }
 }
 
-/// Each request's error code from both servers, or `None` for a result.
+/// Each request's error code from the server, or `None` for a result.
 fn error_codes(requests: &[&str]) -> Vec<Vec<Option<String>>> {
     exchange(requests)
         .into_iter()

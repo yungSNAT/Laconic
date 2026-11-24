@@ -401,11 +401,7 @@ GitHub Actions에서는 복합 Action이 러너(Linux x86_64, Windows x86_64, Ap
 claude mcp add --scope user laconic-check -- laconic-check mcp
 ```
 
-laconic-check 0.3.0 이상에 들어 있습니다. laconic-check 0.2.0 바이너리에는 호출마다 바이너리를 한 번 실행하는 이전 Node 서버 `tools/laconic-check/mcp/server.mjs`가 필요하며, 이 서버는 지원 중단되었고 이후 릴리스에서 제거됩니다.
-
-```bash
-claude mcp add --scope user laconic-check -- node /path/to/laconic/tools/laconic-check/mcp/server.mjs
-```
+laconic-check 0.3.0 이상에 들어 있습니다.
 
 `laconic-check lsp`는 표준 입출력으로 동작하는 언어 서버로, 입력하는 동안 편집기가 `lint`의 지적을 보여 줍니다(0.6.0부터). 열린 Markdown 문서가 바뀔 때마다 검사하고, 각 지적을 경고로(조언이면 힌트로) 규칙에 링크해 표시합니다. 문서를 담은 작업 공간 폴더(폴더가 중첩되면 가장 안쪽)의 `.laconic-check` 파일을 적용하며, 읽거나 해석할 수 없는 파일은 첫 줄에 오류로 표시합니다. 0.6.0 이후에는 규칙이 단 하나의 대체어를 아는 곳마다 빠른 수정도 제공합니다. 미국식 철자, 단어로 쓴 숫자, 라틴어 약어, 시각이나 날짜 형식, 큰따옴표, 보이지 않는 문자 등이 그렇습니다. 수정은 지적된 텍스트만 바꾸며, 직접 고를 때만 적용됩니다(Neovim에서는 `gra`, Helix에서는 `space a`). 엠 대시, 상투적 표현, 연속 쉼표 후보처럼 고쳐 써야 하는 규칙은 수정을 제공하지 않습니다. 수정은 문서의 버전을 함께 알리므로, 텍스트가 바뀐 뒤에 도착한 수정은 편집기가 엉뚱한 곳에 적용하지 않고 거부합니다. 이런 편집을 받는다고 알리지 않는 편집기는 수정을 받지 못하며, 알리지 않고도 받는 Neovim만 예외입니다. Neovim은 문서가 처음 바뀌기 전에 만든 수정은 확인하지 않으므로, 문서가 열린 뒤 한 번이라도 바뀐 다음부터만 수정을 받습니다. `.laconic-check`나 `.git`이 있는 폴더를 작업 공간 폴더로 삼는 Neovim 0.11 이상에서는:
 

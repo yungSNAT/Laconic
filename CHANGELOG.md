@@ -61,7 +61,7 @@ The manifests other than Claude Code's still declare plugin 0.5.0, so a build fr
 
 ### laconic-check: removed
 
-- The deprecated Node MCP server, `tools/laconic-check/mcp/server.mjs`, which only a laconic-check 0.2.0 binary needed; `laconic-check mcp` has served MCP since 0.3.0, so run it instead.
+- The deprecated Node MCP server, `tools/laconic-check/mcp/server.mjs`, which only a laconic-check 0.2.0 binary needed. Upgrade to laconic-check 0.3.0 or later, then run `laconic-check mcp`.
 
 ### laconic-check: fixed
 

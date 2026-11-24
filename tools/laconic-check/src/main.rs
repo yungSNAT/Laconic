@@ -18,7 +18,7 @@ use std::process::ExitCode;
 use laconic_check::mcp::Json;
 use laconic_check::metrics::ProseMetrics;
 use laconic_check::settings::{self, PROJECT_FILE, Settings};
-use laconic_check::{completions, hook, lint, lsp, mcp, preserve, sarif};
+use laconic_check::{action, completions, hook, lint, lsp, mcp, preserve, sarif};
 
 fn usage_text() -> String {
     let advisory: Vec<&str> = lint::RULES
@@ -364,6 +364,7 @@ fn main() -> ExitCode {
             }
         }
         Some("hook") if args.len() == 1 => stop_hook(),
+        Some("action-lint") if args.len() == 1 => action_lint(),
         Some("completions") if args.len() == 2 => match completions::Shell::parse(&args[1]) {
             Some(shell) => {
                 print!("{}", completions::script(shell));
@@ -382,6 +383,29 @@ fn main() -> ExitCode {
             ExitCode::SUCCESS
         }
         _ => usage(),
+    }
+}
+
+/// The composite Action's lint step, which passes its inputs in `LACONIC_FILES` and
+/// `LACONIC_ARGS`. It lints with this binary, so the checksum-verified download is what runs.
+fn action_lint() -> ExitCode {
+    let var = |name| {
+        env::var_os(name)
+            .unwrap_or_default()
+            .to_string_lossy()
+            .into_owned()
+    };
+    match env::current_exe() {
+        Ok(exe) => ExitCode::from(action::run(
+            &var("LACONIC_FILES"),
+            &var("LACONIC_ARGS"),
+            &exe,
+            &mut std::io::stdout().lock(),
+        )),
+        Err(e) => {
+            eprintln!("laconic-check: cannot find its own path: {e}");
+            ExitCode::from(2)
+        }
     }
 }
 

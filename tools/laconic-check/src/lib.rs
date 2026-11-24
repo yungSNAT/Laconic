@@ -4,6 +4,7 @@
 //! laconic-check's rules as a library, so the fuzz targets in `fuzz/` can call them. The
 //! `laconic-check` binary is the supported interface.
 
+pub mod action;
 pub mod completions;
 pub mod hook;
 pub mod lint;

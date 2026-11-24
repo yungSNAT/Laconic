@@ -47,7 +47,10 @@ const fn case(name: &'static str, list: &'static str, args: &'static str) -> Cas
     }
 }
 
-const MANY_FILES: &[(&str, &str)] = &[(".laconic-check", "max-findings = 1\n")];
+const MANY_FILES: &[(&str, &str)] = &[
+    (".laconic-check", "max-findings = 1\n"),
+    ("loose.cfg", "max-findings = 2\n"),
+];
 
 fn cases() -> Vec<Case> {
     let plain = &[
@@ -142,6 +145,11 @@ fn cases() -> Vec<Case> {
             ..case("a_name_with_a_leading_dash_gets_a_prefix", "-dash.md", "")
         },
         Case {
+            files: &[("a:b.md", FAULT)],
+            unix_only: true,
+            ..case("colons_in_a_name_are_escaped", "a:b.md", "")
+        },
+        Case {
             files: &[("a,b%c.md", FAULT)],
             ..case("commas_and_percent_signs_are_escaped", "a,b%c.md", "")
         },
@@ -208,6 +216,25 @@ fn cases() -> Vec<Case> {
                 "limit_after_a_double_dash_is_a_file",
                 "many",
                 "-- --max-findings",
+            )
+        },
+        Case {
+            files: MANY_FILES,
+            setup: Setup::Many,
+            ..case("status_2_after_status_1_wins", "many\nmissing.md", "")
+        },
+        Case {
+            files: MANY_FILES,
+            setup: Setup::Many,
+            ..case("status_2_before_status_1_wins", "missing.md\nmany", "")
+        },
+        Case {
+            files: MANY_FILES,
+            setup: Setup::Many,
+            ..case(
+                "inline_config_names_the_project_file",
+                "many",
+                "--config=loose.cfg",
             )
         },
         Case {
@@ -295,6 +322,11 @@ const RECORDED: &[(&str, i32, &str)] = &[
         "laconic-check: ./-dash.md:3:5: us-spelling: 'color': Australian form is 'colour'\n::error file=./-dash.md,line=3,col=5,title=laconic-check us-spelling::'color': Australian form is 'colour'\n",
     ),
     (
+        "colons_in_a_name_are_escaped",
+        1,
+        "laconic-check: a:b.md:3:5: us-spelling: 'color': Australian form is 'colour'\n::error file=a%3Ab.md,line=3,col=5,title=laconic-check us-spelling::'color': Australian form is 'colour'\n",
+    ),
+    (
         "commas_and_percent_signs_are_escaped",
         1,
         "laconic-check: a,b%c.md:3:5: us-spelling: 'color': Australian form is 'colour'\n::error file=a%2Cb%25c.md,line=3,col=5,title=laconic-check us-spelling::'color': Australian form is 'colour'\n",
@@ -343,6 +375,21 @@ const RECORDED: &[(&str, i32, &str)] = &[
         "limit_after_a_double_dash_is_a_file",
         2,
         "laconic-check: --max-findings: No such file or directory (os error 2)\nlaconic-check: many/0-fault.md:3:5: us-spelling: 'color': Australian form is 'colour'\n::error file=many/0-fault.md,line=3,col=5,title=laconic-check us-spelling::'color': Australian form is 'colour'\nlaconic-check: --max-findings: No such file or directory (os error 2)\nlaconic-check: many/z-fault.md:3:5: us-spelling: 'color': Australian form is 'colour'\n::error file=many/z-fault.md,line=3,col=5,title=laconic-check us-spelling::'color': Australian form is 'colour'\n",
+    ),
+    (
+        "status_2_after_status_1_wins",
+        2,
+        "laconic-check: many/0-fault.md:3:5: us-spelling: 'color': Australian form is 'colour'\n::error file=many/0-fault.md,line=3,col=5,title=laconic-check us-spelling::'color': Australian form is 'colour'\nlaconic-check: many/z-fault.md:3:5: us-spelling: 'color': Australian form is 'colour'\n::error file=many/z-fault.md,line=3,col=5,title=laconic-check us-spelling::'color': Australian form is 'colour'\nlaconic-check: missing.md: No such file or directory (os error 2)\n",
+    ),
+    (
+        "status_2_before_status_1_wins",
+        2,
+        "laconic-check: missing.md: No such file or directory (os error 2)\nlaconic-check: many/0-fault.md:3:5: us-spelling: 'color': Australian form is 'colour'\n::error file=many/0-fault.md,line=3,col=5,title=laconic-check us-spelling::'color': Australian form is 'colour'\nlaconic-check: many/z-fault.md:3:5: us-spelling: 'color': Australian form is 'colour'\n::error file=many/z-fault.md,line=3,col=5,title=laconic-check us-spelling::'color': Australian form is 'colour'\n",
+    ),
+    (
+        "inline_config_names_the_project_file",
+        0,
+        "laconic-check: many/0-fault.md:3:5: us-spelling: 'color': Australian form is 'colour'\n::error file=many/0-fault.md,line=3,col=5,title=laconic-check us-spelling::'color': Australian form is 'colour'\nlaconic-check: many/z-fault.md:3:5: us-spelling: 'color': Australian form is 'colour'\n::error file=many/z-fault.md,line=3,col=5,title=laconic-check us-spelling::'color': Australian form is 'colour'\n",
     ),
     (
         "a_project_rule_is_printed_not_annotated",
@@ -414,7 +461,8 @@ fn list(case: &Case, dir: &Path) -> String {
         .args(["ls-files", "many"])
         .output()
         .unwrap();
-    String::from_utf8(out.stdout).unwrap()
+    let listing = String::from_utf8(out.stdout).unwrap();
+    case.list.replacen("many", &listing, 1)
 }
 
 /// Runs `command` in the case's folder as the Action would, returning its standard output
@@ -444,7 +492,7 @@ fn run(case: &Case, dir: &Path, mut command: Command) -> (String, i32) {
 /// The recorded text names Linux's message for a missing file; other systems word it
 /// differently.
 fn expected(case: &Case) -> (String, i32) {
-    let os = std::fs::read_to_string("nowhere/missing")
+    let os = std::fs::read_to_string("no-such-file-for-the-message")
         .unwrap_err()
         .to_string();
     let (_, code, stdout) = RECORDED

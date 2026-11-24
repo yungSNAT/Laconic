@@ -54,6 +54,7 @@ The manifests other than Claude Code's still declare plugin 0.5.0, so a build fr
 ### laconic-check: added
 - `laconic-check lint` adds register presets (`--profile <email|report|docs|chat|essay>` and `profile = <name>` in `.laconic-check`), the opt-in advisory `unglossed-term` rule for unfamiliar uppercase acronyms used without an earlier gloss, and `--metrics` for per-file and overall distributional prose metrics in text and JSON output (with matching shell completions).
 - `laconic-check completions <bash|zsh|fish|powershell>` prints shell completion scripts covering every subcommand, flag and built-in rule, with no external dependencies.
+- `laconic-check action-lint` does the composite Action's lint step in Rust: it lints with the binary that runs it and prints each finding as a workflow annotation. The Action keeps running its shell script until a release carries the command, so this changes nothing for Action users yet.
 
 - `laconic-check` release builds strip symbols (`strip = true`), declare `[package.metadata.binstall]` metadata for `cargo-binstall` and publish an attested SPDX SBOM (`laconic-check.spdx.json`).
 - `laconic-check mcp` speaks MCP 2026-07-28 beside the handshake versions: a request naming `2026-07-28` in `_meta` is served with no `initialize`, `server/discover` names the versions spoken without a handshake, a request naming another version in `_meta` gets error -32022 listing them, and `ping`, which 2026-07-28 removed, is not served to it. A request with no version in `_meta` is served as before.

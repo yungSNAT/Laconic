@@ -9,9 +9,10 @@
 //! the command is not in `--help` or the completions.
 
 use std::collections::HashSet;
+use std::env;
 use std::io::{self, Read, Write};
 use std::path::Path;
-use std::process::{Command, Stdio};
+use std::process::{Command, ExitCode, Stdio};
 
 use crate::settings::{self, PROJECT_FILE, Settings};
 
@@ -19,6 +20,31 @@ use crate::settings::{self, PROJECT_FILE, Settings};
 /// paths take at most this many UTF-16 units, counting 3 for each path's separator and quotes.
 /// The rest holds the binary's path and the options.
 const BATCH_LIMIT: usize = 24_000;
+
+const CANNOT_LIST: &str = "::error::cannot list the Markdown files Git tracks; check out the repository first, or name files in the files input";
+
+/// The Action's lint step, which passes its inputs in `LACONIC_FILES` and `LACONIC_ARGS`. It
+/// lints with this binary, so the checksum-verified download is what runs.
+pub fn from_env() -> ExitCode {
+    let var = |name| {
+        env::var_os(name)
+            .unwrap_or_default()
+            .to_string_lossy()
+            .into_owned()
+    };
+    match env::current_exe() {
+        Ok(exe) => ExitCode::from(run(
+            &var("LACONIC_FILES"),
+            &var("LACONIC_ARGS"),
+            &exe,
+            &mut io::stdout().lock(),
+        )),
+        Err(e) => {
+            eprintln!("laconic-check: cannot find its own path: {e}");
+            ExitCode::from(2)
+        }
+    }
+}
 
 /// Runs the Action's lint step for `files` (`LACONIC_FILES`) and `args` (`LACONIC_ARGS`),
 /// writing its output to `out`, and returns the exit status.
@@ -90,7 +116,7 @@ pub fn run(files: &str, args: &str, exe: &Path, out: &mut impl Write) -> u8 {
 }
 
 /// What the `lint` calls came to: the highest exit status wins, 2 (an error) over 1 (too many
-/// findings) over 0.
+/// findings) over 0. A call that cannot run ends the step with 2, the highest status.
 #[derive(Default)]
 struct Totals {
     status: u8,
@@ -133,7 +159,7 @@ fn listed(list: &str) -> Result<Vec<String>, String> {
                 .filter(|file| !file.is_empty())
                 .map(str::to_owned)
                 .collect()),
-            _ => Err("::error::cannot list the Markdown files Git tracks; check out the repository first, or name files in the files input".into()),
+            _ => Err(CANNOT_LIST.into()),
         };
     }
     let mut seen = HashSet::new();
@@ -161,9 +187,16 @@ fn lint(exe: &Path, args: &[&str], files: &[String]) -> Result<(u8, String), Str
         .read_to_end(&mut bytes)
         .map_err(|e| format!("cannot read lint's output: {e}"))?;
     let status = child.wait().map_err(|e| e.to_string())?;
-    // A status the system gives no code for (a signal) counts as an error.
-    let code = status.code().map_or(2, |code| code.clamp(0, 255) as u8);
-    Ok((code, String::from_utf8_lossy(&bytes).into_owned()))
+    Ok((
+        exit_code(status.code()),
+        String::from_utf8_lossy(&bytes).into_owned(),
+    ))
+}
+
+/// `lint`'s exit status. A status outside 0 to 255, such as a Windows crash code or none at
+/// all (a signal), counts as an error.
+fn exit_code(code: Option<i32>) -> u8 {
+    code.and_then(|code| u8::try_from(code).ok()).unwrap_or(2)
 }
 
 /// Prints each line of lint's output, and an annotation for each finding in it. Returns the
@@ -346,6 +379,19 @@ mod tests {
             max_findings(&["--max-findings=99999999999999999999999"]),
             usize::MAX
         );
+    }
+
+    #[test]
+    fn a_status_outside_0_to_255_is_an_error() {
+        let given = [
+            Some(0),
+            Some(1),
+            Some(2),
+            Some(-1_073_741_571),
+            Some(256),
+            None,
+        ];
+        assert_eq!(given.map(exit_code), [0, 1, 2, 2, 2, 2]);
     }
 
     #[test]

@@ -114,5 +114,3 @@ laconic-check: two.md:1:5: us-spelling: 'color': Australian form is 'colour'
 ::error file=two.md,line=1,col=5,title=laconic-check us-spelling::'color': Australian form is 'colour'
 laconic-check: two.md:3:5: us-spelling: 'flavor': Australian form is 'flavour'
 ::error file=two.md,line=3,col=5,title=laconic-check us-spelling::'flavor': Australian form is 'flavour'
-
-test record_shell_results ... ok

@@ -3778,6 +3778,8 @@ mod tests {
             "The QBR (2026) ran.",
             "We called the QBR team.",
             "We called QBR yesterday.",
+            "The committee reviewed the report, called QBR on Monday, and adjourned.",
+            "We need an acronym for QBR.",
             "The report (QBR) was published.",
             "The minister called ASIC on Monday. ASIC has not replied.",
             "The report named ACCC as the lead.",

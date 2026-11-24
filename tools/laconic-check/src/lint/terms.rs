@@ -79,8 +79,10 @@ pub(super) fn is_exempt(acronym: &str) -> bool {
 
 /// True when a phrase names the acronym without spelling it: before it, a naming frame ('is
 /// called SLSA', 'known as SLSA'), not the verbs alone ('the minister called ASIC'); after it,
-/// an expansion cue ('SLSA stands for', 'SLSA, short for'). 'Means' is left out, since 'the NDIS
-/// means families pay less' explains nothing.
+/// an expansion cue ('SLSA stands for', 'SLSA, short for'). A comma frame ('the format, called
+/// SARIF, is') needs the acronym to end the phrase, so 'the report, called QBR on Monday' still
+/// flags. 'Means' and 'an acronym for' are left out: 'the NDIS means families pay less' and 'we
+/// need an acronym for QBR' explain nothing.
 pub(super) fn is_named(before: &[char], after: &[char]) -> bool {
     let lower = |chars: &[char]| -> String {
         chars
@@ -91,23 +93,27 @@ pub(super) fn is_named(before: &[char], after: &[char]) -> bool {
     let tail = lower(&before[before.len().saturating_sub(40)..]);
     let head = lower(&after[..after.len().min(24)]);
     let tail = tail.trim_end();
+    let phrase_ends = head
+        .chars()
+        .next()
+        .is_none_or(|c| matches!(c, ',' | '.' | ';' | ':' | ')'));
     [
         " is called",
         " are called",
         " was called",
         " were called",
         " be called",
-        ", called",
         " is named",
-        ", named",
         " known as",
         " is termed",
-        ", termed",
-        " an acronym for",
         " abbreviated as",
     ]
     .iter()
     .any(|cue| tail.ends_with(cue))
+        || (phrase_ends
+            && [", called", ", named", ", termed"]
+                .iter()
+                .any(|cue| tail.ends_with(cue)))
         || [
             " stands for",
             " is short for",
@@ -226,7 +232,49 @@ mod tests {
     }
 
     #[test]
-    fn named_recognises_naming_phrases_and_run_in_explanations() {
+    fn named_recognises_each_naming_cue() {
+        let chars = |s: &str| s.chars().collect::<Vec<char>>();
+        for (before, after) in [
+            ("The format is called ", "."),
+            ("These are called ", "."),
+            ("It was called ", " then."),
+            ("They were called ", "."),
+            ("It will be called ", "."),
+            ("The format, called ", ", is common."),
+            ("The scheme is named ", "."),
+            ("The scheme, named ", ", began."),
+            ("The scheme, known as ", ", began."),
+            ("The method is termed ", "."),
+            ("The method, termed ", ", works."),
+            ("The scheme is abbreviated as ", "."),
+            ("", " stands for Static Analysis"),
+            ("", " is short for Static Analysis"),
+            ("", ", short for Static Analysis"),
+            ("", ", which stands for Static"),
+        ] {
+            assert!(
+                is_named(&chars(before), &chars(after)),
+                "{before}ACR{after}"
+            );
+        }
+        for (before, after) in [
+            (
+                "The committee reviewed the report, called ",
+                " on Monday, and adjourned.",
+            ),
+            ("The report, named ", " as the lead, was late."),
+            ("We need an acronym for ", "."),
+            ("We called ", " yesterday."),
+        ] {
+            assert!(
+                !is_named(&chars(before), &chars(after)),
+                "{before}ACR{after}"
+            );
+        }
+    }
+
+    #[test]
+    fn named_recognises_naming_phrases_only() {
         let chars = |s: &str| s.chars().collect::<Vec<char>>();
         assert!(is_named(&chars("The format is called "), &chars(".")));
         assert!(is_named(&chars("The format, known as "), &chars(", is")));

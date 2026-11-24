@@ -4,17 +4,22 @@
 //! Helpers for `unglossed-term`: unfamiliar uppercase acronyms used without an earlier gloss.
 
 /// Common 3-to-8 letter uppercase acronyms that readers are expected to recognise without a
-/// gloss. Two-letter acronyms such as `AI`, `CI`, `ID`, `OS`, `PR`, `UI` and `UX` are already
-/// below the 3-letter threshold. Kept sorted for binary search.
+/// gloss, with the Style Manual's own examples (ACT, BHP, DNA), Australian forms such as ABC and
+/// CSIRO, bodies and diseases news names without expansion (NASA, NATO, COVID), and repository
+/// files named in prose (README, LICENSE, NOTICE). Two-letter acronyms such as `AI`, `CI`, `ID`,
+/// `OS`, `PR`, `UI` and `UX` are already below the 3-letter threshold. Kept sorted for binary
+/// search.
 const COMMON_ACRONYMS: &[&str] = &[
-    "ABN", "ACN", "ACT", "AEDT", "AEST", "API", "AST", "ATO", "AUD", "AWST", "BAS", "CBD", "CEO",
-    "CFO", "CLI", "CPU", "CSS", "CSV", "CTO", "DNA", "DNS", "DOM", "EOF", "EST", "FAQ", "FTP",
-    "GDP", "GIF", "GMT", "GPS", "GPU", "GST", "GUI", "HTML", "HTTP", "HTTPS", "IDE", "ISBN",
-    "ISSN", "JSON", "JWT", "LAN", "LLM", "LSP", "MCP", "MIME", "NPM", "NSW", "NZD", "OCR", "PDF",
-    "PIN", "PNG", "PST", "QLD", "RAM", "REST", "RGB", "RNA", "RPC", "RSS", "SDK", "SHA", "SIM",
-    "SMS", "SQL", "SSH", "SSL", "SSO", "SVG", "TAS", "TCP", "TFN", "TLS", "TOML", "UDP", "URI",
-    "URL", "USA", "USB", "USD", "UTC", "UTF", "UUID", "VAT", "VIC", "VIP", "VPN", "WASM", "XML",
-    "XSS", "YAML", "ZIP",
+    "ABC", "ABN", "ACN", "ACT", "AEDT", "AEST", "AFL", "AIDS", "ANZAC", "API", "AST", "ATO", "AUD",
+    "AWST", "BAS", "BBC", "BHP", "CBD", "CEO", "CFO", "CLI", "CNN", "COVID", "CPU", "CSIRO", "CSS",
+    "CSV", "CTO", "DIY", "DNA", "DNS", "DOM", "EOF", "EST", "FAQ", "FIFA", "FTP", "GDP", "GIF",
+    "GMT", "GPS", "GPU", "GST", "GUI", "HIV", "HTML", "HTTP", "HTTPS", "IDE", "ISBN", "ISSN",
+    "JSON", "JWT", "LAN", "LED", "LICENSE", "LLM", "LSP", "MCP", "MIME", "MRI", "NASA", "NATO",
+    "NOTICE", "NPM", "NRL", "NSW", "NZD", "OCR", "OPEC", "PDF", "PIN", "PNG", "PST", "QLD", "RAM",
+    "README", "REST", "RGB", "RNA", "RPC", "RSS", "SDK", "SHA", "SIM", "SMS", "SQL", "SSH", "SSL",
+    "SSO", "SVG", "TAS", "TCP", "TFN", "TLS", "TODO", "TOML", "UAE", "UDP", "UNESCO", "UNICEF",
+    "URI", "URL", "USA", "USB", "USD", "UTC", "UTF", "UUID", "VAT", "VIC", "VIP", "VPN", "WASM",
+    "XML", "XSS", "YAML", "ZIP",
 ];
 
 /// True when `s` is a canonical uppercase Roman numeral (`I`..`MMMCMXCIX`).
@@ -43,9 +48,80 @@ pub(super) fn candidate(word: &str) -> Option<&str> {
     ((3..=8).contains(&base.len()) && base.bytes().all(|b| b.is_ascii_uppercase())).then_some(base)
 }
 
-/// True when `acronym` is in the common allowlist or is a canonical Roman numeral.
+/// Ordinary words written in capitals for emphasis, which have an acronym's shape, with the
+/// parts of contractions before the apostrophe ('DON'T'). Words that are also common acronyms,
+/// such as CAN and FIX, are left out. Kept sorted for binary search.
+const SHOUTED_WORDS: &[&str] = &[
+    "ALL", "ALSO", "ALWAYS", "AND", "ANY", "ARE", "BAD", "BEST", "BOTH", "BUT", "DOESN", "DON",
+    "DONE", "EACH", "END", "ERROR", "EVER", "EVERY", "FAIL", "FALSE", "FIRST", "FOR", "FREE",
+    "FROM", "GOOD", "HAS", "HAVE", "HERE", "ISN", "LAST", "LESS", "MORE", "MOST", "MUST", "NEVER",
+    "NEW", "NONE", "NOT", "NOTE", "NOW", "OFF", "ONE", "ONLY", "OUT", "OWN", "READ", "SAME",
+    "SHALL", "STOP", "THAT", "THE", "THEN", "THIS", "TRUE", "TWO", "USE", "VERY", "WARNING", "WAS",
+    "WHAT", "WHEN", "WHY", "WILL", "WITH", "WON", "YES", "YOU", "YOUR",
+];
+
+/// English endings that mark 5 or more capitals as a shouted word ('FAILED', 'TESTING',
+/// 'MAINLY'), since acronyms that long rarely end so; the price is the rare one that does, such
+/// as CREST. Shorter forms are left to SHOUTED_WORDS, where 'LED' and 'RED' collide.
+const INFLECTIONS: &[&str] = &[
+    "ED", "ING", "LY", "TION", "SION", "MENT", "NESS", "ABLE", "IBLE", "FUL", "LESS", "EST", "IES",
+    "OUS", "IVE", "ANCE", "ENCE",
+];
+
+/// True when `acronym` is in the common allowlist, is a canonical Roman numeral or is an
+/// ordinary word in capitals.
 pub(super) fn is_exempt(acronym: &str) -> bool {
-    COMMON_ACRONYMS.binary_search(&acronym).is_ok() || is_roman_numeral(acronym)
+    COMMON_ACRONYMS.binary_search(&acronym).is_ok()
+        || is_roman_numeral(acronym)
+        || SHOUTED_WORDS.binary_search(&acronym).is_ok()
+        || (acronym.len() >= 5 && INFLECTIONS.iter().any(|end| acronym.ends_with(end)))
+}
+
+/// True when a phrase names the acronym without spelling it: before it, a naming frame ('is
+/// called SLSA', 'known as SLSA'), not the verbs alone ('the minister called ASIC'); after it,
+/// an expansion cue ('SLSA stands for', 'SLSA, short for'). A comma frame ('the format, called
+/// SARIF, is') needs the acronym to end the phrase, so 'the report, called QBR on Monday' still
+/// flags. 'Means' and 'an acronym for' are left out: 'the NDIS means families pay less' and 'we
+/// need an acronym for QBR' explain nothing.
+pub(super) fn is_named(before: &[char], after: &[char]) -> bool {
+    let lower = |chars: &[char]| -> String {
+        chars
+            .iter()
+            .map(|c| c.to_lowercase().next().unwrap_or(*c))
+            .collect()
+    };
+    let tail = lower(&before[before.len().saturating_sub(40)..]);
+    let head = lower(&after[..after.len().min(24)]);
+    let tail = tail.trim_end();
+    let phrase_ends = head
+        .chars()
+        .next()
+        .is_none_or(|c| matches!(c, ',' | '.' | ';' | ':' | ')'));
+    [
+        " is called",
+        " are called",
+        " was called",
+        " were called",
+        " be called",
+        " is named",
+        " known as",
+        " is termed",
+        " abbreviated as",
+    ]
+    .iter()
+    .any(|cue| tail.ends_with(cue))
+        || (phrase_ends
+            && [", called", ", named", ", termed"]
+                .iter()
+                .any(|cue| tail.ends_with(cue)))
+        || [
+            " stands for",
+            " is short for",
+            ", short for",
+            ", which stands for",
+        ]
+        .iter()
+        .any(|cue| head.starts_with(cue))
 }
 
 /// True when the word at `masked[start..end]` sits next to another all-uppercase word
@@ -151,8 +227,91 @@ mod tests {
     }
 
     #[test]
+    fn shouted_words_are_sorted_and_unique() {
+        assert!(SHOUTED_WORDS.windows(2).all(|w| w[0] < w[1]));
+    }
+
+    #[test]
+    fn named_recognises_each_naming_cue() {
+        let chars = |s: &str| s.chars().collect::<Vec<char>>();
+        for (before, after) in [
+            ("The format is called ", "."),
+            ("These are called ", "."),
+            ("It was called ", " then."),
+            ("They were called ", "."),
+            ("It will be called ", "."),
+            ("The format, called ", ", is common."),
+            ("The scheme is named ", "."),
+            ("The scheme, named ", ", began."),
+            ("The scheme, known as ", ", began."),
+            ("The method is termed ", "."),
+            ("The method, termed ", ", works."),
+            ("The scheme is abbreviated as ", "."),
+            ("", " stands for Static Analysis"),
+            ("", " is short for Static Analysis"),
+            ("", ", short for Static Analysis"),
+            ("", ", which stands for Static"),
+        ] {
+            assert!(
+                is_named(&chars(before), &chars(after)),
+                "{before}ACR{after}"
+            );
+        }
+        for (before, after) in [
+            (
+                "The committee reviewed the report, called ",
+                " on Monday, and adjourned.",
+            ),
+            ("The report, named ", " as the lead, was late."),
+            ("We need an acronym for ", "."),
+            ("We called ", " yesterday."),
+        ] {
+            assert!(
+                !is_named(&chars(before), &chars(after)),
+                "{before}ACR{after}"
+            );
+        }
+    }
+
+    #[test]
+    fn named_recognises_naming_phrases_only() {
+        let chars = |s: &str| s.chars().collect::<Vec<char>>();
+        assert!(is_named(&chars("The format is called "), &chars(".")));
+        assert!(is_named(&chars("The format, known as "), &chars(", is")));
+        assert!(is_named(&chars(""), &chars(" stands for Static")));
+        assert!(is_named(&chars("This list is also known as "), &chars(".")));
+        assert!(is_named(&chars(""), &chars(", short for Supply-chain")));
+        assert!(!is_named(
+            &chars("The minister called "),
+            &chars(" on Monday.")
+        ));
+        assert!(!is_named(
+            &chars("The report named "),
+            &chars(" as the lead.")
+        ));
+        assert!(!is_named(
+            &chars("The "),
+            &chars(" means families pay less.")
+        ));
+        assert!(!is_named(&chars("4.1 per cent ("), &chars(").")));
+        assert!(is_named(&chars("Such files are called "), &chars(".")));
+        assert!(!is_named(&chars("We called the "), &chars(" team.")));
+        assert!(!is_named(&chars("We called "), &chars(" yesterday.")));
+        assert!(!is_named(
+            &chars("The report ("),
+            &chars(") was published.")
+        ));
+        // A real acronym an exemption hides: the cost of the inflection test.
+        assert!(is_exempt("CREST"));
+        assert!(!is_exempt("CAN"));
+        assert!(!is_named(&chars("Ayoub G. ("), &chars(").")));
+    }
+
+    #[test]
     fn exempt_recognises_common_acronyms_and_roman_numerals() {
-        for common in ["API", "JSON", "ATO", "AEDT", "WASM", "III", "VIII"] {
+        for common in [
+            "API", "JSON", "ATO", "AEDT", "WASM", "III", "VIII", "BHP", "CSIRO", "NOTE", "FAILED",
+        ] {
             assert!(is_exempt(common), "{common}");
         }
         for unfamiliar in ["QBR", "OKR", "NDIS", "SLA"] {

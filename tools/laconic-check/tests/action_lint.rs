@@ -408,7 +408,7 @@ fn a_signalled_lint_gives_128_plus_the_signal() {
 #[test]
 fn action_rejects_non_text_format_prefers_laconic_toml_and_counts_chat_filler_as_error() {
     let dir = Path::new(env!("CARGO_TARGET_TMPDIR"))
-        .join(format!("action-alcuin-{}", std::process::id()));
+        .join(format!("action-format-toml-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
     std::fs::write(dir.join("clean.md"), CLEAN).unwrap();

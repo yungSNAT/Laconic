@@ -1,0 +1,158 @@
+// Copyright 2026 Ryan Duguid
+// SPDX-License-Identifier: Apache-2.0
+
+use crate::lint::{RuleId, lint, lint_all};
+
+fn rules_of(text: &str) -> Vec<&'static str> {
+    lint_all(text)
+        .into_iter()
+        .filter_map(|f| f.rule.house().map(RuleId::name))
+        .collect()
+}
+
+#[test]
+fn unanchored_magnitudes_flag_only_without_anchors() {
+    assert!(lint("It saves thousands of hours and runs 10x faster.").is_empty());
+    assert_eq!(
+        rules_of("It saves thousands of hours."),
+        ["unanchored-magnitude"]
+    );
+    assert_eq!(
+        rules_of("The engine runs 10x faster."),
+        ["unanchored-magnitude"]
+    );
+    assert_eq!(
+        rules_of("Users see a 90% reduction."),
+        ["unanchored-magnitude"]
+    );
+    assert_eq!(
+        rules_of("Users see a 2.5x improvement."),
+        ["unanchored-magnitude"]
+    );
+    for clean in [
+        "It saves thousands of hours per year.",
+        "It saves thousands of hours according to the audit.",
+        "The engine runs 10x faster in our [benchmark](https://example.com/bench).",
+        "The engine runs 10x faster (2026).",
+        "The engine runs 10x faster [1].",
+        "Users saw a 90% reduction from 100 ms to 10 ms.",
+        "Users saw a 90% reduction across 12 teams.",
+        "Users saw a 90% reduction in 2025.",
+        "The tool cut latency by 10x in a benchmark.",
+        "The 10x budget item was approved.",
+    ] {
+        assert!(
+            !rules_of(clean).contains(&"unanchored-magnitude"),
+            "unexpected flag in {clean:?}: {:?}",
+            rules_of(clean)
+        );
+    }
+}
+
+#[test]
+fn unattributed_superlatives_flag_only_without_attribution() {
+    assert_eq!(
+        rules_of("This is a best-in-class parser."),
+        ["unattributed-superlative"]
+    );
+    assert_eq!(
+        rules_of("The engine significantly outperforms rivals."),
+        ["unattributed-superlative"]
+    );
+    for clean in [
+        "The engine significantly outperforms the baseline compared with v1.",
+        "This is a best-in-class parser according to the audit.",
+        "The engine significantly outperforms rivals [see https://example.com].",
+        "The engine significantly outperforms rivals (2026).",
+    ] {
+        assert!(
+            !rules_of(clean).contains(&"unattributed-superlative"),
+            "unexpected flag in {clean:?}: {:?}",
+            rules_of(clean)
+        );
+    }
+}
+
+#[test]
+fn unnamed_evidence_flags_only_without_named_source() {
+    assert_eq!(
+        rules_of("Studies show faster builds."),
+        ["unnamed-evidence"]
+    );
+    assert_eq!(
+        rules_of("Experts agree the layout works."),
+        ["unnamed-evidence"]
+    );
+    assert_eq!(rules_of("Research proves the claim."), ["unnamed-evidence"]);
+    assert_eq!(
+        rules_of("Models train on vast datasets."),
+        ["unnamed-evidence"]
+    );
+    for clean in [
+        "Studies show faster builds [1].",
+        "Studies show faster builds in [the report](https://example.com/r).",
+        "Studies show faster builds by CSIRO.",
+        "Research proves the claim from the University of Sydney.",
+        "Experts agree at Monash.",
+        "Studies show faster builds according to the bureau.",
+        "Studies show faster builds from local teams and by CSIRO.",
+    ] {
+        assert!(
+            !rules_of(clean).contains(&"unnamed-evidence"),
+            "unexpected flag in {clean:?}: {:?}",
+            rules_of(clean)
+        );
+    }
+}
+
+#[test]
+fn ai_placeholder_catches_residue_brackets_and_todo_tbd() {
+    assert_eq!(
+        rules_of("As an AI, I cannot verify this."),
+        ["ai-placeholder"]
+    );
+    assert_eq!(
+        rules_of("Add [insert metric here] before release."),
+        ["ai-placeholder"]
+    );
+    assert_eq!(rules_of("The final total is TBD."), ["ai-placeholder"]);
+    assert_eq!(
+        rules_of("Finish the checklist TODO before sending."),
+        ["ai-placeholder"]
+    );
+    assert!(!rules_of("Run `TODO` and `[insert x]` in code.").contains(&"ai-placeholder"));
+    assert!(!rules_of("Check the todo list tomorrow.").contains(&"ai-placeholder"));
+}
+
+#[test]
+fn chat_filler_catches_gates_and_seams_bloat() {
+    assert_eq!(
+        rules_of("Define clean gates and seams before coding."),
+        ["chat-filler"]
+    );
+    assert_eq!(
+        rules_of("Add a verification gate at the natural seam."),
+        ["chat-filler", "chat-filler"]
+    );
+    assert!(lint("Define clean gates and seams before coding.").is_empty());
+}
+
+#[test]
+fn sentence_isolation_keeps_unanchored_claim_in_second_sentence_flagged() {
+    let text =
+        "See https://example.com for context. It saves thousands of hours! Also 1.5x faster.";
+    let found = rules_of(text);
+    assert_eq!(found, ["unanchored-magnitude", "unanchored-magnitude"]);
+}
+
+#[test]
+fn partial_words_unclosed_brackets_and_unpaired_from_behave_cleanly() {
+    assert_eq!(
+        rules_of("From home, it saves thousands of hours."),
+        ["unanchored-magnitude"]
+    );
+    assert!(!rules_of("It skyrocketedx overnight.").contains(&"unanchored-magnitude"));
+    assert!(!rules_of("Has an aim in sight.").contains(&"ai-placeholder"));
+    assert!(!rules_of("See [insert unclosed text.").contains(&"ai-placeholder"));
+    assert!(!rules_of("The load-bearingx frame held.").contains(&"chat-filler"));
+}

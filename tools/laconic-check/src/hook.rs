@@ -12,7 +12,7 @@ use std::process::{Command, Stdio};
 
 use crate::lint;
 use crate::mcp::{self, Json};
-use crate::settings::{PROJECT_FILE, Settings};
+use crate::settings::{self, Settings};
 
 /// The findings a block decision lists; it gives the number of the rest.
 const LISTED: usize = 50;
@@ -154,10 +154,9 @@ fn path(bytes: &[u8]) -> Result<PathBuf, String> {
 
 /// The project file at the repository's top level, or the default settings without one.
 fn settings(root: &Path) -> Result<Settings, String> {
-    let file = root.join(PROJECT_FILE);
-    if !file.is_file() {
+    let Some(file) = settings::find_in(root) else {
         return Ok(Settings::default());
-    }
+    };
     let shown = file.display().to_string();
     let body = fs::read_to_string(&file).map_err(|e| format!("{shown}: {e}"))?;
     Settings::parse(&shown, &body)

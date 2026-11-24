@@ -17,9 +17,9 @@ const COMMON_ACRONYMS: &[&str] = &[
     "JSON", "JWT", "LAN", "LED", "LICENSE", "LLM", "LSP", "MCP", "MIME", "MRI", "NASA", "NATO",
     "NOTICE", "NPM", "NRL", "NSW", "NZD", "OCR", "OPEC", "PDF", "PIN", "PNG", "PST", "QLD", "RAM",
     "README", "REST", "RGB", "RNA", "RPC", "RSS", "SDK", "SHA", "SIM", "SMS", "SQL", "SSH", "SSL",
-    "SSO", "SVG", "TAS", "TCP", "TFN", "TLS", "TODO", "TOML", "UAE", "UDP", "UNESCO", "UNICEF",
-    "URI", "URL", "USA", "USB", "USD", "UTC", "UTF", "UUID", "VAT", "VIC", "VIP", "VPN", "WASM",
-    "XML", "XSS", "YAML", "ZIP",
+    "SSO", "SVG", "TAS", "TBD", "TCP", "TFN", "TLS", "TODO", "TOML", "UAE", "UDP", "UNESCO",
+    "UNICEF", "URI", "URL", "USA", "USB", "USD", "UTC", "UTF", "UUID", "VAT", "VIC", "VIP", "VPN",
+    "WASM", "XML", "XSS", "YAML", "ZIP",
 ];
 
 /// True when `s` is a canonical uppercase Roman numeral (`I`..`MMMCMXCIX`).

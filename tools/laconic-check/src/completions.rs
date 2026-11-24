@@ -61,6 +61,10 @@ fn bash(rules: &[&str]) -> String {
                     COMPREPLY=( $(compgen -W "{rules}" -- "$cur") )
                     return
                     ;;
+                --format)
+                    COMPREPLY=( $(compgen -W "text json sarif" -- "$cur") )
+                    return
+                    ;;
                 --profile)
                     COMPREPLY=( $(compgen -W "{profiles}" -- "$cur") )
                     return
@@ -74,7 +78,7 @@ fn bash(rules: &[&str]) -> String {
                     ;;
             esac
             if [[ "$cur" == -* ]]; then
-                COMPREPLY=( $(compgen -W "--json --sarif --metrics --profile --disable --only --max-findings --warn --commit-msg --config" -- "$cur") )
+                COMPREPLY=( $(compgen -W "--format --json --sarif --metrics --profile --disable --only --max-findings --warn --commit-msg --config" -- "$cur") )
             else
                 COMPREPLY=( $(compgen -f -- "$cur") )
             fi
@@ -132,6 +136,7 @@ _laconic-check() {{
             case "${{words[1]}}" in
                 lint)
                     _arguments \
+                        '--format[Output format]:format:(text json sarif)' \
                         '--json[Print one JSON document instead of one line a finding]' \
                         '--sarif[Print a SARIF 2.1.0 log instead of one line a finding]' \
                         '--metrics[Print distributional prose metrics per file and overall]' \
@@ -187,6 +192,7 @@ complete -c laconic-check -n "__fish_use_subcommand" -f -a "completions" -d "Pri
 complete -c laconic-check -n "__fish_seen_subcommand_from lint" -l json -d "Print one JSON document"
 complete -c laconic-check -n "__fish_seen_subcommand_from lint" -l sarif -d "Print a SARIF 2.1.0 log"
 complete -c laconic-check -n "__fish_seen_subcommand_from lint" -l metrics -d "Print distributional prose metrics"
+complete -c laconic-check -n "__fish_seen_subcommand_from lint" -l format -r -f -a "text json sarif" -d "Output format"
 complete -c laconic-check -n "__fish_seen_subcommand_from lint" -l profile -r -f -a "{profiles}" -d "Apply a register preset"
 complete -c laconic-check -n "__fish_seen_subcommand_from lint" -l disable -r -f -a "{rules}" -d "Drop findings for these rules"
 complete -c laconic-check -n "__fish_seen_subcommand_from lint" -l only -r -f -a "{rules}" -d "Keep findings only for these rules"
@@ -246,12 +252,17 @@ fn powershell(rules: &[&str]) -> String {
             $candidates = $rules | ForEach-Object {{
                 [System.Management.Automation.CompletionResult]::new($_, $_, [System.Management.Automation.CompletionResultType]::ParameterValue, 'Lint rule')
             }}
+        }} elseif ($prev -eq '--format') {{
+            $candidates = @('text', 'json', 'sarif') | ForEach-Object {{
+                [System.Management.Automation.CompletionResult]::new($_, $_, [System.Management.Automation.CompletionResultType]::ParameterValue, 'Output format')
+            }}
         }} elseif ($prev -eq '--profile') {{
             $candidates = $profiles | ForEach-Object {{
                 [System.Management.Automation.CompletionResult]::new($_, $_, [System.Management.Automation.CompletionResultType]::ParameterValue, 'Register profile')
             }}
         }} elseif ($wordToComplete -like '-*' -or ($prev -ne '--config' -and $prev -ne '--max-findings')) {{
             $candidates = @(
+                [System.Management.Automation.CompletionResult]::new('--format', '--format', [System.Management.Automation.CompletionResultType]::ParameterName, 'Output format (text, json or sarif)')
                 [System.Management.Automation.CompletionResult]::new('--json', '--json', [System.Management.Automation.CompletionResultType]::ParameterName, 'Print one JSON document')
                 [System.Management.Automation.CompletionResult]::new('--sarif', '--sarif', [System.Management.Automation.CompletionResultType]::ParameterName, 'Print a SARIF 2.1.0 log')
                 [System.Management.Automation.CompletionResult]::new('--metrics', '--metrics', [System.Management.Automation.CompletionResultType]::ParameterName, 'Print distributional prose metrics')
@@ -305,6 +316,7 @@ mod tests {
     fn every_script_covers_subcommands_flags_shells_and_rules() {
         let subcommands = ["lint", "preserve", "mcp", "lsp", "hook", "completions"];
         let flags = [
+            "format",
             "json",
             "sarif",
             "metrics",

@@ -8,7 +8,7 @@
 
 use crate::lint::RuleId;
 
-/// Writing register presets accepted by `--profile` and `.laconic-check`.
+/// Writing register presets accepted by `--profile`, `laconic.toml` and `.laconic-check`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Profile {
     Email,
@@ -45,17 +45,27 @@ impl Profile {
         }
     }
 
-    /// True when this profile enables an opt-in rule such as `unglossed-term`.
+    /// True when this profile enables an opt-in rule such as `unglossed-term` or the
+    /// substance-heuristic and chat-filler checks.
     pub fn enables(self, id: RuleId) -> bool {
         match self {
-            Self::Email | Self::Report | Self::Essay => id == RuleId::UnglossedTerm,
-            Self::Docs | Self::Chat => false,
+            Self::Email => matches!(id, RuleId::UnglossedTerm | RuleId::AiPlaceholder),
+            Self::Report | Self::Essay => matches!(
+                id,
+                RuleId::UnglossedTerm
+                    | RuleId::UnanchoredMagnitude
+                    | RuleId::UnattributedSuperlative
+                    | RuleId::UnnamedEvidence
+                    | RuleId::AiPlaceholder
+            ),
+            Self::Docs => matches!(id, RuleId::UnattributedSuperlative | RuleId::AiPlaceholder),
+            Self::Chat => matches!(id, RuleId::ChatFiller | RuleId::AiPlaceholder),
         }
     }
 
     /// True when this profile enables at least one opt-in rule.
     pub fn enables_opt_in(self) -> bool {
-        matches!(self, Self::Email | Self::Report | Self::Essay)
+        true
     }
 
     /// True when this profile relaxes a default-on rule by disabling it.
@@ -73,7 +83,13 @@ impl Profile {
     /// Effective advisory flag for `id` under this profile (`false` means the rule fails `lint`).
     pub fn is_advisory(self, id: RuleId) -> bool {
         match (self, id) {
-            (Self::Chat, RuleId::BoldLabel | RuleId::StackedHedge | RuleId::ClauseDashes)
+            (
+                Self::Chat,
+                RuleId::BoldLabel
+                | RuleId::StackedHedge
+                | RuleId::ClauseDashes
+                | RuleId::ChatFiller,
+            )
             | (Self::Email, RuleId::StackedHedge | RuleId::BoldLabel)
             | (
                 Self::Report,
@@ -113,16 +129,32 @@ mod tests {
     #[test]
     fn profiles_tune_enablement_and_severity_per_register() {
         assert!(Profile::Email.enables(RuleId::UnglossedTerm));
+        assert!(Profile::Email.enables(RuleId::AiPlaceholder));
+        assert!(!Profile::Email.enables(RuleId::UnanchoredMagnitude));
         assert!(Profile::Report.enables(RuleId::UnglossedTerm));
+        assert!(Profile::Report.enables(RuleId::UnanchoredMagnitude));
+        assert!(Profile::Report.enables(RuleId::UnattributedSuperlative));
+        assert!(Profile::Report.enables(RuleId::UnnamedEvidence));
+        assert!(Profile::Report.enables(RuleId::AiPlaceholder));
+        assert!(!Profile::Report.enables(RuleId::ChatFiller));
         assert!(Profile::Essay.enables(RuleId::UnglossedTerm));
+        assert!(Profile::Essay.enables(RuleId::UnanchoredMagnitude));
         assert!(!Profile::Docs.enables(RuleId::UnglossedTerm));
+        assert!(Profile::Docs.enables(RuleId::UnattributedSuperlative));
+        assert!(Profile::Docs.enables(RuleId::AiPlaceholder));
         assert!(!Profile::Chat.enables(RuleId::UnglossedTerm));
+        assert!(Profile::Chat.enables(RuleId::ChatFiller));
+        assert!(Profile::Chat.enables(RuleId::AiPlaceholder));
 
-        assert!(Profile::Email.enables_opt_in());
-        assert!(Profile::Report.enables_opt_in());
-        assert!(Profile::Essay.enables_opt_in());
-        assert!(!Profile::Docs.enables_opt_in());
-        assert!(!Profile::Chat.enables_opt_in());
+        for p in [
+            Profile::Email,
+            Profile::Report,
+            Profile::Docs,
+            Profile::Chat,
+            Profile::Essay,
+        ] {
+            assert!(p.enables_opt_in());
+        }
 
         assert!(Profile::Chat.disables(RuleId::AcronymBeforeDefinition));
         assert!(Profile::Chat.disables(RuleId::HyphenConsistency));
@@ -135,6 +167,7 @@ mod tests {
         assert!(!Profile::Chat.is_advisory(RuleId::BoldLabel));
         assert!(!Profile::Chat.is_advisory(RuleId::StackedHedge));
         assert!(!Profile::Chat.is_advisory(RuleId::ClauseDashes));
+        assert!(!Profile::Chat.is_advisory(RuleId::ChatFiller));
         assert!(Profile::Docs.is_advisory(RuleId::NumberWord));
         assert!(!Profile::Email.is_advisory(RuleId::StackedHedge));
         assert!(!Profile::Email.is_advisory(RuleId::BoldLabel));
@@ -146,5 +179,6 @@ mod tests {
         assert!(!Profile::Essay.is_advisory(RuleId::StackedHedge));
         assert!(!Profile::Report.is_advisory(RuleId::UsSpelling));
         assert!(Profile::Report.is_advisory(RuleId::UnglossedTerm));
+        assert!(Profile::Report.is_advisory(RuleId::UnanchoredMagnitude));
     }
 }

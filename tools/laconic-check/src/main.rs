@@ -17,7 +17,7 @@ use std::process::ExitCode;
 
 use laconic_check::mcp::Json;
 use laconic_check::metrics::ProseMetrics;
-use laconic_check::settings::{self, PROJECT_FILE, Settings};
+use laconic_check::settings::{self, Settings};
 use laconic_check::{action, completions, hook, lint, lsp, mcp, preserve, sarif};
 
 fn usage_text() -> String {
@@ -29,6 +29,7 @@ fn usage_text() -> String {
     format!(
         "usage:\n  laconic-check lint [options] <file.md | ->...\n  laconic-check preserve [--strict] [--loose] <original> <edited>\n  laconic-check mcp\n  laconic-check lsp\n  laconic-check hook\n  laconic-check completions <bash|zsh|fish|powershell>\n\n\
          lint options:\n  \
+           --format <name>     output format: text (default), json or sarif\n  \
            --json              print one JSON document instead of a line a finding\n  \
            --sarif             print a SARIF 2.1.0 log instead of a line a finding\n  \
            --metrics           print distributional prose metrics per file and overall\n  \
@@ -38,7 +39,7 @@ fn usage_text() -> String {
            --max-findings <n>  fail only on more than n failing findings (default 0)\n  \
            --warn              never fail on findings\n  \
            --commit-msg        read each file as a Git commit message\n  \
-           --config <file>     read settings from this file instead of .laconic-check\n\n\
+           --config <file>     read settings from this file instead of laconic.toml or .laconic-check\n\n\
          lint exits 1 when it finds more candidates than --max-findings allows, unless\n\
          --warn is given; advisory findings ({}) never fail it. Each finding names\n\
          its rule, described under that name in {}\n\
@@ -100,7 +101,8 @@ struct Options {
 /// after it, every argument is a file.
 fn options(args: &[String]) -> Result<Options, String> {
     let mut cli = Options::default();
-    let (mut config, mut max_findings, mut profile, mut operands) = (None, None, None, false);
+    let (mut config, mut max_findings, mut profile, mut format, mut operands) =
+        (None, None, None, None, false);
     let mut rest = args.iter();
     while let Some(arg) = rest.next() {
         if operands || arg == "-" || !arg.starts_with('-') {
@@ -113,7 +115,7 @@ fn options(args: &[String]) -> Result<Options, String> {
         };
         let takes_value = matches!(
             name,
-            "--disable" | "--only" | "--max-findings" | "--config" | "--profile"
+            "--disable" | "--only" | "--max-findings" | "--config" | "--profile" | "--format"
         );
         if !takes_value
             && !matches!(
@@ -140,7 +142,25 @@ fn options(args: &[String]) -> Result<Options, String> {
             "--only" => cli.settings.only.extend(settings::rule_names(value)),
             "--max-findings" => max_findings = Some(settings::count(value)?),
             "--profile" => profile = Some(settings::profile(value)?),
+            "--format" => match value {
+                "text" | "json" | "sarif" => format = Some(value.to_owned()),
+                _ => {
+                    return Err(format!(
+                        "unknown format '{value}'; expected text, json or sarif"
+                    ));
+                }
+            },
             _ => config = Some(value.to_owned()),
+        }
+    }
+    if let Some(fmt) = format.as_deref() {
+        match fmt {
+            "text" if cli.json || cli.sarif => {
+                return Err("--format=text cannot be combined with --json or --sarif".into());
+            }
+            "json" => cli.json = true,
+            "sarif" => cli.sarif = true,
+            _ => {}
         }
     }
     if cli.json && cli.sarif {
@@ -150,9 +170,7 @@ fn options(args: &[String]) -> Result<Options, String> {
         return Err("--sarif and --metrics cannot be combined".into());
     }
     let path = config.or_else(|| {
-        std::path::Path::new(PROJECT_FILE)
-            .is_file()
-            .then(|| PROJECT_FILE.to_owned())
+        settings::find_in(std::path::Path::new(".")).map(|p| p.to_string_lossy().into_owned())
     });
     let mut settings = match path {
         Some(path) => Settings::read(&path)?,
@@ -204,8 +222,11 @@ fn run_lint(options: &Options) -> ExitCode {
             overall.merge(&measured);
             file_metrics.push((file.clone(), measured));
         }
-        // SARIF and accepted words need the text of a finding's line.
-        let lines: Vec<&str> = if options.sarif || !options.settings.accept.is_empty() {
+        // SARIF, accepted words and protected phrases need the text of a finding's line.
+        let lines: Vec<&str> = if options.sarif
+            || !options.settings.accept.is_empty()
+            || !options.settings.protect.is_empty()
+        {
             text.lines().collect()
         } else {
             Vec::new()
@@ -229,12 +250,16 @@ fn run_lint(options: &Options) -> ExitCode {
                 failing += 1;
             }
             if options.json {
+                let severity = if advisory { "note" } else { "warning" };
+                let confidence = f.rule.confidence().as_str();
                 findings.push(Json::Object(vec![
                     ("file".into(), Json::String(file.clone())),
                     ("line".into(), Json::Number(f.line.to_string())),
                     ("column".into(), Json::Number(f.column.to_string())),
                     ("rule".into(), Json::String(name)),
                     ("advisory".into(), Json::Bool(advisory)),
+                    ("severity".into(), Json::String(severity.into())),
+                    ("confidence".into(), Json::String(confidence.into())),
                     ("message".into(), Json::String(f.message)),
                     ("url".into(), f.rule.url().map_or(Json::Null, Json::String)),
                 ]));
@@ -253,6 +278,7 @@ fn run_lint(options: &Options) -> ExitCode {
     }
     if options.json {
         let mut fields = vec![
+            ("scope".into(), Json::String(lint::SCOPE_NOTE.into())),
             ("findings".into(), Json::Array(findings)),
             ("failing".into(), Json::Number(failing.to_string())),
             ("suppressed".into(), Json::Number(suppressed.to_string())),
@@ -421,103 +447,5 @@ fn stop_hook() -> ExitCode {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn args(list: &[&str]) -> Vec<String> {
-        list.iter().map(|s| s.to_string()).collect()
-    }
-
-    #[test]
-    fn reads_options_in_either_form_and_only_files_after_a_double_dash() {
-        let read = options(&args(&[
-            "--json",
-            "--disable=us-spelling, em-dash",
-            "a.md",
-            "--only",
-            "word-choice",
-            "--max-findings",
-            "3",
-            "-",
-            "--",
-            "--warn",
-        ]))
-        .unwrap();
-        assert_eq!(
-            read,
-            Options {
-                json: true,
-                settings: Settings {
-                    disable: vec!["us-spelling".into(), "em-dash".into()],
-                    only: vec!["word-choice".into()],
-                    max_findings: 3,
-                    ..Settings::default()
-                },
-                files: args(&["a.md", "-", "--warn"]),
-                ..Options::default()
-            }
-        );
-    }
-
-    #[test]
-    fn rejects_unknown_rules_options_and_numbers() {
-        for (list, wanted) in [
-            (
-                &["--disable", "us-spellings"][..],
-                "unknown rule 'us-spellings'",
-            ),
-            (&["--colour"], "unknown option '--colour'"),
-            (&["-x"], "unknown option '-x'"),
-            (&["--max-findings=-1"], "'-1' is not a whole number"),
-            (&["--max-findings"], "--max-findings needs a value"),
-            (&["--warn=yes"], "--warn takes no value"),
-            (&["--profile=memo"], "unknown profile 'memo'"),
-            (&["--profile"], "--profile needs a value"),
-            (&["--sarif", "--metrics"], "--sarif and --metrics"),
-        ] {
-            let error = options(&args(list)).unwrap_err();
-            assert!(error.starts_with(wanted), "{list:?}: {error}");
-        }
-        let with_profile = options(&args(&["--profile", "report", "--metrics", "a.md"])).unwrap();
-        assert!(with_profile.metrics);
-        assert_eq!(
-            with_profile.settings.profile,
-            Some(laconic_check::profile::Profile::Report)
-        );
-    }
-
-    #[test]
-    fn the_command_line_adds_rules_to_the_project_file_and_overrides_its_count() {
-        let dir =
-            std::env::temp_dir().join(format!("laconic-check-options-{}", std::process::id()));
-        fs::create_dir_all(&dir).unwrap();
-        let config = dir.join("settings");
-        fs::write(
-            &config,
-            "\u{feff}# settings\n\ndisable = em-dash,\nonly = us-spelling\nmax-findings = 4\n",
-        )
-        .unwrap();
-        let config = config.to_str().unwrap();
-        let read = options(&args(&["--config", config, "--disable", "latin", "a.md"])).unwrap();
-        assert_eq!(read.settings.disable, ["em-dash", "latin"]);
-        assert_eq!(read.settings.only, ["us-spelling"]);
-        assert_eq!(read.settings.max_findings, 4);
-        let read = options(&args(&["--config", config, "--max-findings", "0", "a.md"])).unwrap();
-        assert_eq!(read.settings.max_findings, 0);
-        let missing = dir.join("missing");
-        let error = options(&args(&["--config", missing.to_str().unwrap()])).unwrap_err();
-        assert!(error.starts_with(missing.to_str().unwrap()), "{error}");
-    }
-
-    #[test]
-    fn a_commit_message_keeps_what_git_keeps_on_the_same_lines() {
-        let message = "fix: stop the color\n\n# Please enter the commit message\nBody text.\n\
-                       # ------------------------ >8 ------------------------\n\
-                       # Do not modify or remove the line above.\n+color\n";
-        assert_eq!(
-            commit_message(message),
-            "fix: stop the color\n\n\nBody text.\n"
-        );
-        assert_eq!(commit_message("one\r\n#two\r\n"), "one\n\n");
-    }
-}
+#[path = "main_tests.rs"]
+mod tests;

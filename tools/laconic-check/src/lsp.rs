@@ -15,7 +15,7 @@ use std::path::{Component, PathBuf};
 use crate::lint::{self, Finding, RuleRef};
 use crate::mcp::{self, Json, object, text};
 use crate::sarif;
-use crate::settings::{PROJECT_FILE, Settings};
+use crate::settings::{self, Settings};
 
 /// The longest message body, in bytes; a longer one is skipped without being held.
 const MAX_MESSAGE: usize = 16 << 20;
@@ -427,12 +427,9 @@ impl Server {
             .iter()
             .filter(|folder| path.starts_with(folder))
             .max_by_key(|folder| folder.components().count());
-        let Some(file) = folder.map(|folder| folder.join(PROJECT_FILE)) else {
+        let Some(file) = folder.and_then(|folder| settings::find_in(folder)) else {
             return Ok(Settings::default());
         };
-        if !file.is_file() {
-            return Ok(Settings::default());
-        }
         let shown = file.display().to_string();
         let body = fs::read_to_string(&file).map_err(|e| format!("{shown}: {e}"))?;
         Settings::parse(&shown, &body)

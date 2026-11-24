@@ -32,7 +32,7 @@ fn a_rules_section_error_names_its_line() {
     for (text, wanted) in [
         (
             "[rule]\n",
-            "f:1: unknown section '[rule]'; the only section is [rules]",
+            "f:1: unknown section '[rule]'; expected [rules] or [protect]",
         ),
         (
             "[rules]\n\nplain: utilise = use\ndisable = em-dash\n",
@@ -175,7 +175,7 @@ fn profile_and_opt_in_rules_follow_settings_and_accept_lists() {
     assert!(bad.contains("unknown profile 'memo'"), "{bad}");
 
     let docs = Settings::parse("f", "profile = docs\n").unwrap();
-    assert!(!docs.needs_opt_in());
+    assert!(docs.needs_opt_in());
     assert!(docs.is_advisory(&RuleId::NumberWord.into()));
 
     let only_opt = Settings::parse("f", "only = unglossed-term\n").unwrap();
@@ -198,4 +198,178 @@ fn profile_and_opt_in_rules_follow_settings_and_accept_lists() {
     let bold_findings = lint::lint(bold);
     assert_eq!(bold_findings.len(), 1);
     assert!(!docs.keeps(&bold_findings[0], "- **Three:** c"));
+}
+
+#[test]
+fn toml_syntax_and_protect_exemptions_work_across_rules() {
+    let toml = "\
+profile = \"chat\"
+max_findings = 2
+disable = [\"serial-comma\"]
+accept = [\"color\", \"QBR\"]
+
+[protect]
+phrases = [
+    \"deep dive\",
+    \"gates and seams\",
+    'here\u{2019}s the thing',
+    \"Best-in-Class\",
+]
+bottom line:
+\"moving pieces\"
+";
+    let settings = Settings::parse("laconic.toml", toml).unwrap();
+    assert_eq!(settings.profile, Some(crate::profile::Profile::Chat));
+    assert_eq!(settings.max_findings, 2);
+    assert_eq!(settings.disable, ["serial-comma"]);
+    assert_eq!(settings.accept, ["color", "QBR"]);
+    assert_eq!(
+        settings.protect,
+        [
+            "deep dive",
+            "gates and seams",
+            "here\u{2019}s the thing",
+            "Best-in-Class",
+            "bottom line:",
+            "moving pieces",
+        ]
+    );
+
+    // Protected phrase exempts only the matching span, not other findings on the same line.
+    let line = "A deep dive into gates and seams, plus circle back.\n";
+    let found = lint::lint_all(line);
+    let kept: Vec<&str> = found
+        .iter()
+        .filter(|f| settings.keeps(f, line))
+        .map(|f| f.rule.name())
+        .collect();
+    assert_eq!(kept, ["stock-phrase"]);
+
+    // Case-sensitive protection when phrase contains an uppercase letter.
+    let report = Settings::parse(
+        "laconic.toml",
+        "profile = \"report\"\n[protect]\nphrases = [\"Best-in-Class\"]\n",
+    )
+    .unwrap();
+    let upper = "This is a Best-in-Class parser.\n";
+    let lower = "This is a best-in-class parser.\n";
+    assert!(
+        lint::lint_all(upper)
+            .iter()
+            .all(|f| !report.keeps(f, upper))
+    );
+    assert!(lint::lint_all(lower).iter().any(|f| report.keeps(f, lower)));
+
+    // Curly/straight apostrophe equivalence and whitespace collapse.
+    let curly_line = "Here's   the thing about moving pieces.\n";
+    assert!(
+        lint::lint_all(curly_line)
+            .iter()
+            .all(|f| !settings.keeps(f, curly_line))
+    );
+}
+
+#[test]
+fn toml_and_protect_parse_errors_and_edge_cases() {
+    for (text, wanted) in [
+        ("profile = \"unterminated\n", "f:1: unterminated string"),
+        ("profile = 'unterminated\n", "f:1: unterminated string"),
+        ("profile = \"bad\\\n", "f:1: unterminated string"),
+        (
+            "disable = [\"em-dash\"\n",
+            "f:1: unterminated list for 'disable'",
+        ),
+        (
+            "[protect]\nphrases = [\"deep dive\"\n",
+            "f:2: unterminated list for 'phrases'",
+        ),
+        (
+            "[protect]\nother = [\"x\"]\n",
+            "f:2: unknown key 'other' in [protect]",
+        ),
+        ("[protect]\n\"\"\n", "f:2: protected phrase cannot be empty"),
+        (
+            "[protect]\nuse `code`\n",
+            "f:2: 'use `code`' is not a valid protected phrase",
+        ),
+        (
+            "only = [\"em-dash\", \"unterminated]\n",
+            "f:1: unterminated list for 'only'",
+        ),
+        (
+            "accept = [\"good\", \"bad word\"]\n",
+            "f:1: 'bad word' is not one word of letters",
+        ),
+        (
+            "accept = [\n\"bad word\"\n]\n",
+            "f:1: 'bad word' is not one word of letters",
+        ),
+        (
+            "accept = [\"good\"\n",
+            "f:1: unterminated list for 'accept'",
+        ),
+    ] {
+        let err = Settings::parse("f", text).unwrap_err();
+        assert!(err.starts_with(wanted), "{text:?}: {err}");
+    }
+
+    // Escaped quotes, comments in multiline arrays, bare items in brackets, and find_in precedence.
+    let escaped = Settings::parse(
+        "f",
+        "only = [em-dash, # comment\n\"us-spelling\"]\n[protect]\nphrases = [\"a \\\"b\\\" \\\\ \\x\"]\n",
+    )
+    .unwrap();
+    assert_eq!(escaped.only, ["em-dash", "us-spelling"]);
+    assert_eq!(
+        Settings::parse("f", "profile = 'report'\n")
+            .unwrap()
+            .profile,
+        Some(crate::profile::Profile::Report)
+    );
+    assert_eq!(escaped.protect, ["a \"b\" \\ \\x"]);
+    assert_eq!(
+        protect::unquote("\"a \\\"b\\\" \\\\ \\x\"").unwrap(),
+        "a \"b\" \\ \\x"
+    );
+    assert!(protect::unquote("\"a\\\"").is_err());
+    assert!(protect::parse_list("[\"a").is_err());
+    assert!(protect::parse_list("[\"a\\\"").is_err());
+    assert!(
+        protect::parse_list("[\"a\\]")
+            .unwrap_err()
+            .contains("unterminated escape")
+    );
+    assert!(
+        protect::parse_list("[\"a]")
+            .unwrap_err()
+            .contains("unterminated string")
+    );
+    assert!(
+        protect::unquote("\"a\\")
+            .unwrap_err()
+            .contains("unterminated string")
+    );
+    assert!(!protect::is_protected(&[], "abc", 1));
+    assert!(!protect::is_protected(&["abc".into()], "abc", 0));
+    assert!(!protect::is_protected(
+        &["deep dive".into()],
+        "xdeep dive",
+        2
+    ));
+    assert!(!protect::is_protected(
+        &["deep dive".into()],
+        "deep divex",
+        1
+    ));
+    assert!(!protect::is_protected(&["deep dive".into()], "deepdive", 1));
+
+    let dir = std::env::temp_dir().join(format!("laconic-find-in-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    assert_eq!(find_in(&dir), None);
+    std::fs::write(dir.join(PROJECT_FILE), "disable = em-dash\n").unwrap();
+    assert_eq!(find_in(&dir), Some(dir.join(PROJECT_FILE)));
+    std::fs::write(dir.join(TOML_PROJECT_FILE), "disable = [\"em-dash\"]\n").unwrap();
+    assert_eq!(find_in(&dir), Some(dir.join(TOML_PROJECT_FILE)));
+    let _ = std::fs::remove_dir_all(&dir);
 }

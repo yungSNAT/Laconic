@@ -161,22 +161,24 @@ fn json_reports_every_finding_and_the_counts() {
     assert_eq!(code, 1);
     let finding = |line: usize, column: usize, message: &str| {
         format!(
-            r#"{{"file":"two.md","line":{line},"column":{column},"rule":"us-spelling","advisory":false,"message":"{message}","url":"https://github.com/yungSNAT/Laconic/blob/main/docs/rules.md#us-spelling"}}"#
+            r#"{{"file":"two.md","line":{line},"column":{column},"rule":"us-spelling","advisory":false,"severity":"warning","confidence":"high","message":"{message}","url":"https://github.com/yungSNAT/Laconic/blob/main/docs/rules.md#us-spelling"}}"#
         )
     };
     let color = finding(1, 5, "'color': Australian form is 'colour'");
     let flavor = finding(3, 5, "'flavor': Australian form is 'flavour'");
+    let scope = laconic_check::lint::SCOPE_NOTE;
     assert_eq!(
         out,
-        format!(r#"{{"findings":[{color},{flavor},{color},{flavor}],"failing":4,"suppressed":1}}"#)
-            + "\n"
+        format!(
+            r#"{{"scope":"{scope}","findings":[{color},{flavor},{color},{flavor}],"failing":4,"suppressed":1}}"#
+        ) + "\n"
     );
     let clean = folder("json-clean", &[("clean.md", "Fine.\n")]);
     assert_eq!(
         lint(&clean, &["--json", "clean.md"]),
         (
             0,
-            "{\"findings\":[],\"failing\":0,\"suppressed\":0}\n".into(),
+            format!(r#"{{"scope":"{scope}","findings":[],"failing":0,"suppressed":0}}"#) + "\n",
             String::new()
         )
     );
@@ -670,4 +672,78 @@ fn metrics_reports_per_file_and_overall_summaries_in_text_and_json() {
     let (code, out, err) = lint(&dir, &["--sarif", "--metrics", "a.md"]);
     assert_eq!((code, out.as_str()), (2, ""));
     assert!(err.contains("--sarif and --metrics"), "{err}");
+}
+
+#[test]
+fn format_flag_confidence_scope_protect_and_substance_rules_work_end_to_end() {
+    let dir = folder(
+        "substance-protect",
+        &[
+            (
+                "laconic.toml",
+                "profile = \"report\"\n[protect]\nphrases = [\"deep dive\"]\n",
+            ),
+            (
+                "draft.md",
+                "We did a deep dive. It saves thousands of hours and is best-in-class. Studies show TBD.\n",
+            ),
+            ("chat.md", "Define clean gates and seams before coding.\n"),
+        ],
+    );
+    // `--format json` reads `laconic.toml`, protects 'deep dive', emits severity + confidence + scope.
+    let (code, out, err) = lint(&dir, &["--format", "json", "draft.md"]);
+    assert_eq!((code, err.as_str()), (0, ""), "{out}");
+    let doc = parse(&out).expect("valid JSON");
+    assert_eq!(
+        string(at(&doc, &["scope"])),
+        laconic_check::lint::SCOPE_NOTE
+    );
+    let items = array(at(&doc, &["findings"]));
+    let pairs: Vec<(&str, &str, &str)> = items
+        .iter()
+        .map(|f| {
+            (
+                string(at(f, &["rule"])),
+                string(at(f, &["severity"])),
+                string(at(f, &["confidence"])),
+            )
+        })
+        .collect();
+    assert!(
+        pairs.contains(&("unanchored-magnitude", "note", "low")),
+        "{pairs:?}"
+    );
+    assert!(
+        pairs.contains(&("unattributed-superlative", "note", "medium")),
+        "{pairs:?}"
+    );
+    assert!(
+        pairs.contains(&("unnamed-evidence", "note", "medium")),
+        "{pairs:?}"
+    );
+    assert!(
+        pairs.contains(&("ai-placeholder", "note", "high")),
+        "{pairs:?}"
+    );
+    assert!(
+        !pairs.iter().any(|(r, _, _)| *r == "stock-phrase"),
+        "{pairs:?}"
+    );
+
+    // `--format sarif` emits separate confidence property and non-authorship scope note.
+    let (code, sarif_out, err) = lint(&dir, &["--format=sarif", "draft.md"]);
+    assert_eq!((code, err.as_str()), (0, ""), "{sarif_out}");
+    let log = parse(&sarif_out).expect("valid SARIF");
+    assert_eq!(
+        string(at(&log, &["runs", "0", "properties", "scope"])),
+        laconic_check::lint::SCOPE_NOTE
+    );
+    let first = &array(at(&log, &["runs", "0", "results"]))[0];
+    string(at(first, &["properties", "confidence"]));
+    string(at(first, &["properties", "severity"]));
+
+    // Chat profile tightens `chat-filler` ('gates and seams') to a failing finding.
+    let (code, out, err) = lint(&dir, &["--profile", "chat", "chat.md"]);
+    assert_eq!((code, err.as_str()), (1, ""), "{out}");
+    assert!(out.contains("chat-filler"), "{out}");
 }

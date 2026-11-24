@@ -14,7 +14,7 @@ use std::io::{self, Read, Write};
 use std::path::Path;
 use std::process::{Command, ExitCode, Stdio};
 
-use crate::settings::{self, PROJECT_FILE, Settings};
+use crate::settings::{self, Settings};
 
 /// Windows caps a command line at 32,767 characters, so `lint` runs on batches of files whose
 /// paths take at most this many UTF-16 units, counting 3 for each path's separator and quotes.
@@ -324,9 +324,11 @@ fn max_findings(args: &[&str]) -> usize {
         return settings::count(value).unwrap_or(usize::MAX);
     }
     let path = config
-        .or_else(|| Path::new(PROJECT_FILE).is_file().then_some(PROJECT_FILE))
-        .filter(|path| !path.is_empty());
-    path.and_then(|path| Settings::read(path).ok())
+        .filter(|path| !path.is_empty())
+        .map(str::to_owned)
+        .or_else(|| settings::find_in(Path::new(".")).map(|p| p.to_string_lossy().into_owned()));
+    path.as_deref()
+        .and_then(|path| Settings::read(path).ok())
         .map_or(0, |settings| settings.max_findings)
 }
 

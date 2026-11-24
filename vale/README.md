@@ -54,6 +54,11 @@ Not generated, and why:
 | `acronym-before-definition` | It compares uses and definitions across the document |
 | `unglossed-term` | It checks whether each unfamiliar acronym is glossed earlier in the document |
 | `bold-label` | It counts consecutive list items |
+| `unanchored-magnitude` | It checks the surrounding sentence for citations, denominators, links or timeframes |
+| `unattributed-superlative` | It checks the surrounding sentence for a baseline or named source |
+| `unnamed-evidence` | It checks the surrounding sentence for a named source or citation |
+| `ai-placeholder` | It is an opt-in prose rule that skips inline code and fenced blocks |
+| `chat-filler` | It is an opt-in chat-profile rule targeting architectural plan filler |
 | `unused-suppression` | Vale has its own comments for turning rules off |
 
 ## Tests

@@ -12,7 +12,7 @@ use std::process::{Command, Stdio};
 
 use crate::lint;
 use crate::mcp::{self, Json};
-use crate::settings::{PROJECT_FILE, Settings};
+use crate::settings::{self, LineProtectCache, Settings};
 
 /// The findings a block decision lists; it gives the number of the rest.
 const LISTED: usize = 50;
@@ -62,22 +62,19 @@ fn failing(root: &Path, file: &Path, settings: &Settings) -> Result<Vec<String>,
     let path = file.display();
     let text = fs::read_to_string(root.join(file)).map_err(|e| format!("{path}: {e}"))?;
     let lines: Vec<&str> = text.lines().collect();
+    let mut protect_cache = LineProtectCache::default();
     Ok(
         lint::lint_counting_with(&text, &settings.rules, settings.needs_opt_in())
             .0
             .into_iter()
             .filter(|f| {
                 let line = f.line.checked_sub(1).and_then(|i| lines.get(i)).copied();
-                !settings.is_advisory(&f.rule) && settings.keeps(f, line.unwrap_or(""))
+                !settings.is_advisory(&f.rule)
+                    && settings.keeps_cached(f, line.unwrap_or(""), &mut protect_cache)
             })
             .map(|f| {
-                format!(
-                    "{path}:{}:{}: {}: {}",
-                    f.line,
-                    f.column,
-                    f.rule.name(),
-                    f.message
-                )
+                let msg = settings.format_message(&f.rule, &f.message);
+                format!("{path}:{}:{}: {}: {msg}", f.line, f.column, f.rule.name())
             })
             .collect(),
     )
@@ -154,10 +151,9 @@ fn path(bytes: &[u8]) -> Result<PathBuf, String> {
 
 /// The project file at the repository's top level, or the default settings without one.
 fn settings(root: &Path) -> Result<Settings, String> {
-    let file = root.join(PROJECT_FILE);
-    if !file.is_file() {
+    let Some(file) = settings::find_in(root) else {
         return Ok(Settings::default());
-    }
+    };
     let shown = file.display().to_string();
     let body = fs::read_to_string(&file).map_err(|e| format!("{shown}: {e}"))?;
     Settings::parse(&shown, &body)

@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::*;
+use crate::settings::PROJECT_FILE;
 
 /// A new Git repository in a fresh temporary directory.
 fn repository(name: &str) -> PathBuf {

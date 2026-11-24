@@ -44,6 +44,26 @@ pub const NOT_GENERATED: &[(&str, &str)] = &[
     ),
     ("bold-label", "counts consecutive list items"),
     (
+        "unanchored-magnitude",
+        "checks the surrounding sentence for citations, denominators, links or timeframes",
+    ),
+    (
+        "unattributed-superlative",
+        "checks the surrounding sentence for a baseline or named source",
+    ),
+    (
+        "unnamed-evidence",
+        "checks the surrounding sentence for a named source or citation",
+    ),
+    (
+        "ai-placeholder",
+        "opt-in prose rule that skips inline code and fenced blocks",
+    ),
+    (
+        "chat-filler",
+        "opt-in chat-profile rule targeting architectural plan filler",
+    ),
+    (
         "unused-suppression",
         "Vale has its own comments for turning rules off",
     ),

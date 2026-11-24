@@ -1,19 +1,40 @@
 // Copyright 2026 Ryan Duguid
 // SPDX-License-Identifier: Apache-2.0
 
-//! `lint`'s project settings, the `.laconic-check` file, which the command line, the MCP
-//! server and the language server all apply.
+//! `lint`'s project settings, read from `laconic.toml` or `.laconic-check`, which the command
+//! line, the MCP server, the language server and the Stop hook all apply.
 
+use std::path::{Path, PathBuf};
 use std::rc::Rc;
 
 use crate::lint::{self, Finding, Phrase, ProjectRule, RuleId, RuleRef};
 use crate::profile::Profile;
 
-/// The project file `lint` and the MCP server read from the current directory, and the
-/// language server from the workspace folder that holds a document.
+pub(crate) mod protect;
+pub use protect::{LineProtectCache, ProtectList};
+
+/// The legacy dotfile `lint` reads when `laconic.toml` is absent.
 pub const PROJECT_FILE: &str = ".laconic-check";
 
-/// Which findings `lint` reports, how many fail it, and the project's own rules.
+/// The TOML project file `lint` checks before `.laconic-check`.
+pub const TOML_PROJECT_FILE: &str = "laconic.toml";
+
+/// Returns the first project file present in `dir`: `laconic.toml`, then `.laconic-check`.
+pub fn find_in(dir: &Path) -> Option<PathBuf> {
+    for name in [TOML_PROJECT_FILE, PROJECT_FILE] {
+        let candidate = if dir == Path::new(".") {
+            PathBuf::from(name)
+        } else {
+            dir.join(name)
+        };
+        if candidate.is_file() {
+            return Some(candidate);
+        }
+    }
+    None
+}
+
+/// Which findings `lint` reports, how many fail it, author-protected phrases and project rules.
 #[derive(Debug, Default, PartialEq)]
 pub struct Settings {
     pub disable: Vec<String>,
@@ -23,77 +44,175 @@ pub struct Settings {
     pub profile: Option<Profile>,
     /// Words `us-spelling` and `unglossed-term` do not flag, matched as written: whole word.
     pub accept: Vec<String>,
+    /// Author signature idioms/phrases exempt from lint findings on matching spans.
+    pub protect: ProtectList,
     /// The `[rules]` section's rules, in the order the file first names them.
     pub rules: Vec<Rc<ProjectRule>>,
 }
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Section {
+    Top,
+    Rules,
+    Protect,
+}
+
+#[derive(Clone, Copy)]
+enum ListTarget {
+    Disable,
+    Only,
+    Accept,
+    Protect,
+}
+
+impl ListTarget {
+    fn key(self) -> &'static str {
+        match self {
+            Self::Disable => "disable",
+            Self::Only => "only",
+            Self::Accept => "accept",
+            Self::Protect => "phrases",
+        }
+    }
+}
+
 impl Settings {
-    /// A project file: `key = value` lines for `disable`, `only`, `max-findings` and `accept`,
-    /// then optionally a `[rules]` section of `id: phrase = replacement` lines, with blank
-    /// lines and lines that start with `#` ignored. `path` names it in errors.
+    /// Parses a `.laconic-check` or `laconic.toml` project file. Top-level `key = value` lines
+    /// configure `disable`, `only`, `max-findings` (`max_findings`), `profile` and `accept`,
+    /// followed optionally by `[rules]` (`id: phrase = replacement`) and `[protect]` (author
+    /// phrases exempt from lint rules, as `phrases = [...]` or one phrase per line).
     pub fn parse(path: &str, text: &str) -> Result<Settings, String> {
         let mut settings = Settings::default();
         let mut rules: Vec<ProjectRule> = Vec::new();
-        // Each phrase's line, for a duplicate's error.
         let mut phrase_lines: Vec<(String, usize)> = Vec::new();
-        // Rule names in disable and only, checked once every project rule is known.
         let mut named: Vec<(usize, String)> = Vec::new();
-        let mut in_rules = false;
-        for (index, line) in text.trim_start_matches('\u{feff}').lines().enumerate() {
-            let line = line.trim();
+        let mut section = Section::Top;
+        let mut pending: Option<(usize, ListTarget, String)> = None;
+
+        for (index, raw) in text.trim_start_matches('\u{feff}').lines().enumerate() {
+            let line = raw.trim();
             let number = index + 1;
             let at = |message: String| format!("{path}:{number}: {message}");
+
+            if let Some((start_line, target, mut buf)) = pending.take() {
+                buf.push('\n');
+                buf.push_str(line);
+                if bracket_balanced(&buf) {
+                    apply_list_key(&mut settings, &mut named, target, &buf, start_line)
+                        .map_err(|m| format!("{path}:{start_line}: {m}"))?;
+                } else {
+                    pending = Some((start_line, target, buf));
+                }
+                continue;
+            }
+
             if line.is_empty() || line.starts_with('#') {
                 continue;
             }
             if line.starts_with('[') {
-                if line != "[rules]" {
-                    return Err(at(format!(
-                        "unknown section '{line}'; the only section is [rules]"
-                    )));
-                }
-                in_rules = true;
+                let header = protect::strip_comment(line);
+                section = match header {
+                    "[rules]" => Section::Rules,
+                    "[protect]" => Section::Protect,
+                    _ => {
+                        return Err(at(format!(
+                            "unknown section '{header}'; expected [rules] or [protect]"
+                        )));
+                    }
+                };
                 continue;
             }
-            if in_rules {
-                let (id, phrase) = rule_line(line).map_err(at)?;
-                if let Some((_, first)) = phrase_lines.iter().find(|(p, _)| *p == phrase.text) {
-                    return Err(at(format!(
-                        "'{}' is already a rule on line {first}",
-                        phrase.text
-                    )));
-                }
-                phrase_lines.push((phrase.text.clone(), number));
-                let name = format!("project/{id}");
-                match rules.iter_mut().find(|r| r.name == name) {
-                    Some(rule) => rule.phrases.push(phrase),
-                    None => rules.push(ProjectRule {
-                        name,
-                        phrases: vec![phrase],
-                    }),
-                }
-                continue;
-            }
-            let Some((key, value)) = line.split_once('=') else {
-                return Err(at(format!("expected 'key = value', found '{line}'")));
-            };
-            let value = value.trim();
-            match key.trim() {
-                "disable" | "only" => {
-                    let names = rule_names(value);
-                    named.extend(names.iter().map(|n| (number, n.clone())));
-                    if key.trim() == "disable" {
-                        settings.disable.extend(names);
-                    } else {
-                        settings.only.extend(names);
+
+            match section {
+                Section::Rules => {
+                    let (id, phrase) = rule_line(line).map_err(at)?;
+                    if let Some((_, first)) = phrase_lines.iter().find(|(p, _)| *p == phrase.text) {
+                        return Err(at(format!(
+                            "'{}' is already a rule on line {first}",
+                            phrase.text
+                        )));
+                    }
+                    phrase_lines.push((phrase.text.clone(), number));
+                    let name = format!("project/{id}");
+                    match rules.iter_mut().find(|r| r.name == name) {
+                        Some(rule) => rule.phrases.push(phrase),
+                        None => rules.push(ProjectRule {
+                            name,
+                            phrases: vec![phrase],
+                        }),
                     }
                 }
-                "max-findings" => settings.max_findings = count(value).map_err(at)?,
-                "profile" => settings.profile = Some(profile(value).map_err(at)?),
-                "accept" => settings.accept.extend(words(value).map_err(at)?),
-                key => return Err(at(format!("unknown key '{key}'"))),
+                Section::Protect => {
+                    let clean = protect::strip_comment(line);
+                    if let Some((key, value)) = clean.split_once('=') {
+                        let key = key.trim();
+                        if key != "phrases" {
+                            return Err(at(format!(
+                                "unknown key '{key}' in [protect]; use 'phrases = [...]' or list one phrase per line"
+                            )));
+                        }
+                        let value = value.trim();
+                        if value.starts_with('[') && !bracket_balanced(value) {
+                            pending = Some((number, ListTarget::Protect, value.to_owned()));
+                        } else {
+                            apply_list_key(
+                                &mut settings,
+                                &mut named,
+                                ListTarget::Protect,
+                                value,
+                                number,
+                            )
+                            .map_err(at)?;
+                        }
+                    } else {
+                        let decoded = protect::decode_value(clean).map_err(at)?;
+                        let phrase = protect::normalise_phrase_text(&decoded).map_err(at)?;
+                        settings.push_protect(phrase);
+                    }
+                }
+                Section::Top => {
+                    let Some((key, value)) = line.split_once('=') else {
+                        return Err(at(format!("expected 'key = value', found '{line}'")));
+                    };
+                    let key = key.trim();
+                    let value = value.trim();
+                    let target = match key {
+                        "disable" => Some(ListTarget::Disable),
+                        "only" => Some(ListTarget::Only),
+                        "accept" => Some(ListTarget::Accept),
+                        _ => None,
+                    };
+                    if let Some(target) = target {
+                        if value.starts_with('[') && !bracket_balanced(value) {
+                            pending = Some((number, target, value.to_owned()));
+                        } else {
+                            apply_list_key(&mut settings, &mut named, target, value, number)
+                                .map_err(at)?;
+                        }
+                        continue;
+                    }
+                    match key {
+                        "max-findings" | "max_findings" => {
+                            let val = protect::strip_comment(value);
+                            settings.max_findings = count(val).map_err(at)?;
+                        }
+                        "profile" => {
+                            let val = protect::decode_value(value).map_err(at)?;
+                            settings.profile = Some(profile(&val).map_err(at)?);
+                        }
+                        _ => return Err(at(format!("unknown key '{key}'"))),
+                    }
+                }
             }
         }
+
+        if let Some((start_line, target, _)) = pending {
+            return Err(format!(
+                "{path}:{start_line}: unterminated list for '{}'",
+                target.key()
+            ));
+        }
+
         settings.rules = rules.into_iter().map(Rc::new).collect();
         for (number, name) in named {
             settings
@@ -109,12 +228,12 @@ impl Settings {
         Settings::parse(path, &text)
     }
 
-    /// The project file in the current directory, or the defaults when there is none.
+    /// The project file in the current directory (`laconic.toml` or `.laconic-check`),
+    /// or the defaults when neither is present.
     pub fn current_dir() -> Result<Settings, String> {
-        if std::path::Path::new(PROJECT_FILE).is_file() {
-            Settings::read(PROJECT_FILE)
-        } else {
-            Ok(Settings::default())
+        match find_in(Path::new(".")) {
+            Some(path) => Settings::read(&path.to_string_lossy()),
+            None => Ok(Settings::default()),
         }
     }
 
@@ -145,6 +264,10 @@ impl Settings {
         self.profile.is_some_and(|p| p.enables_opt_in())
     }
 
+    fn push_protect(&mut self, phrase: String) {
+        self.protect.push(phrase);
+    }
+
     /// Effective advisory flag for `rule`, after any active register profile.
     pub fn is_advisory(&self, rule: &RuleRef) -> bool {
         match (self.profile, rule.house()) {
@@ -153,8 +276,46 @@ impl Settings {
         }
     }
 
+    /// Aligns a built-in finding's `(advisory)` tag with its effective advisory state under the
+    /// active profile, so text output and Action runners agree when a profile tightens or relaxes
+    /// a rule without modifying user-authored `[rules]` messages.
+    pub fn format_message(&self, rule: &RuleRef, message: &str) -> String {
+        let Some(id) = rule.house() else {
+            return message.to_owned();
+        };
+        let advisory = self.is_advisory(rule);
+        if advisory == id.rule().advisory {
+            return message.to_owned();
+        }
+        if advisory {
+            format!("{message} (advisory)")
+        } else {
+            message.replacen(" (advisory)", "", 1)
+        }
+    }
+
     /// Whether `lint` reports a finding, given the text of the line it is on.
     pub fn keeps(&self, finding: &Finding, line: &str) -> bool {
+        self.keeps_inner(finding, line, None)
+    }
+
+    /// Like [`Settings::keeps`], reusing per-line protected spans via `cache` so long lines with
+    /// many findings stay linear in line length.
+    pub fn keeps_cached(
+        &self,
+        finding: &Finding,
+        line: &str,
+        cache: &mut LineProtectCache,
+    ) -> bool {
+        self.keeps_inner(finding, line, Some(cache))
+    }
+
+    fn keeps_inner(
+        &self,
+        finding: &Finding,
+        line: &str,
+        cache: Option<&mut LineProtectCache>,
+    ) -> bool {
         let name = finding.rule.name();
         let listed = |names: &[String]| names.iter().any(|n| n == name);
         if listed(&self.disable) {
@@ -173,8 +334,17 @@ impl Settings {
                 return false;
             }
         }
-        // A `us-spelling` or `unglossed-term` finding's column is the first letter of a whole
-        // run of letters, so the letters from there are that word.
+        if !self.protect.is_empty() {
+            let protected = match cache {
+                Some(cache) => {
+                    cache.contains(self.protect.items(), finding.line, line, finding.column)
+                }
+                None => protect::is_protected(self.protect.items(), line, finding.column),
+            };
+            if protected {
+                return false;
+            }
+        }
         let word_at = || -> String {
             line.chars()
                 .skip(finding.column.saturating_sub(1))
@@ -193,6 +363,73 @@ impl Settings {
         }
         true
     }
+}
+
+fn bracket_balanced(text: &str) -> bool {
+    let mut in_quote: Option<char> = None;
+    let mut escape = false;
+    let mut depth = 0usize;
+    let mut chars = text.chars();
+    while let Some(c) = chars.next() {
+        if let Some(q) = in_quote {
+            if q == '"' && escape {
+                escape = false;
+            } else if q == '"' && c == '\\' {
+                escape = true;
+            } else if c == q {
+                in_quote = None;
+            }
+            continue;
+        }
+        match c {
+            '#' => {
+                for ch in chars.by_ref() {
+                    if ch == '\n' {
+                        break;
+                    }
+                }
+            }
+            '"' | '\'' => in_quote = Some(c),
+            '[' => depth += 1,
+            ']' => depth = depth.saturating_sub(1),
+            _ => {}
+        }
+    }
+    depth == 0
+}
+
+fn apply_list_key(
+    settings: &mut Settings,
+    named: &mut Vec<(usize, String)>,
+    target: ListTarget,
+    value: &str,
+    line_no: usize,
+) -> Result<(), String> {
+    let items = protect::parse_list(value)?;
+    match target {
+        ListTarget::Disable => {
+            named.extend(items.iter().map(|n| (line_no, n.clone())));
+            settings.disable.extend(items);
+        }
+        ListTarget::Only => {
+            named.extend(items.iter().map(|n| (line_no, n.clone())));
+            settings.only.extend(items);
+        }
+        ListTarget::Accept => {
+            for word in items {
+                if !word.chars().all(char::is_alphabetic) {
+                    return Err(format!("'{word}' is not one word of letters"));
+                }
+                settings.accept.push(word);
+            }
+        }
+        ListTarget::Protect => {
+            for decoded in items {
+                settings.push_protect(protect::normalise_phrase_text(&decoded)?);
+            }
+        }
+    }
+    Ok(())
 }
 
 /// A `[rules]` line, `id: phrase = replacement`: the id, of lower-case letters, digits and
@@ -261,21 +498,6 @@ pub fn profile(value: &str) -> Result<Profile, String> {
             Profile::NAMES.join(", ")
         )
     })
-}
-
-/// A comma-separated list of words, each made of letters only.
-fn words(list: &str) -> Result<Vec<String>, String> {
-    list.split(',')
-        .map(str::trim)
-        .filter(|word| !word.is_empty())
-        .map(|word| {
-            if word.chars().all(char::is_alphabetic) {
-                Ok(word.to_owned())
-            } else {
-                Err(format!("'{word}' is not one word of letters"))
-            }
-        })
-        .collect()
 }
 
 #[cfg(test)]

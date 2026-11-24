@@ -15,7 +15,7 @@ use std::path::{Component, PathBuf};
 use crate::lint::{self, Finding, RuleRef};
 use crate::mcp::{self, Json, object, text};
 use crate::sarif;
-use crate::settings::{PROJECT_FILE, Settings};
+use crate::settings::{self, LineProtectCache, Settings};
 
 /// The longest message body, in bytes; a longer one is skipped without being held.
 const MAX_MESSAGE: usize = 16 << 20;
@@ -300,16 +300,18 @@ impl Server {
         let lines: Vec<&str> = body.lines().collect();
         let width = self.width();
         let found = lint::lint_counting_with(body, &settings.rules, settings.needs_opt_in()).0;
+        let mut protect_cache = LineProtectCache::default();
         found
             .into_iter()
-            .filter_map(|finding| {
+            .filter_map(|mut finding| {
                 let line = lines
                     .get(finding.line.checked_sub(1)?)
                     .copied()
                     .unwrap_or("");
-                if !settings.keeps(&finding, line) {
+                if !settings.keeps_cached(&finding, line, &mut protect_cache) {
                     return None;
                 }
+                finding.message = settings.format_message(&finding.rule, &finding.message);
                 let (start, end) = sarif::span(line, finding.column, width);
                 Some((finding, start, end))
             })
@@ -427,12 +429,9 @@ impl Server {
             .iter()
             .filter(|folder| path.starts_with(folder))
             .max_by_key(|folder| folder.components().count());
-        let Some(file) = folder.map(|folder| folder.join(PROJECT_FILE)) else {
+        let Some(file) = folder.and_then(|folder| settings::find_in(folder)) else {
             return Ok(Settings::default());
         };
-        if !file.is_file() {
-            return Ok(Settings::default());
-        }
         let shown = file.display().to_string();
         let body = fs::read_to_string(&file).map_err(|e| format!("{shown}: {e}"))?;
         Settings::parse(&shown, &body)

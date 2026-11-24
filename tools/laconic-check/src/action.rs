@@ -14,7 +14,7 @@ use std::io::{self, Read, Write};
 use std::path::Path;
 use std::process::{Command, ExitCode, Stdio};
 
-use crate::settings::{self, PROJECT_FILE, Settings};
+use crate::settings::{self, Settings};
 
 /// Windows caps a command line at 32,767 characters, so `lint` runs on batches of files whose
 /// paths take at most this many UTF-16 units, counting 3 for each path's separator and quotes.
@@ -57,12 +57,36 @@ pub fn run(files: &str, args: &str, exe: &Path, out: &mut impl Write) -> u8 {
         .split([' ', '\t', '\n'])
         .filter(|arg| !arg.is_empty())
         .collect();
-    for arg in &args {
-        if matches!(*arg, "--json" | "--sarif") {
+    let mut iter = args.iter();
+    while let Some(&arg) = iter.next() {
+        if arg == "--" {
+            break;
+        }
+        if matches!(arg, "--json" | "--sarif") {
             let message = format!(
                 "::error::the Action reads lint's text output, so args cannot include {arg}"
             );
             return fail(out, &message);
+        }
+        if arg == "--format" {
+            if iter.next().copied() != Some("text") {
+                return fail(
+                    out,
+                    "::error::the Action reads lint's text output, so args cannot include --format other than text",
+                );
+            }
+        } else if let Some(fmt) = arg.strip_prefix("--format=") {
+            if fmt != "text" {
+                let message = format!(
+                    "::error::the Action reads lint's text output, so args cannot include {arg}"
+                );
+                return fail(out, &message);
+            }
+        } else if matches!(
+            arg,
+            "--config" | "--profile" | "--max-findings" | "--only" | "--disable"
+        ) {
+            iter.next();
         }
     }
     let warn = args.contains(&"--warn");
@@ -307,7 +331,7 @@ fn max_findings(args: &[&str]) -> usize {
             "--" => break,
             "--max-findings" => max = rest.next().copied(),
             "--config" => config = rest.next().copied(),
-            "--disable" | "--only" | "--profile" => {
+            "--disable" | "--only" | "--profile" | "--format" => {
                 rest.next();
             }
             _ => {
@@ -324,9 +348,11 @@ fn max_findings(args: &[&str]) -> usize {
         return settings::count(value).unwrap_or(usize::MAX);
     }
     let path = config
-        .or_else(|| Path::new(PROJECT_FILE).is_file().then_some(PROJECT_FILE))
-        .filter(|path| !path.is_empty());
-    path.and_then(|path| Settings::read(path).ok())
+        .filter(|path| !path.is_empty())
+        .map(str::to_owned)
+        .or_else(|| settings::find_in(Path::new(".")).map(|p| p.to_string_lossy().into_owned()));
+    path.as_deref()
+        .and_then(|path| Settings::read(path).ok())
         .map_or(0, |settings| settings.max_findings)
 }
 

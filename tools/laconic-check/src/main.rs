@@ -447,5 +447,5 @@ fn stop_hook() -> ExitCode {
 }
 
 #[cfg(test)]
-#[path = "main_tests.rs"]
+#[path = "main/tests.rs"]
 mod tests;

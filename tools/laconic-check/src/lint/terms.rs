@@ -48,20 +48,21 @@ pub(super) fn candidate(word: &str) -> Option<&str> {
     ((3..=8).contains(&base.len()) && base.bytes().all(|b| b.is_ascii_uppercase())).then_some(base)
 }
 
-/// Ordinary words written in capitals for emphasis, which have an acronym's shape. Kept sorted
-/// for binary search.
+/// Ordinary words written in capitals for emphasis, which have an acronym's shape, with the
+/// parts of contractions before the apostrophe ('DON'T'). Words that are also common acronyms,
+/// such as CAN and FIX, are left out. Kept sorted for binary search.
 const SHOUTED_WORDS: &[&str] = &[
-    "ALL", "ALSO", "AND", "ANY", "ARE", "BAD", "BEST", "BOTH", "BUT", "CAN", "DONE", "EACH", "END",
-    "ERROR", "EVER", "EVERY", "FAIL", "FALSE", "FIRST", "FIX", "FOR", "FREE", "FROM", "GOOD",
-    "HAS", "HAVE", "HERE", "LAST", "LESS", "MORE", "MOST", "MUST", "NEVER", "NEW", "NONE", "NOT",
-    "NOTE", "NOW", "OFF", "ONE", "ONLY", "OUT", "OWN", "READ", "SAME", "SHALL", "STOP", "THAT",
-    "THE", "THEN", "THIS", "TRUE", "TWO", "USE", "VERY", "WARNING", "WAS", "WHAT", "WHEN", "WHY",
-    "WILL", "WITH", "YES", "YOU", "YOUR",
+    "ALL", "ALSO", "ALWAYS", "AND", "ANY", "ARE", "BAD", "BEST", "BOTH", "BUT", "DOESN", "DON",
+    "DONE", "EACH", "END", "ERROR", "EVER", "EVERY", "FAIL", "FALSE", "FIRST", "FOR", "FREE",
+    "FROM", "GOOD", "HAS", "HAVE", "HERE", "ISN", "LAST", "LESS", "MORE", "MOST", "MUST", "NEVER",
+    "NEW", "NONE", "NOT", "NOTE", "NOW", "OFF", "ONE", "ONLY", "OUT", "OWN", "READ", "SAME",
+    "SHALL", "STOP", "THAT", "THE", "THEN", "THIS", "TRUE", "TWO", "USE", "VERY", "WARNING", "WAS",
+    "WHAT", "WHEN", "WHY", "WILL", "WITH", "WON", "YES", "YOU", "YOUR",
 ];
 
 /// English endings that mark 5 or more capitals as a shouted word ('FAILED', 'TESTING',
-/// 'MAINLY'), since acronyms that long rarely end so. Shorter forms are left to SHOUTED_WORDS,
-/// where 'LED' and 'RED' collide.
+/// 'MAINLY'), since acronyms that long rarely end so; the price is the rare one that does, such
+/// as CREST. Shorter forms are left to SHOUTED_WORDS, where 'LED' and 'RED' collide.
 const INFLECTIONS: &[&str] = &[
     "ED", "ING", "LY", "TION", "SION", "MENT", "NESS", "ABLE", "IBLE", "FUL", "LESS", "EST", "IES",
     "OUS", "IVE", "ANCE", "ENCE",
@@ -76,21 +77,11 @@ pub(super) fn is_exempt(acronym: &str) -> bool {
         || (acronym.len() >= 5 && INFLECTIONS.iter().any(|end| acronym.ends_with(end)))
 }
 
-/// True when the words around an acronym explain it without spelling it: prose run straight
-/// into a bracket that closes after it ('where the code came from (SLSA)'), a phrase before it
-/// that names it ('is called SLSA', 'known as SLSA') or one after it that expands it ('SLSA
-/// stands for', 'SLSA is short for').
+/// True when a phrase names the acronym without spelling it: before it, a naming frame ('is
+/// called SLSA', 'known as SLSA'), not the verbs alone ('the minister called ASIC'); after it,
+/// an expansion cue ('SLSA stands for', 'SLSA, short for'). 'Means' is left out, since 'the NDIS
+/// means families pay less' explains nothing.
 pub(super) fn is_named(before: &[char], after: &[char]) -> bool {
-    if let Some((&'(', prose)) = before.split_last()
-        && after.first() == Some(&')')
-        && prose
-            .iter()
-            .rev()
-            .find(|c| !c.is_whitespace())
-            .is_some_and(|c| c.is_lowercase())
-    {
-        return true;
-    }
     let lower = |chars: &[char]| -> String {
         chars
             .iter()
@@ -98,22 +89,33 @@ pub(super) fn is_named(before: &[char], after: &[char]) -> bool {
             .collect()
     };
     let tail = lower(&before[before.len().saturating_sub(40)..]);
-    let head = lower(&after[..after.len().min(20)]);
+    let head = lower(&after[..after.len().min(24)]);
     let tail = tail.trim_end();
     [
-        " called",
-        " named",
+        " is called",
+        " are called",
+        " was called",
+        " were called",
+        " be called",
+        ", called",
+        " is named",
+        ", named",
         " known as",
-        " termed",
-        " short for",
+        " is termed",
+        ", termed",
         " an acronym for",
         " abbreviated as",
     ]
     .iter()
-    .any(|cue| tail.ends_with(cue) || tail == &cue[1..])
-        || [" stands for", " means", " is short for"]
-            .iter()
-            .any(|cue| head.starts_with(cue))
+    .any(|cue| tail.ends_with(cue))
+        || [
+            " stands for",
+            " is short for",
+            ", short for",
+            ", which stands for",
+        ]
+        .iter()
+        .any(|cue| head.starts_with(cue))
 }
 
 /// True when the word at `masked[start..end]` sits next to another all-uppercase word
@@ -229,10 +231,32 @@ mod tests {
         assert!(is_named(&chars("The format is called "), &chars(".")));
         assert!(is_named(&chars("The format, known as "), &chars(", is")));
         assert!(is_named(&chars(""), &chars(" stands for Static")));
-        assert!(is_named(&chars("came from ("), &chars(").")));
+        assert!(is_named(&chars("This list is also known as "), &chars(".")));
+        assert!(is_named(&chars(""), &chars(", short for Supply-chain")));
+        assert!(!is_named(
+            &chars("The minister called "),
+            &chars(" on Monday.")
+        ));
+        assert!(!is_named(
+            &chars("The report named "),
+            &chars(" as the lead.")
+        ));
+        assert!(!is_named(
+            &chars("The "),
+            &chars(" means families pay less.")
+        ));
+        assert!(!is_named(&chars("4.1 per cent ("), &chars(").")));
+        assert!(is_named(&chars("Such files are called "), &chars(".")));
         assert!(!is_named(&chars("We called the "), &chars(" team.")));
+        assert!(!is_named(&chars("We called "), &chars(" yesterday.")));
+        assert!(!is_named(
+            &chars("The report ("),
+            &chars(") was published.")
+        ));
+        // A real acronym an exemption hides: the cost of the inflection test.
+        assert!(is_exempt("CREST"));
+        assert!(!is_exempt("CAN"));
         assert!(!is_named(&chars("Ayoub G. ("), &chars(").")));
-        assert!(!is_named(&chars("came from ("), &chars(" and")));
     }
 
     #[test]

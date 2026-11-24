@@ -179,7 +179,7 @@ Example: `The BOM forecast came from the Bureau of Meteorology (BOM), which`.
 
 ### unglossed-term
 
-An unfamiliar uppercase acronym of 3 to 8 capitals used without an earlier gloss such as 'Full Name (ACR)', 'ACR (Full Name)', an explanation run into the bracket ('where the code came from (SLSA)') or a naming phrase ('called SLSA', 'SLSA stands for'). The Style Manual's examples (ACT, BHP, DNA), other widely known forms, Roman numerals, words in capitals for emphasis ('NOTE', 'FAILED') and runs of capitals pass. Enabled by --only, a project file or the email, report and essay profiles.
+An unfamiliar uppercase acronym of 3 to 8 capitals used without an earlier gloss such as 'Full Name (ACR)', 'ACR (Full Name)' or a naming phrase ('is called SLSA', 'known as SLSA', 'SLSA stands for'). The Style Manual's examples (ACT, BHP, DNA), other widely known forms, Roman numerals, words in capitals for emphasis ('NOTE', 'FAILED') and runs of capitals pass. Enabled by --only, a project file or the email, report and essay profiles.
 
 Fails `lint`: no (advisory, opt-in). Style Manual: [Shortened forms](../skills/laconic-prose/references/style-manual-rules.md#shortened-forms). Human prose: 209 findings, 1.02 per 1,000 words. Outside articles: flags 17 of 75 held out (19 findings) and 22 of 75 for calibration.
 

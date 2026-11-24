@@ -164,7 +164,7 @@ rules! {
     UnglossedTerm = opt_in_advisory(
         "unglossed-term",
         Some("Shortened forms"),
-        "An unfamiliar uppercase acronym of 3 to 8 capitals used without an earlier gloss such as 'Full Name (ACR)', 'ACR (Full Name)', an explanation run into the bracket ('where the code came from (SLSA)') or a naming phrase ('called SLSA', 'SLSA stands for'). The Style Manual's examples (ACT, BHP, DNA), other widely known forms, Roman numerals, words in capitals for emphasis ('NOTE', 'FAILED') and runs of capitals pass. Enabled by --only, a project file or the email, report and essay profiles.",
+        "An unfamiliar uppercase acronym of 3 to 8 capitals used without an earlier gloss such as 'Full Name (ACR)', 'ACR (Full Name)' or a naming phrase ('is called SLSA', 'known as SLSA', 'SLSA stands for'). The Style Manual's examples (ACT, BHP, DNA), other widely known forms, Roman numerals, words in capitals for emphasis ('NOTE', 'FAILED') and runs of capitals pass. Enabled by --only, a project file or the email, report and essay profiles.",
     ),
     Closer = rule(
         "closer",
@@ -3755,27 +3755,35 @@ mod tests {
             // The Style Manual's own examples of forms needing no definition, and Australian
             // forms readers know.
             "BHP and the ACT agreed.",
-            "The ABC, the CSIRO and the AFL and NRL reported. ANZAC Day is in April.",
+            "The ABC, the CSIRO and the AFL and NRL reported. ANZAC forces landed in 1915.",
             // Repository files named in prose.
             "Read the README, the LICENSE and the NOTICE, then the TODO list.",
-            // An explanation the acronym follows, or a phrase that names it.
-            "It writes a signed record of where the code came from (SLSA).",
+            // A phrase that names it.
             "The log format is called SARIF.",
             "The format, known as SARIF, is common.",
             "SARIF stands for Static Analysis Results Interchange Format.",
             "SARIF is short for Static Analysis Results Interchange Format.",
+            "SLSA, short for Supply-chain Levels for Software Artifacts, is a framework.",
             // Ordinary words in capitals for emphasis, alone or inflected.
             "Do NOT change it. NOTE the date. It MUST pass and NEVER fail.",
             "The build FAILED, so it is MAINLY fine and still TESTING.",
+            "DON'T merge it. It must ALWAYS pass.",
         ] {
             assert!(found(clean).is_empty(), "{clean}: {:?}", found(clean));
         }
-        // A label after a full stop, an acronym with a year, a cue that does not name it, and
+        // A label in brackets, an acronym with a year, 'called' as an ordinary verb, and
         // capitals that are not a Roman numeral.
         for flagged in [
             "The fork is by Ayoub G. (QBR).",
             "The QBR (2026) ran.",
             "We called the QBR team.",
+            "We called QBR yesterday.",
+            "The report (QBR) was published.",
+            "The minister called ASIC on Monday. ASIC has not replied.",
+            "The report named ACCC as the lead.",
+            "The NDIS means families pay less.",
+            "Unemployment rose to 4.1 per cent (ABS). The ABS revised it.",
+            "The car's CAN bus failed.",
             "The LCD panel failed.",
         ] {
             assert_eq!(found(flagged).len(), 1, "{flagged}");

@@ -35,6 +35,11 @@ To report a finding that should not have been flagged, use the [false-positive f
 | [`staged-contrast`](#staged-contrast) | yes | none | under 0.01 | 2 of 75 |
 | [`reveal-question`](#reveal-question) | yes | none | 0.00 | 1 of 75 |
 | [`residue`](#residue) | yes | none | under 0.01 | 0 of 75 |
+| [`unanchored-magnitude`](#unanchored-magnitude) | no (advisory, opt-in) | none | 0.00 | 4 of 75 |
+| [`unattributed-superlative`](#unattributed-superlative) | no (advisory, opt-in) | none | 0.03 | 0 of 75 |
+| [`unnamed-evidence`](#unnamed-evidence) | no (advisory, opt-in) | none | 0.11 | 12 of 75 |
+| [`ai-placeholder`](#ai-placeholder) | no (advisory, opt-in) | none | 0.00 | 0 of 75 |
+| [`chat-filler`](#chat-filler) | no (advisory, opt-in) | none | 0.00 | 0 of 75 |
 | [`unused-suppression`](#unused-suppression) | no (advisory) | none | 0.00 | 0 of 75 |
 
 ## Style Manual coverage
@@ -53,7 +58,7 @@ To report a finding that should not have been flagged, use the [false-positive f
 | [Dates and time](../skills/laconic-prose/references/style-manual-rules.md#dates-and-time) | `date`, `weekday`, `time` |
 | [Shortened forms](../skills/laconic-prose/references/style-manual-rules.md#shortened-forms) | `latin`, `acronym-before-definition`, `unglossed-term` |
 
-The rules with no Style Manual section flag writing patterns from [patterns.md](../skills/laconic-prose/references/patterns.md), chat-tool residue or suppression comments: `closer`, `stock-phrase`, `stacked-hedge`, `bold-label`, `staged-contrast`, `reveal-question`, `residue`, `unused-suppression`.
+The rules with no Style Manual section flag writing patterns from [patterns.md](../skills/laconic-prose/references/patterns.md), chat-tool residue or suppression comments: `closer`, `stock-phrase`, `stacked-hedge`, `bold-label`, `staged-contrast`, `reveal-question`, `residue`, `unanchored-magnitude`, `unattributed-superlative`, `unnamed-evidence`, `ai-placeholder`, `chat-filler`, `unused-suppression`.
 
 ## Rules
 
@@ -248,6 +253,46 @@ Fails `lint`: yes. Not a Style Manual rule. Human prose: 1 finding, under 0.01 p
 Examples: `after the go-ahead.\u{200b}`, `https://example.com/guide?utm_source=chatgpt.com`.
 
 Invisible characters appear here as `\u{...}` escapes, so copying an example does not reproduce them; the tests plant the characters themselves.
+
+### unanchored-magnitude
+
+Vague or dramatic magnitudes ('thousands of hours', '10x faster', '90% reduction') with no nearby citation, denominator, baseline, link or period in the sentence. Enabled by --only, a project file or the report and essay profiles.
+
+Fails `lint`: no (advisory, opt-in). Not a Style Manual rule. Human prose: 0 findings, 0.00 per 1,000 words. Outside articles: flags 4 of 75 held out (5 findings) and 2 of 75 for calibration.
+
+Examples: `It saves thousands of hours.`, `The tool runs 10x faster and reads the meter`.
+
+### unattributed-superlative
+
+Unattributed superlatives and comparative performance claims ('best-in-class', 'significantly outperforms') with no baseline or source in the sentence. Enabled by --only, a project file or the report, docs and essay profiles.
+
+Fails `lint`: no (advisory, opt-in). Not a Style Manual rule. Human prose: 6 findings, 0.03 per 1,000 words. Outside articles: flags 0 of 75 held out (0 findings) and 1 of 75 for calibration.
+
+Example: `This is a best-in-class parser.`.
+
+### unnamed-evidence
+
+Appeals to unnamed evidence or authority ('studies show', 'experts agree', 'research proves', 'vast datasets') without a named source or citation in the sentence. Enabled by --only, a project file or the report and essay profiles.
+
+Fails `lint`: no (advisory, opt-in). Not a Style Manual rule. Human prose: 23 findings, 0.11 per 1,000 words. Outside articles: flags 12 of 75 held out (15 findings) and 6 of 75 for calibration.
+
+Example: `Studies show faster builds.`.
+
+### ai-placeholder
+
+AI self-reference residue ('As an AI', 'based on my training data') and leftover placeholders ('[insert ...]', 'TBD', 'TODO') in finished prose. Enabled by --only, a project file or any register profile.
+
+Fails `lint`: no (advisory, opt-in). Not a Style Manual rule. Human prose: 0 findings, 0.00 per 1,000 words. Outside articles: flags 0 of 75 held out (0 findings) and 0 of 75 for calibration.
+
+Examples: `The final total is TBD.`, `Add [insert metric] and read the meter`.
+
+### chat-filler
+
+Architectural riddle filler in chat plans ('gates and seams', 'natural seam', 'verification gate', 'load-bearing', 'moving pieces'). Enabled and tightened by the chat profile, or via --only and project files.
+
+Fails `lint`: no (advisory, opt-in). Not a Style Manual rule. Human prose: 0 findings, 0.00 per 1,000 words. Outside articles: flags 0 of 75 held out (0 findings) and 0 of 75 for calibration.
+
+Example: `Define clean gates and seams before coding.`.
 
 ### unused-suppression
 

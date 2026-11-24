@@ -404,3 +404,108 @@ fn a_signalled_lint_gives_128_plus_the_signal() {
         );
     }
 }
+
+#[test]
+fn action_rejects_non_text_format_prefers_laconic_toml_and_counts_chat_filler_as_error() {
+    let dir = Path::new(env!("CARGO_TARGET_TMPDIR"))
+        .join(format!("action-format-toml-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(dir.join("clean.md"), CLEAN).unwrap();
+    std::fs::write(
+        dir.join("chat.md"),
+        "Define clean gates and seams before coding.\n",
+    )
+    .unwrap();
+    std::fs::write(dir.join("laconic.toml"), "max_findings = 1\n").unwrap();
+    std::fs::write(dir.join(".laconic-check"), "max-findings = 99\n").unwrap();
+    let sub = dir.join("many");
+    std::fs::create_dir_all(&sub).unwrap();
+    let mut files = String::new();
+    let pad = "a".repeat(200);
+    for i in 0..130 {
+        let name = format!("many/{pad}-{i:03}.md");
+        let body = if i == 0 || i == 129 {
+            "The color is red.\n"
+        } else {
+            CLEAN
+        };
+        std::fs::write(dir.join(&name), body).unwrap();
+        files.push_str(&name);
+        files.push('\n');
+    }
+
+    let run_both = |files_in: &str, args_in: &str| -> Vec<(String, i32)> {
+        let mut results = Vec::new();
+        let out = Command::new(exe())
+            .arg("action-lint")
+            .current_dir(&dir)
+            .env("LACONIC_CHECK", exe())
+            .env("LACONIC_FILES", files_in)
+            .env("LACONIC_ARGS", args_in)
+            .output()
+            .unwrap();
+        results.push((
+            String::from_utf8(out.stdout).unwrap(),
+            out.status.code().unwrap(),
+        ));
+        #[cfg(unix)]
+        if Command::new("bash").arg("--version").output().is_ok() {
+            let script = Path::new(env!("CARGO_MANIFEST_DIR")).join("action/lint.sh");
+            let out = Command::new("bash")
+                .arg(&script)
+                .current_dir(&dir)
+                .env("LACONIC_CHECK", exe())
+                .env("LACONIC_FILES", files_in)
+                .env("LACONIC_ARGS", args_in)
+                .output()
+                .unwrap();
+            results.push((
+                String::from_utf8(out.stdout).unwrap(),
+                out.status.code().unwrap(),
+            ));
+        }
+        results
+    };
+
+    for bad_args in [
+        "--format json",
+        "--format=json",
+        "--format sarif",
+        "--format=sarif",
+        "--format",
+        "--config -- --format=json",
+        "--config -- --json",
+        "--profile -- --format sarif",
+    ] {
+        for (stdout, code) in run_both("clean.md", bad_args) {
+            assert_eq!(code, 2, "{bad_args}: {stdout}");
+            assert!(
+                stdout.contains("::error::the Action reads lint's text output"),
+                "{bad_args}: {stdout}"
+            );
+        }
+    }
+    for ok_args in ["--format text", "--format=text", "--warn --"] {
+        for (stdout, code) in run_both("clean.md", ok_args) {
+            assert_eq!(code, 0, "{ok_args}: {stdout}");
+        }
+    }
+
+    for (stdout, code) in run_both("chat.md", "--profile chat --max-findings 0") {
+        assert_eq!(code, 1, "{stdout}");
+        assert!(stdout.contains("::error file=chat.md"), "{stdout}");
+        assert!(!stdout.contains("::warning file=chat.md"), "{stdout}");
+    }
+
+    for (stdout, code) in run_both(&files, "") {
+        assert_eq!(code, 1, "{stdout}");
+        assert!(
+            stdout.contains(
+                "2 failing findings across all the files, more than --max-findings allows (1)"
+            ),
+            "{stdout}"
+        );
+    }
+    let _ = std::fs::remove_dir_all(&dir);
+}

@@ -158,6 +158,41 @@ const SEEDS: &[(&str, &str, &str)] = &[
         "https://example.com/guide?utm_source=chatgpt.com",
     ),
     (
+        "unanchored-magnitude",
+        "Each member gets a healthcare plan.",
+        "It saves thousands of hours.",
+    ),
+    (
+        "unanchored-magnitude",
+        "Read the meter",
+        "The tool runs 10x faster and reads the meter",
+    ),
+    (
+        "unattributed-superlative",
+        "Each member gets a healthcare plan.",
+        "This is a best-in-class parser.",
+    ),
+    (
+        "unnamed-evidence",
+        "Each member gets a healthcare plan.",
+        "Studies show faster builds.",
+    ),
+    (
+        "ai-placeholder",
+        "Each member gets a healthcare plan.",
+        "The final total is TBD.",
+    ),
+    (
+        "ai-placeholder",
+        "Read the meter",
+        "Add [insert metric] and read the meter",
+    ),
+    (
+        "chat-filler",
+        "Each member gets a healthcare plan.",
+        "Define clean gates and seams before coding.",
+    ),
+    (
         "unused-suppression",
         "Each member gets a healthcare plan.",
         "<!-- laconic-check-disable-next-line em-dash -->",

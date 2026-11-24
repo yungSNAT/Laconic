@@ -13,8 +13,33 @@ use std::rc::Rc;
 use std::sync::OnceLock;
 
 mod project;
+mod substance;
 mod terms;
 pub use project::{Phrase, ProjectRule};
+
+/// Explicit scope statement emitted in JSON and SARIF output: `laconic-check` detects
+/// house-style, prose-pattern and substance defects, never authorship.
+pub const SCOPE_NOTE: &str =
+    "Checks house style, prose patterns and substance heuristics; never infers authorship.";
+
+/// How deterministic a rule's match is, reported separately from `severity`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Confidence {
+    High,
+    Medium,
+    Low,
+}
+
+impl Confidence {
+    /// Lower-case wire name for JSON and SARIF output.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::High => "high",
+            Self::Medium => "medium",
+            Self::Low => "low",
+        }
+    }
+}
 
 /// One lint rule. `docs/rules.md` is generated from this table and the seeded-fault tests;
 /// every finding's `RuleId` has an entry here.
@@ -26,6 +51,8 @@ pub struct Rule {
     /// Opt-in rules stay off in default `lint` until enabled via `--only`, a profile or a
     /// project file.
     pub opt_in: bool,
+    /// Match determinism reported separately from severity.
+    pub confidence: Confidence,
     /// The heading in `skills/laconic-prose/references/style-manual-rules.md` whose rules
     /// this one checks in part; `None` for writing patterns and chat-tool residue.
     pub section: Option<&'static str>,
@@ -33,21 +60,33 @@ pub struct Rule {
     pub checks: &'static str,
 }
 
-const fn rule(name: &'static str, section: Option<&'static str>, checks: &'static str) -> Rule {
+const fn rule(
+    name: &'static str,
+    confidence: Confidence,
+    section: Option<&'static str>,
+    checks: &'static str,
+) -> Rule {
     Rule {
         name,
         advisory: false,
         opt_in: false,
+        confidence,
         section,
         checks,
     }
 }
 
-const fn advisory(name: &'static str, section: Option<&'static str>, checks: &'static str) -> Rule {
+const fn advisory(
+    name: &'static str,
+    confidence: Confidence,
+    section: Option<&'static str>,
+    checks: &'static str,
+) -> Rule {
     Rule {
         name,
         advisory: true,
         opt_in: false,
+        confidence,
         section,
         checks,
     }
@@ -55,6 +94,7 @@ const fn advisory(name: &'static str, section: Option<&'static str>, checks: &'s
 
 const fn opt_in_advisory(
     name: &'static str,
+    confidence: Confidence,
     section: Option<&'static str>,
     checks: &'static str,
 ) -> Rule {
@@ -62,6 +102,7 @@ const fn opt_in_advisory(
         name,
         advisory: true,
         opt_in: true,
+        confidence,
         section,
         checks,
     }
@@ -92,117 +133,170 @@ macro_rules! rules {
 rules! {
     UsSpelling = rule(
         "us-spelling",
+        Confidence::High,
         SPELLING,
         "US spellings that have an Australian form, such as 'color', 'organized' and 'skeptical', and 'percent' in prose.",
     ),
     WordChoice = rule(
         "word-choice",
+        Confidence::Medium,
         SPELLING,
         "'while' and 'among' as a conjunction or preposition, where the house rule writes 'whilst' and 'amongst'. Noun uses such as 'a while' pass.",
     ),
     DoubleQuotes = rule(
         "double-quotes",
+        Confidence::High,
         QUOTES,
         "A pair of double quotation marks, straight or curly, around a short span of prose (under 120 characters), where single marks are the default.",
     ),
     SymbolSpace = rule(
         "symbol-space",
+        Confidence::High,
         QUOTES,
         "A space before a percentage sign or after a dollar sign, with or without a currency code, as in '5 %', '$ 27.99' or 'A$ 5'.",
     ),
     SerialComma = rule(
         "serial-comma",
+        Confidence::Medium,
         Some("Punctuation"),
         "A possible comma before the final 'and' or 'or' in a list. Keep it only if it prevents a misreading.",
     ),
-    EmDash = rule("em-dash", DASHES, "Em dashes in original prose."),
+    EmDash = rule("em-dash", Confidence::High, DASHES, "Em dashes in original prose."),
     ClauseDashes = advisory(
         "clause-dashes",
+        Confidence::Medium,
         DASHES,
         "A paragraph with clause dashes (an em dash, or a spaced en dash, hyphen or double hyphen) in 2 or more sentences, where a pair around one aside counts once.",
     ),
     Hyphen = rule(
         "hyphen",
+        Confidence::High,
         Some("Hyphens"),
         "Unnecessary hyphens in open set phrases and closed compounds, such as 'open-source' and 'e-mail'.",
     ),
     HyphenConsistency = advisory(
         "hyphen-consistency",
+        Confidence::Medium,
         Some("Hyphens"),
         "A compound written both closed and hyphenated in one document, such as 'healthcare' and 'health-care'. Some such pairs are different words, such as 'resign' and 're-sign'.",
     ),
     NumberWord = rule(
         "number-word",
+        Confidence::Medium,
         Some("Numbers"),
         "Numbers from 2 to 20 written as words where the Style Manual uses numerals.",
     ),
     Date = rule(
         "date",
+        Confidence::High,
         DATES,
         "Dates not written as day month year: an ordinal ('19th October'), the month first ('October 19'), a comma before the year and an apostrophe in a decade ('1980's').",
     ),
     Weekday = rule(
         "weekday",
+        Confidence::High,
         DATES,
         "A weekday that does not match its date, such as 'Wednesday 22 October 2026'.",
     ),
     Time = rule(
         "time",
+        Confidence::High,
         DATES,
         "Times not written as '9:30 am' or '9 am', such as '9am', '9.30am' and '9:30 a.m.'.",
     ),
     Latin = rule(
         "latin",
+        Confidence::High,
         Some("Shortened forms"),
         "The Latin abbreviations 'e.g.' and 'i.e.', with or without full stops, where 'for example' and 'that is' are preferred.",
     ),
     AcronymBeforeDefinition = advisory(
         "acronym-before-definition",
+        Confidence::Medium,
         Some("Shortened forms"),
         "An acronym of 2 to 6 capitals used before the parenthesised definition that introduces it later in the document, as in 'The BOM said ... the Bureau of Meteorology (BOM)'.",
     ),
     UnglossedTerm = opt_in_advisory(
         "unglossed-term",
+        Confidence::Medium,
         Some("Shortened forms"),
         "An unfamiliar uppercase acronym of 3 to 8 capitals used without an earlier gloss such as 'Full Name (ACR)', 'ACR (Full Name)' or a naming phrase ('is called SLSA', 'known as SLSA', 'SLSA stands for'). The Style Manual's examples (ACT, BHP, DNA), other widely known forms, Roman numerals, words in capitals for emphasis ('NOTE', 'FAILED') and runs of capitals pass. Enabled by --only, a project file or the email, report and essay profiles.",
     ),
     Closer = rule(
         "closer",
+        Confidence::High,
         None,
         "Chatbot closers such as 'hope this helps', 'let me know if' and 'feel free to'.",
     ),
     StockPhrase = rule(
         "stock-phrase",
+        Confidence::Medium,
         None,
         "Stock phrases that rarely carry meaning, such as 'Bottom line:', 'circle back' and 'it's worth noting', and timeless openers such as 'since the dawn of time'.",
     ),
     StackedHedge = advisory(
         "stacked-hedge",
+        Confidence::Medium,
         None,
         "Stacked hedges such as 'could potentially' and 'may possibly'.",
     ),
     BoldLabel = advisory(
         "bold-label",
+        Confidence::Medium,
         None,
         "3 or more bullets in a row that open with a bold label, such as '**Cause:**'.",
     ),
     StagedContrast = rule(
         "staged-contrast",
+        Confidence::Medium,
         None,
         "Staged contrasts: 'it's not X, it's Y' and 'not just X but Y'.",
     ),
     RevealQuestion = rule(
         "reveal-question",
+        Confidence::Medium,
         None,
         "Verbless reveal questions, such as 'The result? A 40% cut.'",
     ),
     Residue = rule(
         "residue",
+        Confidence::High,
         None,
         "Chat-tool residue: 4 known ChatGPT citation and tracking markers (`oaicite`, `contentReference`, `utm_source=chatgpt` and `utm_source=openai`), including inside links, and selected invisible characters that can hide or reorder text: zero-width characters, bidirectional controls and runs of Unicode tag characters (except the England, Scotland and Wales flags).",
     ),
+    UnanchoredMagnitude = opt_in_advisory(
+        "unanchored-magnitude",
+        Confidence::Low,
+        None,
+        "Vague or dramatic magnitudes ('thousands of hours', '10x faster', '90% reduction') with no nearby citation, denominator, baseline, link or period in the sentence. Enabled by --only, a project file or the report and essay profiles.",
+    ),
+    UnattributedSuperlative = opt_in_advisory(
+        "unattributed-superlative",
+        Confidence::Medium,
+        None,
+        "Unattributed superlatives and comparative performance claims ('best-in-class', 'significantly outperforms') with no baseline or source in the sentence. Enabled by --only, a project file or the report, docs and essay profiles.",
+    ),
+    UnnamedEvidence = opt_in_advisory(
+        "unnamed-evidence",
+        Confidence::Medium,
+        None,
+        "Appeals to unnamed evidence or authority ('studies show', 'experts agree', 'research proves', 'vast datasets') without a named source or citation in the sentence. Enabled by --only, a project file or the report and essay profiles.",
+    ),
+    AiPlaceholder = opt_in_advisory(
+        "ai-placeholder",
+        Confidence::High,
+        None,
+        "AI self-reference residue ('As an AI', 'based on my training data') and leftover placeholders ('[insert ...]', 'TBD', 'TODO') in finished prose. Enabled by --only, a project file or any register profile.",
+    ),
+    ChatFiller = opt_in_advisory(
+        "chat-filler",
+        Confidence::Medium,
+        None,
+        "Architectural riddle filler in chat plans ('gates and seams', 'natural seam', 'verification gate', 'load-bearing', 'moving pieces'). Enabled and tightened by the chat profile, or via --only and project files.",
+    ),
     UnusedSuppression = advisory(
         "unused-suppression",
+        Confidence::High,
         None,
         "A suppression comment, `<!-- laconic-check-disable-next-line rule -->` on its own line, that silences nothing: it names no rule or an unknown one, or the next non-blank line has no finding of the rule it names. A suppression silences the named rules (comma or space separated) on that line only.",
     ),
@@ -260,6 +354,14 @@ impl RuleRef {
     /// Whether the finding is advice that never fails `lint`; no project rule is.
     pub fn advisory(&self) -> bool {
         matches!(self, RuleRef::Builtin(id) if id.rule().advisory)
+    }
+
+    /// The rule's match confidence; project rules are explicit matches (`High`).
+    pub fn confidence(&self) -> Confidence {
+        match self {
+            RuleRef::Builtin(id) => id.rule().confidence,
+            RuleRef::Project(_) => Confidence::High,
+        }
     }
 
     /// The rule's entry in the rule reference; a project rule has none.
@@ -712,7 +814,13 @@ fn scan(
             continue;
         }
         if trimmed.starts_with("```") || trimmed.starts_with("~~~") {
-            paragraph.flush(&mut findings, &mut document, project, prose.as_deref_mut());
+            paragraph.flush(
+                &mut findings,
+                &mut document,
+                project,
+                include_opt_in,
+                prose.as_deref_mut(),
+            );
             fence = Some(if trimmed.starts_with("```") {
                 "```"
             } else {
@@ -738,7 +846,13 @@ fn scan(
                         .collect(),
                 });
             }
-            paragraph.flush(&mut findings, &mut document, project, prose.as_deref_mut());
+            paragraph.flush(
+                &mut findings,
+                &mut document,
+                project,
+                include_opt_in,
+                prose.as_deref_mut(),
+            );
             continue;
         }
         let marker_width = if is_break_line(trimmed) {
@@ -766,7 +880,13 @@ fn scan(
             code_lines.push(line_no);
         }
         if single_line || list_item {
-            paragraph.flush(&mut findings, &mut document, project, prose.as_deref_mut());
+            paragraph.flush(
+                &mut findings,
+                &mut document,
+                project,
+                include_opt_in,
+                prose.as_deref_mut(),
+            );
         }
         // Bullets nested under a run leave it open; a sibling without a label ends it.
         if list_item && (labels.1 == 0 || indent <= labels.0) {
@@ -791,10 +911,22 @@ fn scan(
         paragraph.push(raw, line_no);
         // A hard line break (two trailing spaces or a backslash) also ends the run.
         if single_line || raw.ends_with("  ") || raw.trim_end().ends_with('\\') {
-            paragraph.flush(&mut findings, &mut document, project, prose.as_deref_mut());
+            paragraph.flush(
+                &mut findings,
+                &mut document,
+                project,
+                include_opt_in,
+                prose.as_deref_mut(),
+            );
         }
     }
-    paragraph.flush(&mut findings, &mut document, project, prose.as_deref_mut());
+    paragraph.flush(
+        &mut findings,
+        &mut document,
+        project,
+        include_opt_in,
+        prose.as_deref_mut(),
+    );
     if prose.is_some() {
         return (Vec::new(), 0);
     }
@@ -1112,6 +1244,7 @@ impl Paragraph {
         findings: &mut Vec<Finding>,
         document: &mut Document,
         project: &[Rc<ProjectRule>],
+        include_opt_in: bool,
         prose: Option<&mut Vec<String>>,
     ) {
         if self.lines.is_empty() {
@@ -1149,6 +1282,9 @@ impl Paragraph {
         }
         let mut joined = Vec::new();
         check_line(&masked, 0, &mut joined);
+        if include_opt_in {
+            substance::check(&masked, &self.chars, &mut joined);
+        }
         project::check(&masked, project, &mut joined);
         found.extend(joined.into_iter().map(|f| self.place(f)));
         // Report in line order; the sort is stable, so each line keeps its rule order.

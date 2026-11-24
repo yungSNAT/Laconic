@@ -8,7 +8,7 @@ use std::path::Path;
 
 use std::rc::Rc;
 
-use crate::lint::{Finding, ProjectRule, RULES, RULES_URL, RuleRef};
+use crate::lint::{Finding, ProjectRule, RULES, RULES_URL, RuleRef, SCOPE_NOTE};
 use crate::mcp::{Json, object, text};
 
 /// A rule's level: advisory findings are notes and the rest warnings, since a finding is a
@@ -54,11 +54,19 @@ pub fn result(
     let (start, end) = span(line, finding.column, char::len_utf16);
     let (start, end) = (start + 1, end + 1);
     let number = |n: usize| Json::Number(n.to_string());
+    let confidence = finding.rule.confidence().as_str();
     object(vec![
         ("ruleId", text(finding.rule.name())),
         ("ruleIndex", number(index)),
         ("level", level(advisory)),
         ("message", message(&finding.message)),
+        (
+            "properties",
+            object(vec![
+                ("severity", level(advisory)),
+                ("confidence", text(confidence)),
+            ]),
+        ),
         (
             "locations",
             Json::Array(vec![object(vec![(
@@ -95,6 +103,10 @@ pub fn log(results: Vec<Json>, complete: bool, project: &[Rc<ProjectRule>]) -> J
                 "defaultConfiguration",
                 object(vec![("level", level(rule.advisory))]),
             ),
+            (
+                "properties",
+                object(vec![("confidence", text(rule.confidence.as_str()))]),
+            ),
         ])
     });
     let own = project.iter().map(|rule| {
@@ -108,6 +120,7 @@ pub fn log(results: Vec<Json>, complete: bool, project: &[Rc<ProjectRule>]) -> J
                 "defaultConfiguration",
                 object(vec![("level", level(false))]),
             ),
+            ("properties", object(vec![("confidence", text("high"))])),
         ])
     });
     let rules = house.chain(own).collect();
@@ -143,6 +156,7 @@ pub fn log(results: Vec<Json>, complete: bool, project: &[Rc<ProjectRule>]) -> J
                     )])]),
                 ),
                 ("results", Json::Array(results)),
+                ("properties", object(vec![("scope", text(SCOPE_NOTE))])),
             ])]),
         ),
     ])

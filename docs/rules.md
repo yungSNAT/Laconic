@@ -27,7 +27,7 @@ To report a finding that should not have been flagged, use the [false-positive f
 | [`time`](#time) | yes | Dates and time | under 0.01 | 3 of 75 |
 | [`latin`](#latin) | yes | Shortened forms | under 0.01 | 0 of 75 |
 | [`acronym-before-definition`](#acronym-before-definition) | no (advisory) | Shortened forms | 0.07 | 0 of 75 |
-| [`unglossed-term`](#unglossed-term) | no (advisory, opt-in) | Shortened forms | 1.05 | 21 of 75 |
+| [`unglossed-term`](#unglossed-term) | no (advisory, opt-in) | Shortened forms | 1.02 | 17 of 75 |
 | [`closer`](#closer) | yes | none | 0.00 | 0 of 75 |
 | [`stock-phrase`](#stock-phrase) | yes | none | 0.02 | 4 of 75 |
 | [`stacked-hedge`](#stacked-hedge) | no (advisory) | none | 0.04 | 0 of 75 |
@@ -179,9 +179,9 @@ Example: `The BOM forecast came from the Bureau of Meteorology (BOM), which`.
 
 ### unglossed-term
 
-An unfamiliar uppercase acronym of 3 to 8 capitals used without an earlier gloss such as 'Full Name (ACR)' or 'ACR (Full Name)'. Enabled by --only, a project file or the email, report and essay profiles.
+An unfamiliar uppercase acronym of 3 to 8 capitals used without an earlier gloss such as 'Full Name (ACR)', 'ACR (Full Name)', an explanation run into the bracket ('where the code came from (SLSA)') or a naming phrase ('called SLSA', 'SLSA stands for'). The Style Manual's examples (ACT, BHP, DNA), other widely known forms, Roman numerals, words in capitals for emphasis ('NOTE', 'FAILED') and runs of capitals pass. Enabled by --only, a project file or the email, report and essay profiles.
 
-Fails `lint`: no (advisory, opt-in). Style Manual: [Shortened forms](../skills/laconic-prose/references/style-manual-rules.md#shortened-forms). Human prose: 216 findings, 1.05 per 1,000 words. Outside articles: flags 21 of 75 held out (25 findings) and 30 of 75 for calibration.
+Fails `lint`: no (advisory, opt-in). Style Manual: [Shortened forms](../skills/laconic-prose/references/style-manual-rules.md#shortened-forms). Human prose: 209 findings, 1.02 per 1,000 words. Outside articles: flags 17 of 75 held out (19 findings) and 22 of 75 for calibration.
 
 Example: `Each member gets a QBR plan.`.
 

@@ -164,7 +164,7 @@ rules! {
     UnglossedTerm = opt_in_advisory(
         "unglossed-term",
         Some("Shortened forms"),
-        "An unfamiliar uppercase acronym of 3 to 8 capitals used without an earlier gloss such as 'Full Name (ACR)' or 'ACR (Full Name)'. Enabled by --only, a project file or the email, report and essay profiles.",
+        "An unfamiliar uppercase acronym of 3 to 8 capitals used without an earlier gloss such as 'Full Name (ACR)', 'ACR (Full Name)', an explanation run into the bracket ('where the code came from (SLSA)') or a naming phrase ('called SLSA', 'SLSA stands for'). The Style Manual's examples (ACT, BHP, DNA), other widely known forms, Roman numerals, words in capitals for emphasis ('NOTE', 'FAILED') and runs of capitals pass. Enabled by --only, a project file or the email, report and essay profiles.",
     ),
     Closer = rule(
         "closer",
@@ -1296,7 +1296,10 @@ impl Document {
                 first.entry(capitals.to_owned()).or_insert(place);
             }
             if let Some(base) = terms::candidate(&word) {
-                if pre_glossed || terms::is_post_glossed(&masked[k..], base) {
+                if pre_glossed
+                    || terms::is_post_glossed(&masked[k..], base)
+                    || terms::is_named(&masked[..start], &masked[k..])
+                {
                     self.glossed.entry(base.to_owned()).or_insert(place);
                 } else if !terms::is_exempt(base) && !terms::in_all_caps_run(masked, start, k) {
                     self.term_used.entry(base.to_owned()).or_insert(place);
@@ -3737,5 +3740,45 @@ mod tests {
             found("The QBR ran.\nLater QBR (Quarterly Business Review) closed.").len(),
             1
         );
+    }
+
+    #[test]
+    fn passes_australian_forms_explained_terms_and_shouted_words() {
+        let found = |text: &str| -> Vec<String> {
+            lint_all(text)
+                .into_iter()
+                .filter(|f| f.rule == RuleId::UnglossedTerm)
+                .map(|f| f.message)
+                .collect()
+        };
+        for clean in [
+            // The Style Manual's own examples of forms needing no definition, and Australian
+            // forms readers know.
+            "BHP and the ACT agreed.",
+            "The ABC, the CSIRO and the AFL and NRL reported. ANZAC Day is in April.",
+            // Repository files named in prose.
+            "Read the README, the LICENSE and the NOTICE, then the TODO list.",
+            // An explanation the acronym follows, or a phrase that names it.
+            "It writes a signed record of where the code came from (SLSA).",
+            "The log format is called SARIF.",
+            "The format, known as SARIF, is common.",
+            "SARIF stands for Static Analysis Results Interchange Format.",
+            "SARIF is short for Static Analysis Results Interchange Format.",
+            // Ordinary words in capitals for emphasis, alone or inflected.
+            "Do NOT change it. NOTE the date. It MUST pass and NEVER fail.",
+            "The build FAILED, so it is MAINLY fine and still TESTING.",
+        ] {
+            assert!(found(clean).is_empty(), "{clean}: {:?}", found(clean));
+        }
+        // A label after a full stop, an acronym with a year, a cue that does not name it, and
+        // capitals that are not a Roman numeral.
+        for flagged in [
+            "The fork is by Ayoub G. (QBR).",
+            "The QBR (2026) ran.",
+            "We called the QBR team.",
+            "The LCD panel failed.",
+        ] {
+            assert_eq!(found(flagged).len(), 1, "{flagged}");
+        }
     }
 }

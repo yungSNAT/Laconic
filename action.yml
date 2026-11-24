@@ -28,4 +28,4 @@ runs:
         LACONIC_CHECK: ${{ steps.install.outputs.bin }}
         LACONIC_FILES: ${{ inputs.files }}
         LACONIC_ARGS: ${{ inputs.args }}
-      run: "$LACONIC_CHECK" action-lint
+      run: '"$LACONIC_CHECK" action-lint'

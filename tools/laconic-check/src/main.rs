@@ -18,7 +18,7 @@ use std::process::ExitCode;
 use laconic_check::mcp::Json;
 use laconic_check::metrics::ProseMetrics;
 use laconic_check::settings::{self, PROJECT_FILE, Settings};
-use laconic_check::{completions, hook, lint, lsp, mcp, preserve, sarif};
+use laconic_check::{action, completions, hook, lint, lsp, mcp, preserve, sarif};
 
 fn usage_text() -> String {
     let advisory: Vec<&str> = lint::RULES
@@ -364,6 +364,7 @@ fn main() -> ExitCode {
             }
         }
         Some("hook") if args.len() == 1 => stop_hook(),
+        Some("action-lint") if args.len() == 1 => action::from_env(),
         Some("completions") if args.len() == 2 => match completions::Shell::parse(&args[1]) {
             Some(shell) => {
                 print!("{}", completions::script(shell));

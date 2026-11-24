@@ -1,0 +1,116 @@
+== clean_file_passes 0
+== failing_findings_fail 1
+laconic-check: two.md:1:5: us-spelling: 'color': Australian form is 'colour'
+::error file=two.md,line=1,col=5,title=laconic-check us-spelling::'color': Australian form is 'colour'
+laconic-check: two.md:3:5: us-spelling: 'flavor': Australian form is 'flavour'
+::error file=two.md,line=3,col=5,title=laconic-check us-spelling::'flavor': Australian form is 'flavour'
+== advisory_finding_warns 0
+laconic-check: advisory.md:1:4: stacked-hedge: stacked hedge 'could potentially' (advisory); keep one qualifier at the confidence the source supports
+::warning file=advisory.md,line=1,col=4,title=laconic-check stacked-hedge::stacked hedge 'could potentially' (advisory); keep one qualifier at the confidence the source supports
+== warn_keeps_status_zero 0
+laconic-check: two.md:1:5: us-spelling: 'color': Australian form is 'colour'
+::error file=two.md,line=1,col=5,title=laconic-check us-spelling::'color': Australian form is 'colour'
+laconic-check: two.md:3:5: us-spelling: 'flavor': Australian form is 'flavour'
+::error file=two.md,line=3,col=5,title=laconic-check us-spelling::'flavor': Australian form is 'flavour'
+== a_path_named_twice_counts_once 0
+laconic-check: two.md:1:5: us-spelling: 'color': Australian form is 'colour'
+::error file=two.md,line=1,col=5,title=laconic-check us-spelling::'color': Australian form is 'colour'
+laconic-check: two.md:3:5: us-spelling: 'flavor': Australian form is 'flavour'
+::error file=two.md,line=3,col=5,title=laconic-check us-spelling::'flavor': Australian form is 'flavour'
+== a_missing_file_is_status_2 2
+laconic-check: missing.md: No such file or directory (os error 2)
+== json_is_refused 2
+::error::the Action reads lint's text output, so args cannot include --json
+== sarif_is_refused 2
+::error::the Action reads lint's text output, so args cannot include --sarif
+== an_unknown_option_is_status_2 2
+laconic-check: laconic-check: unknown option '--bogus'
+== arguments_split_on_new_lines_and_tabs 0
+laconic-check: two.md:1:5: us-spelling: 'color': Australian form is 'colour'
+::error file=two.md,line=1,col=5,title=laconic-check us-spelling::'color': Australian form is 'colour'
+laconic-check: two.md:3:5: us-spelling: 'flavor': Australian form is 'flavour'
+::error file=two.md,line=3,col=5,title=laconic-check us-spelling::'flavor': Australian form is 'flavour'
+== blank_lines_in_the_list_are_skipped 0
+== an_empty_list_takes_the_tracked_markdown 1
+laconic-check: a.md:3:5: us-spelling: 'color': Australian form is 'colour'
+::error file=a.md,line=3,col=5,title=laconic-check us-spelling::'color': Australian form is 'colour'
+== no_tracked_markdown_is_status_0 0
+No Markdown files to lint.
+== outside_a_repository_the_list_fails 2
+::error::cannot list the Markdown files Git tracks; check out the repository first, or name files in the files input
+== a_name_with_a_leading_dash_gets_a_prefix 1
+laconic-check: ./-dash.md:3:5: us-spelling: 'color': Australian form is 'colour'
+::error file=./-dash.md,line=3,col=5,title=laconic-check us-spelling::'color': Australian form is 'colour'
+== colons_in_a_name_are_escaped 1
+laconic-check: a:b.md:3:5: us-spelling: 'color': Australian form is 'colour'
+::error file=a%3Ab.md,line=3,col=5,title=laconic-check us-spelling::'color': Australian form is 'colour'
+== commas_and_percent_signs_are_escaped 1
+laconic-check: a,b%c.md:3:5: us-spelling: 'color': Australian form is 'colour'
+::error file=a%2Cb%25c.md,line=3,col=5,title=laconic-check us-spelling::'color': Australian form is 'colour'
+== a_carriage_return_in_a_name_is_refused 2
+::error::the Action cannot annotate a filename containing a line break
+== a_tracked_name_with_a_line_break_is_refused 2
+::error::the Action cannot annotate a filename containing a line break
+== limit_counts_across_calls 1
+laconic-check: many/0-fault.md:3:5: us-spelling: 'color': Australian form is 'colour'
+::error file=many/0-fault.md,line=3,col=5,title=laconic-check us-spelling::'color': Australian form is 'colour'
+laconic-check: many/z-fault.md:3:5: us-spelling: 'color': Australian form is 'colour'
+::error file=many/z-fault.md,line=3,col=5,title=laconic-check us-spelling::'color': Australian form is 'colour'
+::error::2 failing findings across all the files, more than --max-findings allows (1)
+== limit_allows_2_across_calls 0
+laconic-check: many/0-fault.md:3:5: us-spelling: 'color': Australian form is 'colour'
+::error file=many/0-fault.md,line=3,col=5,title=laconic-check us-spelling::'color': Australian form is 'colour'
+laconic-check: many/z-fault.md:3:5: us-spelling: 'color': Australian form is 'colour'
+::error file=many/z-fault.md,line=3,col=5,title=laconic-check us-spelling::'color': Australian form is 'colour'
+== limit_comes_from_the_project_file 1
+laconic-check: many/0-fault.md:3:5: us-spelling: 'color': Australian form is 'colour'
+::error file=many/0-fault.md,line=3,col=5,title=laconic-check us-spelling::'color': Australian form is 'colour'
+laconic-check: many/z-fault.md:3:5: us-spelling: 'color': Australian form is 'colour'
+::error file=many/z-fault.md,line=3,col=5,title=laconic-check us-spelling::'color': Australian form is 'colour'
+::error::2 failing findings across all the files, more than --max-findings allows (1)
+== the_option_beats_the_project_file 0
+laconic-check: many/0-fault.md:3:5: us-spelling: 'color': Australian form is 'colour'
+::error file=many/0-fault.md,line=3,col=5,title=laconic-check us-spelling::'color': Australian form is 'colour'
+laconic-check: many/z-fault.md:3:5: us-spelling: 'color': Australian form is 'colour'
+::error file=many/z-fault.md,line=3,col=5,title=laconic-check us-spelling::'color': Australian form is 'colour'
+== warn_skips_the_cross_call_limit 0
+laconic-check: many/0-fault.md:3:5: us-spelling: 'color': Australian form is 'colour'
+::error file=many/0-fault.md,line=3,col=5,title=laconic-check us-spelling::'color': Australian form is 'colour'
+laconic-check: many/z-fault.md:3:5: us-spelling: 'color': Australian form is 'colour'
+::error file=many/z-fault.md,line=3,col=5,title=laconic-check us-spelling::'color': Australian form is 'colour'
+== an_option_value_is_not_an_option 0
+laconic-check: many/0-fault.md:3:5: us-spelling: 'color': Australian form is 'colour'
+::error file=many/0-fault.md,line=3,col=5,title=laconic-check us-spelling::'color': Australian form is 'colour'
+laconic-check: many/z-fault.md:3:5: us-spelling: 'color': Australian form is 'colour'
+::error file=many/z-fault.md,line=3,col=5,title=laconic-check us-spelling::'color': Australian form is 'colour'
+== limit_after_a_double_dash_is_a_file 2
+laconic-check: --max-findings: No such file or directory (os error 2)
+laconic-check: many/0-fault.md:3:5: us-spelling: 'color': Australian form is 'colour'
+::error file=many/0-fault.md,line=3,col=5,title=laconic-check us-spelling::'color': Australian form is 'colour'
+laconic-check: --max-findings: No such file or directory (os error 2)
+laconic-check: many/z-fault.md:3:5: us-spelling: 'color': Australian form is 'colour'
+::error file=many/z-fault.md,line=3,col=5,title=laconic-check us-spelling::'color': Australian form is 'colour'
+== status_2_after_status_1_wins 2
+laconic-check: many/0-fault.md:3:5: us-spelling: 'color': Australian form is 'colour'
+::error file=many/0-fault.md,line=3,col=5,title=laconic-check us-spelling::'color': Australian form is 'colour'
+laconic-check: many/z-fault.md:3:5: us-spelling: 'color': Australian form is 'colour'
+::error file=many/z-fault.md,line=3,col=5,title=laconic-check us-spelling::'color': Australian form is 'colour'
+laconic-check: missing.md: No such file or directory (os error 2)
+== status_2_before_status_1_wins 2
+laconic-check: missing.md: No such file or directory (os error 2)
+laconic-check: many/0-fault.md:3:5: us-spelling: 'color': Australian form is 'colour'
+::error file=many/0-fault.md,line=3,col=5,title=laconic-check us-spelling::'color': Australian form is 'colour'
+laconic-check: many/z-fault.md:3:5: us-spelling: 'color': Australian form is 'colour'
+::error file=many/z-fault.md,line=3,col=5,title=laconic-check us-spelling::'color': Australian form is 'colour'
+== inline_config_names_the_project_file 0
+laconic-check: many/0-fault.md:3:5: us-spelling: 'color': Australian form is 'colour'
+::error file=many/0-fault.md,line=3,col=5,title=laconic-check us-spelling::'color': Australian form is 'colour'
+laconic-check: many/z-fault.md:3:5: us-spelling: 'color': Australian form is 'colour'
+::error file=many/z-fault.md,line=3,col=5,title=laconic-check us-spelling::'color': Australian form is 'colour'
+== a_project_rule_is_printed_not_annotated 1
+laconic-check: rule.md:1:4: project/plain: 'utilise': the project file prefers 'use'
+== config_option_names_the_project_file 1
+laconic-check: two.md:1:5: us-spelling: 'color': Australian form is 'colour'
+::error file=two.md,line=1,col=5,title=laconic-check us-spelling::'color': Australian form is 'colour'
+laconic-check: two.md:3:5: us-spelling: 'flavor': Australian form is 'flavour'
+::error file=two.md,line=3,col=5,title=laconic-check us-spelling::'flavor': Australian form is 'flavour'

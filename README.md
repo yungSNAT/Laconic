@@ -307,7 +307,7 @@ To run `lint` as a gate in CI or a pre-commit hook, these options set what it re
 | `--commit-msg` | Reads each file as a Git commit message, without comment lines or anything below the scissors line. |
 | `--config <file>` | Reads settings from this file instead of `.laconic-check`. |
 
-A profile changes which rules run and which fail; without one, `lint` is unchanged. `email`, `report` and `essay` turn on [`unglossed-term`](docs/rules.md#unglossed-term), an advisory rule for an acronym of 3 to 8 capitals with no earlier gloss such as 'Full Name (ACR)' or 'ACR stands for'; widely known forms such as 'BHP' and words in capitals for emphasis pass. Every profile also turns on some other opt-in rules; [docs/rules.md](docs/rules.md) says which under each rule. `--only unglossed-term` turns it on without a profile. Those 3 profiles make `stacked-hedge` fail, `email` and `essay` also `bold-label`, `essay` also `clause-dashes`, and `report` also `hyphen-consistency` and `acronym-before-definition`. `chat` makes `stacked-hedge`, `bold-label` and `clause-dashes` fail and drops `acronym-before-definition` and `hyphen-consistency`; `docs` drops `bold-label` and `acronym-before-definition` and makes `number-word` advisory. A finding that a profile makes fail keeps '(advisory)' in its message; `--json` gives its state in `advisory`:
+A profile changes which rules run and which fail; without one, `lint` is unchanged. `email`, `report` and `essay` turn on [`unglossed-term`](docs/rules.md#unglossed-term), an advisory rule for an acronym of 3 to 8 capitals with no earlier gloss such as 'Full Name (ACR)' or 'ACR stands for'; widely known forms such as 'BHP' and words in capitals for emphasis pass. Every profile also turns on some other opt-in rules; [docs/rules.md](docs/rules.md) says which under each rule. `--only unglossed-term` turns it on without a profile. Those 3 profiles make `stacked-hedge` fail, `email` and `essay` also `bold-label`, `essay` also `clause-dashes`, and `report` also `hyphen-consistency` and `acronym-before-definition`. `chat` makes `stacked-hedge`, `bold-label` and `clause-dashes` fail and drops `acronym-before-definition` and `hyphen-consistency`; `docs` drops `bold-label` and `acronym-before-definition` and makes `number-word` advisory. A finding that a profile makes fail drops '(advisory)' from its message:
 
 ```text
 $ printf 'Each member gets a QBR plan. This could potentially slip a week.\n' > memo.md
@@ -315,7 +315,7 @@ $ laconic-check lint memo.md; echo "exit $?"
 memo.md:1:35: stacked-hedge: stacked hedge 'could potentially' (advisory); keep one qualifier at the confidence the source supports
 exit 0
 $ laconic-check lint --profile report memo.md; echo "exit $?"
-memo.md:1:35: stacked-hedge: stacked hedge 'could potentially' (advisory); keep one qualifier at the confidence the source supports
+memo.md:1:35: stacked-hedge: stacked hedge 'could potentially'; keep one qualifier at the confidence the source supports
 memo.md:1:20: unglossed-term: 'QBR' is used without an earlier gloss (advisory); expand it at first use, as in 'Full Name (QBR)' or 'QBR (Full Name)'
 exit 1
 $ printf 'The quarterly business review (QBR) sets targets. Each member gets a QBR plan.\n' > glossed.md

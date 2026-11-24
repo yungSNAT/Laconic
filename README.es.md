@@ -320,7 +320,7 @@ Para usar `lint` como filtro en CI o en un hook de pre-commit, estas opciones fi
 | `--commit-msg` | Lee cada archivo como un mensaje de commit de Git, sin las líneas de comentario ni nada bajo la línea de tijeras. |
 | `--config <file>` | Lee la configuración de este archivo en lugar de `.laconic-check`. |
 
-Un perfil cambia qué reglas se ejecutan y cuáles fallan; sin perfil, `lint` no cambia. `email`, `report` y `essay` activan [`unglossed-term`](docs/rules.md#unglossed-term), una regla de aviso para una sigla de 3 a 8 mayúsculas sin una explicación previa como 'Full Name (ACR)' o 'ACR stands for'; pasan las formas muy conocidas como 'BHP' y las palabras en mayúsculas para dar énfasis. Cada perfil activa además otras reglas opcionales; [docs/rules.md](docs/rules.md) indica cuáles en cada regla. `--only unglossed-term` la activa sin perfil. Esos 3 perfiles hacen fallar `stacked-hedge`; `email` y `essay`, también `bold-label`; `essay`, también `clause-dashes`; y `report`, también `hyphen-consistency` y `acronym-before-definition`. `chat` hace fallar `stacked-hedge`, `bold-label` y `clause-dashes` y descarta `acronym-before-definition` y `hyphen-consistency`; `docs` descarta `bold-label` y `acronym-before-definition` y deja `number-word` como aviso. Un hallazgo que un perfil hace fallar conserva '(advisory)' en su mensaje; `--json` da su estado en `advisory`:
+Un perfil cambia qué reglas se ejecutan y cuáles fallan; sin perfil, `lint` no cambia. `email`, `report` y `essay` activan [`unglossed-term`](docs/rules.md#unglossed-term), una regla de aviso para una sigla de 3 a 8 mayúsculas sin una explicación previa como 'Full Name (ACR)' o 'ACR stands for'; pasan las formas muy conocidas como 'BHP' y las palabras en mayúsculas para dar énfasis. Cada perfil activa además otras reglas opcionales; [docs/rules.md](docs/rules.md) indica cuáles en cada regla. `--only unglossed-term` la activa sin perfil. Esos 3 perfiles hacen fallar `stacked-hedge`; `email` y `essay`, también `bold-label`; `essay`, también `clause-dashes`; y `report`, también `hyphen-consistency` y `acronym-before-definition`. `chat` hace fallar `stacked-hedge`, `bold-label` y `clause-dashes` y descarta `acronym-before-definition` y `hyphen-consistency`; `docs` descarta `bold-label` y `acronym-before-definition` y deja `number-word` como aviso. Un hallazgo que un perfil hace fallar pierde '(advisory)' en su mensaje:
 
 ```text
 $ printf 'Each member gets a QBR plan. This could potentially slip a week.\n' > memo.md
@@ -328,7 +328,7 @@ $ laconic-check lint memo.md; echo "exit $?"
 memo.md:1:35: stacked-hedge: stacked hedge 'could potentially' (advisory); keep one qualifier at the confidence the source supports
 exit 0
 $ laconic-check lint --profile report memo.md; echo "exit $?"
-memo.md:1:35: stacked-hedge: stacked hedge 'could potentially' (advisory); keep one qualifier at the confidence the source supports
+memo.md:1:35: stacked-hedge: stacked hedge 'could potentially'; keep one qualifier at the confidence the source supports
 memo.md:1:20: unglossed-term: 'QBR' is used without an earlier gloss (advisory); expand it at first use, as in 'Full Name (QBR)' or 'QBR (Full Name)'
 exit 1
 $ printf 'The quarterly business review (QBR) sets targets. Each member gets a QBR plan.\n' > glossed.md

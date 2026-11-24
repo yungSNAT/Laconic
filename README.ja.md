@@ -320,7 +320,7 @@ Homebrew のフォーミュラと winget のマニフェストは tap と winget
 | `--commit-msg` | 各ファイルを Git のコミットメッセージとして読み、コメント行とはさみ線より下は除きます。 |
 | `--config <file>` | `.laconic-check` の代わりにこのファイルから設定を読みます。 |
 
-プロファイルは、どのルールを実行し、どのルールで失敗するかを変えます。指定しなければ `lint` は変わりません。`email`、`report`、`essay` は [`unglossed-term`](docs/rules.md#unglossed-term) を有効にします。これは 'Full Name (ACR)' や 'ACR stands for' のような説明が前にない、大文字 3〜8 字の略語を指摘する助言ルールで、'BHP' のような広く知られた形や強調のための大文字の語は通します。どのプロファイルも、ほかのオプトインのルールをいくつか有効にします。どれかは [docs/rules.md](docs/rules.md) の各ルールに書かれています。`--only unglossed-term` はプロファイルなしでこれを有効にします。この 3 つのプロファイルでは `stacked-hedge` で失敗し、さらに `email` と `essay` では `bold-label`、`essay` では `clause-dashes`、`report` では `hyphen-consistency` と `acronym-before-definition` でも失敗します。`chat` は `stacked-hedge`、`bold-label`、`clause-dashes` で失敗させ、`acronym-before-definition` と `hyphen-consistency` を外します。`docs` は `bold-label` と `acronym-before-definition` を外し、`number-word` を助言にします。プロファイルで失敗するようになった指摘も、メッセージには '(advisory)' が残ります。状態は `--json` の `advisory` で分かります。
+プロファイルは、どのルールを実行し、どのルールで失敗するかを変えます。指定しなければ `lint` は変わりません。`email`、`report`、`essay` は [`unglossed-term`](docs/rules.md#unglossed-term) を有効にします。これは 'Full Name (ACR)' や 'ACR stands for' のような説明が前にない、大文字 3〜8 字の略語を指摘する助言ルールで、'BHP' のような広く知られた形や強調のための大文字の語は通します。どのプロファイルも、ほかのオプトインのルールをいくつか有効にします。どれかは [docs/rules.md](docs/rules.md) の各ルールに書かれています。`--only unglossed-term` はプロファイルなしでこれを有効にします。この 3 つのプロファイルでは `stacked-hedge` で失敗し、さらに `email` と `essay` では `bold-label`、`essay` では `clause-dashes`、`report` では `hyphen-consistency` と `acronym-before-definition` でも失敗します。`chat` は `stacked-hedge`、`bold-label`、`clause-dashes` で失敗させ、`acronym-before-definition` と `hyphen-consistency` を外します。`docs` は `bold-label` と `acronym-before-definition` を外し、`number-word` を助言にします。プロファイルで失敗するようになった指摘は、メッセージから '(advisory)' が消えます。
 
 ```text
 $ printf 'Each member gets a QBR plan. This could potentially slip a week.\n' > memo.md
@@ -328,7 +328,7 @@ $ laconic-check lint memo.md; echo "exit $?"
 memo.md:1:35: stacked-hedge: stacked hedge 'could potentially' (advisory); keep one qualifier at the confidence the source supports
 exit 0
 $ laconic-check lint --profile report memo.md; echo "exit $?"
-memo.md:1:35: stacked-hedge: stacked hedge 'could potentially' (advisory); keep one qualifier at the confidence the source supports
+memo.md:1:35: stacked-hedge: stacked hedge 'could potentially'; keep one qualifier at the confidence the source supports
 memo.md:1:20: unglossed-term: 'QBR' is used without an earlier gloss (advisory); expand it at first use, as in 'Full Name (QBR)' or 'QBR (Full Name)'
 exit 1
 $ printf 'The quarterly business review (QBR) sets targets. Each member gets a QBR plan.\n' > glossed.md

@@ -311,12 +311,39 @@ Homebrew のフォーミュラと winget のマニフェストは tap と winget
 | --- | --- |
 | `--json` | JSON オブジェクトを 1 つ出力します。それぞれ `file`、`line`、`column`、`rule`、`advisory`、`message`、`url` を持つ `findings`、続いて `failing` の件数と、コメントで `suppressed` された指摘の数です。 |
 | `--sarif` | GitHub の code scanning などの SARIF ビューア向けに [SARIF 2.1.0](https://docs.oasis-open.org/sarif/sarif/v2.1.0/sarif-v2.1.0.html) のログを出力します。すべてのルールを説明とリンク付きで含め、各指摘を `warning` レベル（助言なら `note`）の結果として含めます。位置は、code scanning がリポジトリのパスに対応付けるファイルの絶対 `file` URI と、SARIF の数え方どおり UTF-16 コード単位の列で示します。`--json` とは併用できません。0.6.0 から。 |
+| `--metrics` | 指摘の後に、各ファイルの文章指標と、ファイルが 2 つ以上ならその合計を出力します。`--json` では `files` と `overall` を持つ `metrics` オブジェクトを加えます。`--sarif` とは併用できません。0.6.0 より後。 |
+| `--profile <name>` | 文章の用途別プリセットを適用します: `email`、`report`、`docs`、`chat`、`essay`。`.laconic-check` の `profile = <name>` 行も同じ働きをし、`--profile` がそれより優先します。0.6.0 より後。 |
 | `--disable <rules>` | これらのルールの指摘を捨てます。カンマ区切りで、繰り返し指定できます。 |
 | `--only <rules>` | これらのルールの指摘だけを残します。`--disable` が優先します。 |
 | `--max-findings <n>` | 失敗となる指摘が n 件を超えた場合だけ失敗します（既定値 0）。 |
 | `--warn` | 指摘では失敗しません。 |
 | `--commit-msg` | 各ファイルを Git のコミットメッセージとして読み、コメント行とはさみ線より下は除きます。 |
 | `--config <file>` | `.laconic-check` の代わりにこのファイルから設定を読みます。 |
+
+プロファイルは、どのルールを実行し、どのルールで失敗するかを変えます。指定しなければ `lint` は変わりません。`email`、`report`、`essay` は [`unglossed-term`](docs/rules.md#unglossed-term) を有効にします。これは 'Full Name (ACR)' や 'ACR stands for' のような説明が前にない、大文字 3〜8 字の略語を指摘する助言ルールで、'BHP' のような広く知られた形や強調のための大文字の語は通します。`--only unglossed-term` はプロファイルなしでこれを有効にします。この 3 つのプロファイルでは `stacked-hedge` で失敗し、さらに `email` と `essay` では `bold-label`、`essay` では `clause-dashes`、`report` では `hyphen-consistency` と `acronym-before-definition` でも失敗します。`chat` は `stacked-hedge`、`bold-label`、`clause-dashes` で失敗させ、`acronym-before-definition` と `hyphen-consistency` を外します。`docs` は `bold-label` と `acronym-before-definition` を外し、`number-word` を助言にします。プロファイルで失敗するようになった指摘も、メッセージには '(advisory)' が残ります。状態は `--json` の `advisory` で分かります。
+
+```text
+$ printf 'Each member gets a QBR plan. This could potentially slip a week.\n' > memo.md
+$ laconic-check lint memo.md; echo "exit $?"
+memo.md:1:35: stacked-hedge: stacked hedge 'could potentially' (advisory); keep one qualifier at the confidence the source supports
+exit 0
+$ laconic-check lint --profile report memo.md; echo "exit $?"
+memo.md:1:35: stacked-hedge: stacked hedge 'could potentially' (advisory); keep one qualifier at the confidence the source supports
+memo.md:1:20: unglossed-term: 'QBR' is used without an earlier gloss (advisory); expand it at first use, as in 'Full Name (QBR)' or 'QBR (Full Name)'
+exit 1
+$ printf 'The quarterly business review (QBR) sets targets. Each member gets a QBR plan.\n' > glossed.md
+$ laconic-check lint --only unglossed-term memo.md glossed.md; echo "exit $?"
+memo.md:1:20: unglossed-term: 'QBR' is used without an earlier gloss (advisory); expand it at first use, as in 'Full Name (QBR)' or 'QBR (Full Name)'
+exit 0
+```
+
+`--metrics` は文章だけを測り、コード、URL、HTML タグ、フロントマター、`> [!NOTE]` のようなアラート以外の引用は除きます。語数、文数、平均語長、長い語（7 文字以上）の割合、名詞化語（3 文字以上の語幹に '-tion'、'-sion'、'-ment'、'-ness'、'-ity'、'-ance'、'-ence' が続く語）の割合、'logs, metrics and traces' のような 3 項目の列挙、文の長さの平均と中央値を報告します。指摘や終了ステータスは変えないので、下書きと書き直しの比較に使えます。
+
+```text
+$ printf 'We reviewed the logs, metrics and traces. The implementation of the measurement is complete.\n' > notes.md
+$ laconic-check lint --metrics notes.md
+metrics: notes.md: words=14 sentences=2 mean_word_len=5.43 long_words=35.7% nominalisations=14.3% triads=1 sentence_len=mean 7.0 / median 7.0
+```
 
 `lint` を実行するディレクトリにある `.laconic-check` ファイルには、`disable`、`only`、`max-findings` の `key = value` 行と、`#` のコメント行を書きます。`accept` 行は、`us-spelling` が指摘しない英字のみの語を並べ、それぞれ同じ大文字小文字で単語単位で照合します。そのため `accept = color` でも文頭の 'Color' は指摘されます（0.6.0 から）。コマンドラインのルールはそのリストに追加され、`--max-findings` はその件数を置き換えます。
 

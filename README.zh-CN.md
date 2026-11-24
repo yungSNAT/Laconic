@@ -311,12 +311,39 @@ Homebrew 配方和 winget 清单是为 tap 和 winget 目录附上的，但 tap 
 | --- | --- |
 | `--json` | 输出一个 JSON 对象：`findings`，每项含 `file`、`line`、`column`、`rule`、`advisory`、`message` 和 `url`，然后是 `failing` 计数和被注释 `suppressed` 的问题数。 |
 | `--sarif` | 为 GitHub code scanning 和其他 SARIF 查看器输出 [SARIF 2.1.0](https://docs.oasis-open.org/sarif/sarif/v2.1.0/sarif-v2.1.0.html) 日志：包含每条规则及其描述和链接，每个问题作为级别为 `warning`（若为建议则为 `note`）的结果，用文件的绝对 `file` URI 定位（code scanning 会把它映射到仓库路径），列按 SARIF 的计数方式以 UTF-16 码元计。不能与 `--json` 同用；自 0.6.0 起。 |
+| `--metrics` | 在问题之后，打印每个文件的文字指标；有 2 个或更多文件时，还打印合计。配合 `--json` 时，增加一个含 `files` 和 `overall` 的 `metrics` 对象。不能与 `--sarif` 同用；0.6.0 之后。 |
+| `--profile <name>` | 应用一种文体预设：`email`、`report`、`docs`、`chat` 或 `essay`。`.laconic-check` 中的 `profile = <name>` 行作用相同，`--profile` 优先于它。0.6.0 之后。 |
 | `--disable <rules>` | 丢弃这些规则的问题；用逗号分隔，可重复。 |
 | `--only <rules>` | 只保留这些规则的问题；`--disable` 优先。 |
 | `--max-findings <n>` | 只有失败问题多于 n 个时才失败（默认 0）。 |
 | `--warn` | 永不因问题而失败。 |
 | `--commit-msg` | 把每个文件当作 Git 提交信息读取，忽略注释行和剪刀线以下的内容。 |
 | `--config <file>` | 从此文件而不是 `.laconic-check` 读取设置。 |
+
+预设决定运行哪些规则、哪些规则会导致失败；不指定时，`lint` 不变。`email`、`report` 和 `essay` 会启用 [`unglossed-term`](docs/rules.md#unglossed-term)，这是一条建议性规则，针对前文没有 'Full Name (ACR)' 或 'ACR stands for' 之类说明、由 3 到 8 个大写字母组成的缩写；'BHP' 之类广为人知的形式和用于强调的大写词会通过。`--only unglossed-term` 可在不用预设时启用它。这 3 个预设会因 `stacked-hedge` 失败，`email` 和 `essay` 还会因 `bold-label`，`essay` 还会因 `clause-dashes`，`report` 还会因 `hyphen-consistency` 和 `acronym-before-definition` 失败。`chat` 会因 `stacked-hedge`、`bold-label` 和 `clause-dashes` 失败，并去掉 `acronym-before-definition` 和 `hyphen-consistency`；`docs` 去掉 `bold-label` 和 `acronym-before-definition`，并把 `number-word` 改为建议性。因预设而导致失败的问题，其消息中仍保留 '(advisory)'；`--json` 在 `advisory` 中给出其状态：
+
+```text
+$ printf 'Each member gets a QBR plan. This could potentially slip a week.\n' > memo.md
+$ laconic-check lint memo.md; echo "exit $?"
+memo.md:1:35: stacked-hedge: stacked hedge 'could potentially' (advisory); keep one qualifier at the confidence the source supports
+exit 0
+$ laconic-check lint --profile report memo.md; echo "exit $?"
+memo.md:1:35: stacked-hedge: stacked hedge 'could potentially' (advisory); keep one qualifier at the confidence the source supports
+memo.md:1:20: unglossed-term: 'QBR' is used without an earlier gloss (advisory); expand it at first use, as in 'Full Name (QBR)' or 'QBR (Full Name)'
+exit 1
+$ printf 'The quarterly business review (QBR) sets targets. Each member gets a QBR plan.\n' > glossed.md
+$ laconic-check lint --only unglossed-term memo.md glossed.md; echo "exit $?"
+memo.md:1:20: unglossed-term: 'QBR' is used without an earlier gloss (advisory); expand it at first use, as in 'Full Name (QBR)' or 'QBR (Full Name)'
+exit 0
+```
+
+`--metrics` 只测量正文，跳过代码、URL、HTML 标签、front matter，以及除 `> [!NOTE]` 之类提示外的引文。它报告词数、句数、平均词长、长词（7 个或更多字母）的比例、名词化词（3 个或更多字母的词干后接 '-tion'、'-sion'、'-ment'、'-ness'、'-ity'、'-ance' 或 '-ence'）的比例、'logs, metrics and traces' 这样的 3 项列举，以及句长的平均值和中位数。它不改变任何问题或退出状态，因此可用来比较草稿和改写稿：
+
+```text
+$ printf 'We reviewed the logs, metrics and traces. The implementation of the measurement is complete.\n' > notes.md
+$ laconic-check lint --metrics notes.md
+metrics: notes.md: words=14 sentences=2 mean_word_len=5.43 long_words=35.7% nominalisations=14.3% triads=1 sentence_len=mean 7.0 / median 7.0
+```
 
 在运行 `lint` 的目录中，`.laconic-check` 文件包含 `disable`、`only` 和 `max-findings` 的 `key = value` 行，以及 `#` 注释行。`accept` 行列出 `us-spelling` 不再标记的纯字母单词，每个词按整词并区分大小写匹配，因此 `accept = color` 仍会标记句首的 'Color'（自 0.6.0 起）。命令行上的规则会追加到其列表中，`--max-findings` 会替换其计数：
 

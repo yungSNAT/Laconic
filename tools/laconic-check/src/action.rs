@@ -187,15 +187,30 @@ fn lint(exe: &Path, args: &[&str], files: &[String]) -> Result<(u8, String), Str
         .map_err(|e| format!("cannot read lint's output: {e}"))?;
     let status = child.wait().map_err(|e| e.to_string())?;
     Ok((
-        exit_code(status.code()),
+        exit_code(status.code(), signal(&status)),
         String::from_utf8_lossy(&bytes).into_owned(),
     ))
 }
 
-/// `lint`'s exit status. A status outside 0 to 255, such as a Windows crash code or none at
-/// all (a signal), counts as an error.
-fn exit_code(code: Option<i32>) -> u8 {
-    code.and_then(|code| u8::try_from(code).ok()).unwrap_or(2)
+/// The signal that ended a process, where the system says.
+#[cfg(unix)]
+fn signal(status: &std::process::ExitStatus) -> Option<i32> {
+    std::os::unix::process::ExitStatusExt::signal(status)
+}
+
+#[cfg(not(unix))]
+fn signal(_: &std::process::ExitStatus) -> Option<i32> {
+    None
+}
+
+/// `lint`'s exit status, as a shell reports it: 128 plus the signal that ended it. Any other
+/// status outside 0 to 255, such as a Windows crash code, counts as an error.
+fn exit_code(code: Option<i32>, signal: Option<i32>) -> u8 {
+    match (code, signal) {
+        (Some(code), _) => u8::try_from(code).unwrap_or(2),
+        (None, Some(signal)) => u8::try_from(128 + signal).unwrap_or(2),
+        (None, None) => 2,
+    }
 }
 
 /// Prints each line of lint's output, and an annotation for each finding in it. Returns the
@@ -390,7 +405,11 @@ mod tests {
             Some(256),
             None,
         ];
-        assert_eq!(given.map(exit_code), [0, 1, 2, 2, 2, 2]);
+        assert_eq!(given.map(|code| exit_code(code, None)), [0, 1, 2, 2, 2, 2]);
+        assert_eq!(
+            [exit_code(None, Some(15)), exit_code(None, Some(9))],
+            [143, 137]
+        );
     }
 
     #[test]

@@ -374,3 +374,33 @@ fn every_case_is_recorded_once() {
         );
     }
 }
+
+/// A `lint` ended by a signal gives the status a shell reports: 128 plus the signal.
+#[cfg(unix)]
+#[test]
+fn a_signalled_lint_gives_128_plus_the_signal() {
+    use std::os::unix::fs::PermissionsExt;
+    let dir = Path::new(env!("CARGO_TARGET_TMPDIR")).join("action-signal");
+    std::fs::create_dir_all(&dir).unwrap();
+    let fake = dir.join("fake-laconic-check");
+    std::fs::write(&fake, "#!/bin/sh\nkill -TERM $$\n").unwrap();
+    std::fs::set_permissions(&fake, std::fs::Permissions::from_mode(0o755)).unwrap();
+    std::fs::write(dir.join("a.md"), CLEAN).unwrap();
+    let script = Path::new(env!("CARGO_MANIFEST_DIR")).join("action/lint.sh");
+    let (mut rust, mut shell) = (Command::new(exe()), Command::new("bash"));
+    rust.arg("action-lint");
+    shell.arg(script);
+    for command in [&mut rust, &mut shell] {
+        let out = command
+            .current_dir(&dir)
+            .env("LACONIC_CHECK", &fake)
+            .env("LACONIC_FILES", "a.md")
+            .env("LACONIC_ARGS", "")
+            .output()
+            .unwrap();
+        assert_eq!(
+            (out.stdout.as_slice(), out.status.code()),
+            (&b""[..], Some(143))
+        );
+    }
+}

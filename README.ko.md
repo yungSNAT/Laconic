@@ -311,12 +311,39 @@ Homebrew 포뮬러와 winget 매니페스트는 탭과 winget 카탈로그용으
 | --- | --- |
 | `--json` | JSON 객체 하나를 출력합니다. 각각 `file`, `line`, `column`, `rule`, `advisory`, `message`, `url`이 있는 `findings`, 그다음 `failing` 개수와 주석으로 `suppressed`된 지적 수입니다. |
 | `--sarif` | GitHub code scanning과 다른 SARIF 뷰어용 [SARIF 2.1.0](https://docs.oasis-open.org/sarif/sarif/v2.1.0/sarif-v2.1.0.html) 로그를 출력합니다. 모든 규칙을 설명과 링크와 함께 담고, 각 지적을 `warning` 수준(조언이면 `note`) 결과로 담습니다. 위치는 code scanning이 저장소 경로로 대응시키는 파일의 절대 `file` URI와, SARIF가 세는 방식대로 UTF-16 코드 단위의 열로 나타냅니다. `--json`과 함께 쓸 수 없으며, 0.6.0부터입니다. |
+| `--metrics` | 지적 사항 뒤에 각 파일의 문장 지표를 출력하고, 파일이 2개 이상이면 전체 지표도 출력합니다. `--json`에서는 `files`와 `overall`을 담은 `metrics` 객체를 더합니다. `--sarif`와 함께 쓸 수 없으며, 0.6.0 이후입니다. |
+| `--profile <name>` | 글의 용도별 프리셋을 적용합니다: `email`, `report`, `docs`, `chat`, `essay`. `.laconic-check`의 `profile = <name>` 줄도 같은 일을 하며, `--profile`이 그보다 우선합니다. 0.6.0 이후입니다. |
 | `--disable <rules>` | 이 규칙들의 지적을 버립니다. 쉼표로 구분하며 반복할 수 있습니다. |
 | `--only <rules>` | 이 규칙들의 지적만 남깁니다. `--disable`이 우선합니다. |
 | `--max-findings <n>` | 실패 지적이 n개를 넘을 때만 실패합니다(기본값 0). |
 | `--warn` | 지적 때문에 실패하지 않습니다. |
 | `--commit-msg` | 각 파일을 Git 커밋 메시지로 읽으며, 주석 줄과 가위 줄 아래는 제외합니다. |
 | `--config <file>` | `.laconic-check` 대신 이 파일에서 설정을 읽습니다. |
+
+프로필은 어떤 규칙을 실행하고 어떤 규칙으로 실패할지를 바꿉니다. 프로필이 없으면 `lint`는 그대로입니다. `email`, `report`, `essay`는 [`unglossed-term`](docs/rules.md#unglossed-term)을 켭니다. 이 규칙은 'Full Name (ACR)'이나 'ACR stands for' 같은 설명이 앞에 없는 대문자 3~8자의 약어를 알리는 권고 규칙이며, 'BHP' 같은 널리 알려진 형태와 강조용 대문자 단어는 통과합니다. 모든 프로필은 다른 옵트인 규칙도 일부 켭니다. 어떤 규칙인지는 [docs/rules.md](docs/rules.md)의 각 규칙에 나옵니다. `--only unglossed-term`은 프로필 없이 이 규칙을 켭니다. 이 3개 프로필은 `stacked-hedge`로 실패하고, `email`과 `essay`는 `bold-label`, `essay`는 `clause-dashes`, `report`는 `hyphen-consistency`와 `acronym-before-definition`으로도 실패합니다. `chat`은 `stacked-hedge`, `bold-label`, `clause-dashes`로 실패하게 하고 `acronym-before-definition`과 `hyphen-consistency`를 뺍니다. `docs`는 `bold-label`과 `acronym-before-definition`을 빼고 `number-word`를 권고로 바꿉니다. 프로필 때문에 실패하게 된 지적은 메시지에서 '(advisory)'가 빠집니다.
+
+```text
+$ printf 'Each member gets a QBR plan. This could potentially slip a week.\n' > memo.md
+$ laconic-check lint memo.md; echo "exit $?"
+memo.md:1:35: stacked-hedge: stacked hedge 'could potentially' (advisory); keep one qualifier at the confidence the source supports
+exit 0
+$ laconic-check lint --profile report memo.md; echo "exit $?"
+memo.md:1:35: stacked-hedge: stacked hedge 'could potentially'; keep one qualifier at the confidence the source supports
+memo.md:1:20: unglossed-term: 'QBR' is used without an earlier gloss (advisory); expand it at first use, as in 'Full Name (QBR)' or 'QBR (Full Name)'
+exit 1
+$ printf 'The quarterly business review (QBR) sets targets. Each member gets a QBR plan.\n' > glossed.md
+$ laconic-check lint --only unglossed-term memo.md glossed.md; echo "exit $?"
+memo.md:1:20: unglossed-term: 'QBR' is used without an earlier gloss (advisory); expand it at first use, as in 'Full Name (QBR)' or 'QBR (Full Name)'
+exit 0
+```
+
+`--metrics`는 문장만 측정하며 코드, URL, HTML 태그, 프런트 매터, 그리고 `> [!NOTE]` 같은 알림이 아닌 인용은 건너뜁니다. 단어 수, 문장 수, 평균 단어 길이, 긴 단어(7자 이상)의 비율, 명사화 단어(3자 이상의 어간 뒤에 '-tion', '-sion', '-ment', '-ness', '-ity', '-ance', '-ence'가 붙은 단어)의 비율, 'logs, metrics and traces' 같은 3항목 나열, 문장 길이의 평균과 중앙값을 보고합니다. 지적 사항이나 종료 상태는 바꾸지 않으므로 초안과 고쳐 쓴 글을 비교할 수 있습니다.
+
+```text
+$ printf 'We reviewed the logs, metrics and traces. The implementation of the measurement is complete.\n' > notes.md
+$ laconic-check lint --metrics notes.md
+metrics: notes.md: words=14 sentences=2 mean_word_len=5.43 long_words=35.7% nominalisations=14.3% triads=1 sentence_len=mean 7.0 / median 7.0
+```
 
 `lint`를 실행하는 디렉터리의 `.laconic-check` 파일에는 `disable`, `only`, `max-findings`에 대한 `key = value` 줄과 `#` 주석 줄이 들어갑니다. `accept` 줄은 `us-spelling`이 지적하지 않을 글자만으로 된 단어를 나열하며, 각 단어는 같은 대소문자로 온전한 단어 단위로 대조됩니다. 그래서 `accept = color`여도 문장 첫머리의 'Color'는 계속 지적됩니다(0.6.0부터). 명령줄의 규칙은 목록에 더해지고, `--max-findings`는 개수를 대체합니다.
 

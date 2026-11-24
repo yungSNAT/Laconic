@@ -311,12 +311,39 @@ Para usar `lint` como filtro en CI o en un hook de pre-commit, estas opciones fi
 | --- | --- |
 | `--json` | Imprime un objeto JSON: `findings`, cada uno con `file`, `line`, `column`, `rule`, `advisory`, `message` y `url`, luego el recuento `failing` y el número de hallazgos `suppressed` por comentarios. |
 | `--sarif` | Imprime un registro [SARIF 2.1.0](https://docs.oasis-open.org/sarif/sarif/v2.1.0/sarif-v2.1.0.html) para el code scanning de GitHub y otros visores SARIF: cada regla, con su descripción y enlace, y cada hallazgo como resultado de nivel `warning` (`note` si es consejo), ubicado por la URI `file` absoluta del archivo, que code scanning asigna a su ruta en el repositorio, y por columnas en unidades de código UTF-16, como las cuenta SARIF. No con `--json`; desde 0.6.0. |
+| `--metrics` | Tras los hallazgos, imprime métricas de la prosa de cada archivo, y de todos juntos cuando hay 2 o más; con `--json`, añade un objeto `metrics` con `files` y `overall`. No con `--sarif`; después de 0.6.0. |
+| `--profile <name>` | Aplica un perfil de registro: `email`, `report`, `docs`, `chat` o `essay`. Una línea `profile = <name>` en `.laconic-check` hace lo mismo, y `--profile` la sustituye. Después de 0.6.0. |
 | `--disable <rules>` | Descarta los hallazgos de estas reglas; separadas por comas y repetible. |
 | `--only <rules>` | Conserva solo los hallazgos de estas reglas; `--disable` prevalece sobre ella. |
 | `--max-findings <n>` | Falla solo con más de n hallazgos que hacen fallar (por defecto 0). |
 | `--warn` | Nunca falla por hallazgos. |
 | `--commit-msg` | Lee cada archivo como un mensaje de commit de Git, sin las líneas de comentario ni nada bajo la línea de tijeras. |
 | `--config <file>` | Lee la configuración de este archivo en lugar de `.laconic-check`. |
+
+Un perfil cambia qué reglas se ejecutan y cuáles fallan; sin perfil, `lint` no cambia. `email`, `report` y `essay` activan [`unglossed-term`](docs/rules.md#unglossed-term), una regla de aviso para una sigla de 3 a 8 mayúsculas sin una explicación previa como 'Full Name (ACR)' o 'ACR stands for'; pasan las formas muy conocidas como 'BHP' y las palabras en mayúsculas para dar énfasis. Cada perfil activa además otras reglas opcionales; [docs/rules.md](docs/rules.md) indica cuáles en cada regla. `--only unglossed-term` la activa sin perfil. Esos 3 perfiles hacen fallar `stacked-hedge`; `email` y `essay`, también `bold-label`; `essay`, también `clause-dashes`; y `report`, también `hyphen-consistency` y `acronym-before-definition`. `chat` hace fallar `stacked-hedge`, `bold-label` y `clause-dashes` y descarta `acronym-before-definition` y `hyphen-consistency`; `docs` descarta `bold-label` y `acronym-before-definition` y deja `number-word` como aviso. Un hallazgo que un perfil hace fallar pierde '(advisory)' en su mensaje:
+
+```text
+$ printf 'Each member gets a QBR plan. This could potentially slip a week.\n' > memo.md
+$ laconic-check lint memo.md; echo "exit $?"
+memo.md:1:35: stacked-hedge: stacked hedge 'could potentially' (advisory); keep one qualifier at the confidence the source supports
+exit 0
+$ laconic-check lint --profile report memo.md; echo "exit $?"
+memo.md:1:35: stacked-hedge: stacked hedge 'could potentially'; keep one qualifier at the confidence the source supports
+memo.md:1:20: unglossed-term: 'QBR' is used without an earlier gloss (advisory); expand it at first use, as in 'Full Name (QBR)' or 'QBR (Full Name)'
+exit 1
+$ printf 'The quarterly business review (QBR) sets targets. Each member gets a QBR plan.\n' > glossed.md
+$ laconic-check lint --only unglossed-term memo.md glossed.md; echo "exit $?"
+memo.md:1:20: unglossed-term: 'QBR' is used without an earlier gloss (advisory); expand it at first use, as in 'Full Name (QBR)' or 'QBR (Full Name)'
+exit 0
+```
+
+`--metrics` mide solo la prosa y omite código, URL, etiquetas HTML, front matter y citas que no sean alertas como `> [!NOTE]`. Informa de palabras, oraciones, longitud media de palabra, la proporción de palabras largas (7 o más letras), la proporción de nominalizaciones (una raíz de 3 o más letras antes de '-tion', '-sion', '-ment', '-ness', '-ity', '-ance' o '-ence'), listas de 3 como 'logs, metrics and traces' y la longitud media y mediana de las oraciones. No cambia ningún hallazgo ni el estado de salida, así que sirve para comparar un borrador con su reescritura:
+
+```text
+$ printf 'We reviewed the logs, metrics and traces. The implementation of the measurement is complete.\n' > notes.md
+$ laconic-check lint --metrics notes.md
+metrics: notes.md: words=14 sentences=2 mean_word_len=5.43 long_words=35.7% nominalisations=14.3% triads=1 sentence_len=mean 7.0 / median 7.0
+```
 
 Un archivo `.laconic-check` en el directorio desde el que se ejecuta `lint` contiene líneas `key = value` para `disable`, `only` y `max-findings`, y líneas de comentario `#`. Una línea `accept` enumera palabras solo de letras que `us-spelling` no marca, cada una comparada como palabra completa y con las mismas mayúsculas, así que `accept = color` sigue marcando 'Color' al inicio de una frase (desde 0.6.0). Las reglas de la línea de comandos se suman a sus listas, y `--max-findings` sustituye su recuento:
 

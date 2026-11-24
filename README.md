@@ -298,12 +298,39 @@ To run `lint` as a gate in CI or a pre-commit hook, these options set what it re
 | --- | --- |
 | `--json` | Prints one JSON object: `findings`, each with `file`, `line`, `column`, `rule`, `advisory`, `message` and `url`, then the `failing` count and the number of findings `suppressed` by comments. |
 | `--sarif` | Prints a [SARIF 2.1.0](https://docs.oasis-open.org/sarif/sarif/v2.1.0/sarif-v2.1.0.html) log for GitHub code scanning and other SARIF viewers: every rule, with its description and link, and each finding as a result at level `warning` (`note` if advisory), located by the file's absolute `file` URI, which code scanning maps to its repository path, and by columns in UTF-16 code units, as SARIF counts them. Not with `--json`; from 0.6.0. |
+| `--metrics` | After the findings, prints prose metrics for each file, and for all of them together when there are 2 or more; with `--json`, adds a `metrics` object holding `files` and `overall`. Not with `--sarif`; after 0.6.0. |
+| `--profile <name>` | Applies a register preset: `email`, `report`, `docs`, `chat` or `essay`. A `profile = <name>` line in `.laconic-check` does the same, and `--profile` overrides it. After 0.6.0. |
 | `--disable <rules>` | Drops these rules' findings; comma-separated and repeatable. |
 | `--only <rules>` | Keeps only these rules' findings; `--disable` wins over it. |
 | `--max-findings <n>` | Fails only on more than n failing findings (default 0). |
 | `--warn` | Never fails on findings. |
 | `--commit-msg` | Reads each file as a Git commit message, without comment lines or anything below the scissors line. |
 | `--config <file>` | Reads settings from this file instead of `.laconic-check`. |
+
+A profile changes which rules run and which fail; without one, `lint` is unchanged. `email`, `report` and `essay` turn on [`unglossed-term`](docs/rules.md#unglossed-term), an advisory rule for an acronym of 3 to 8 capitals with no earlier gloss such as 'Full Name (ACR)' or 'ACR stands for'; widely known forms such as 'BHP' and words in capitals for emphasis pass. Every profile also turns on some other opt-in rules; [docs/rules.md](docs/rules.md) says which under each rule. `--only unglossed-term` turns it on without a profile. Those 3 profiles make `stacked-hedge` fail, `email` and `essay` also `bold-label`, `essay` also `clause-dashes`, and `report` also `hyphen-consistency` and `acronym-before-definition`. `chat` makes `stacked-hedge`, `bold-label` and `clause-dashes` fail and drops `acronym-before-definition` and `hyphen-consistency`; `docs` drops `bold-label` and `acronym-before-definition` and makes `number-word` advisory. A finding that a profile makes fail drops '(advisory)' from its message:
+
+```text
+$ printf 'Each member gets a QBR plan. This could potentially slip a week.\n' > memo.md
+$ laconic-check lint memo.md; echo "exit $?"
+memo.md:1:35: stacked-hedge: stacked hedge 'could potentially' (advisory); keep one qualifier at the confidence the source supports
+exit 0
+$ laconic-check lint --profile report memo.md; echo "exit $?"
+memo.md:1:35: stacked-hedge: stacked hedge 'could potentially'; keep one qualifier at the confidence the source supports
+memo.md:1:20: unglossed-term: 'QBR' is used without an earlier gloss (advisory); expand it at first use, as in 'Full Name (QBR)' or 'QBR (Full Name)'
+exit 1
+$ printf 'The quarterly business review (QBR) sets targets. Each member gets a QBR plan.\n' > glossed.md
+$ laconic-check lint --only unglossed-term memo.md glossed.md; echo "exit $?"
+memo.md:1:20: unglossed-term: 'QBR' is used without an earlier gloss (advisory); expand it at first use, as in 'Full Name (QBR)' or 'QBR (Full Name)'
+exit 0
+```
+
+`--metrics` measures prose only, skipping code, URLs, HTML tags, front matter and quotations other than alerts such as `> [!NOTE]`. It reports words, sentences, mean word length, the share of long words (7 or more letters), the share of nominalisations (a stem of 3 or more letters before '-tion', '-sion', '-ment', '-ness', '-ity', '-ance' or '-ence'), lists of 3 such as 'logs, metrics and traces' and the mean and median sentence length. It changes no finding or exit status, so it can compare a draft with its rewrite:
+
+```text
+$ printf 'We reviewed the logs, metrics and traces. The implementation of the measurement is complete.\n' > notes.md
+$ laconic-check lint --metrics notes.md
+metrics: notes.md: words=14 sentences=2 mean_word_len=5.43 long_words=35.7% nominalisations=14.3% triads=1 sentence_len=mean 7.0 / median 7.0
+```
 
 A `.laconic-check` file in the directory `lint` runs from holds `key = value` lines for `disable`, `only` and `max-findings`, and `#` comment lines. An `accept` line lists words of letters only that `us-spelling` does not flag, each matched as a whole word in the same case, so `accept = color` keeps 'Color' at the start of a sentence flagged (from 0.6.0). Rules on the command line add to its lists, and `--max-findings` replaces its count:
 

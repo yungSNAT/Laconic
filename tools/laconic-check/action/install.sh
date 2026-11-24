@@ -4,11 +4,20 @@
 # `bin`, so the lint step runs that binary and no other. Used by the composite Action in action.yml.
 set -euo pipefail
 case "$VERSION" in
-  '' | *[!0-9.]*)
-    echo "::error::version must be a release number such as 0.3.0, not '$VERSION'"
+  '' | *[!0-9.]* | .* | *. | *..* )
+    echo "::error::version must be a release number such as 0.6.0, not '$VERSION'"
     exit 2
     ;;
 esac
+IFS='.' read -r major minor patch extra <<< "$VERSION"
+if [[ -z "$patch" || -n "$extra" ]]; then
+  echo "::error::version must be a release number such as 0.6.0, not '$VERSION'"
+  exit 2
+fi
+if (( 10#$major == 0 && 10#$minor < 6 )); then
+  echo "::error::the Action requires laconic-check 0.6.0 or later, not '$VERSION'"
+  exit 2
+fi
 case "$RUNNER_OS/$RUNNER_ARCH" in
   Linux/X64) target=x86_64-unknown-linux-musl ext=tar.gz exe=laconic-check ;;
   Windows/X64) target=x86_64-pc-windows-msvc ext=zip exe=laconic-check.exe ;;
@@ -38,4 +47,6 @@ if [[ ! -f "$exe" || ! -x "$exe" ]]; then
   echo "::error::$name holds no executable $exe"
   exit 1
 fi
-echo "bin=$(pwd)/$exe" >> "$GITHUB_OUTPUT"
+bin="$(pwd)/$exe"
+if command -v cygpath > /dev/null; then bin=$(cygpath -m "$bin"); fi
+echo "bin=$bin" >> "$GITHUB_OUTPUT"

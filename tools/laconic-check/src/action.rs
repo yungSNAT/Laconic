@@ -1,12 +1,12 @@
 // Copyright 2026 Ryan Duguid
 // SPDX-License-Identifier: Apache-2.0
 
-//! `laconic-check action-lint`: what the composite Action's `lint.sh` does. It runs this binary's
-//! `lint` on the files named in `LACONIC_FILES`, one path a line, or on every Markdown file
-//! Git tracks, and prints each finding as a workflow annotation: an error, or a warning for
-//! an advisory finding. `LACONIC_ARGS` holds further `lint` options. The exit status is
-//! lint's highest across the calls. The Action is the only caller and passes no arguments, so
-//! the command is not in `--help` or the completions.
+//! `laconic-check action-lint`: what the composite Action's `lint.sh` does. It runs `lint`,
+//! with the binary in `LACONIC_CHECK`, on the files named in `LACONIC_FILES`, one path a line,
+//! or on every Markdown file Git tracks, and prints each finding as a workflow annotation: an
+//! error, or a warning for an advisory finding. `LACONIC_ARGS` holds further `lint` options.
+//! The exit status is lint's highest across the calls. The Action is the only caller, so the
+//! command is not in `--help` or the completions.
 
 use std::collections::HashSet;
 use std::env;
@@ -23,8 +23,8 @@ const BATCH_LIMIT: usize = 24_000;
 
 const CANNOT_LIST: &str = "::error::cannot list the Markdown files Git tracks; check out the repository first, or name files in the files input";
 
-/// The Action's lint step, which passes its inputs in `LACONIC_FILES` and `LACONIC_ARGS`. It
-/// lints with this binary, so the checksum-verified download is what runs.
+/// The Action's lint step, which passes its inputs in `LACONIC_FILES` and `LACONIC_ARGS`, and
+/// the binary the install step verified in `LACONIC_CHECK`.
 pub fn from_env() -> ExitCode {
     let var = |name| {
         env::var_os(name)
@@ -32,18 +32,17 @@ pub fn from_env() -> ExitCode {
             .to_string_lossy()
             .into_owned()
     };
-    match env::current_exe() {
-        Ok(exe) => ExitCode::from(run(
-            &var("LACONIC_FILES"),
-            &var("LACONIC_ARGS"),
-            &exe,
-            &mut io::stdout().lock(),
-        )),
-        Err(e) => {
-            eprintln!("laconic-check: cannot find its own path: {e}");
-            ExitCode::from(2)
-        }
+    let exe = var("LACONIC_CHECK");
+    if exe.is_empty() {
+        println!("::error::LACONIC_CHECK names no binary to lint with");
+        return ExitCode::from(2);
     }
+    ExitCode::from(run(
+        &var("LACONIC_FILES"),
+        &var("LACONIC_ARGS"),
+        Path::new(&exe),
+        &mut io::stdout().lock(),
+    ))
 }
 
 /// Runs the Action's lint step for `files` (`LACONIC_FILES`) and `args` (`LACONIC_ARGS`),

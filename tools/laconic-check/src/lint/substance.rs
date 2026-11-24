@@ -186,7 +186,7 @@ fn has_magnitude_anchor(orig: &str, low: &str) -> bool {
         return true;
     }
     for prep in ["across ", "over ", "of ", "in 19", "in 20"] {
-        if let Some(pos) = low.find(prep) {
+        for (pos, _) in low.match_indices(prep) {
             let tail = &low[pos + prep.len()..];
             if prep.starts_with("in ") || tail.as_bytes().first().is_some_and(u8::is_ascii_digit) {
                 return true;
@@ -215,15 +215,13 @@ fn has_evidence_anchor(orig: &str, low: &str) -> bool {
         return true;
     }
     for prep in [" by ", " from ", " at "] {
-        let mut from = 0;
-        while let Some(pos) = low[from..].find(prep) {
-            let idx = from + pos + prep.len();
-            let after = orig.get(idx..).unwrap_or("");
-            let trimmed = after.strip_prefix("the ").unwrap_or(after);
+        for (pos, _) in low.match_indices(prep) {
+            let char_idx = low[..pos + prep.len()].chars().count();
+            let after: String = orig.chars().skip(char_idx).collect();
+            let trimmed = after.strip_prefix("the ").unwrap_or(&after);
             if trimmed.chars().next().is_some_and(char::is_uppercase) {
                 return true;
             }
-            from = idx;
         }
     }
     false

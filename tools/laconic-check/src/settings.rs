@@ -314,7 +314,8 @@ fn bracket_balanced(text: &str) -> bool {
     let mut in_quote: Option<char> = None;
     let mut escape = false;
     let mut depth = 0usize;
-    for c in text.chars() {
+    let mut chars = text.chars();
+    while let Some(c) = chars.next() {
         if let Some(q) = in_quote {
             if q == '"' && escape {
                 escape = false;
@@ -326,6 +327,13 @@ fn bracket_balanced(text: &str) -> bool {
             continue;
         }
         match c {
+            '#' => {
+                for ch in chars.by_ref() {
+                    if ch == '\n' {
+                        break;
+                    }
+                }
+            }
             '"' | '\'' => in_quote = Some(c),
             '[' => depth += 1,
             ']' => depth = depth.saturating_sub(1),

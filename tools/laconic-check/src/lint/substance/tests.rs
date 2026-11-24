@@ -156,3 +156,23 @@ fn partial_words_unclosed_brackets_and_unpaired_from_behave_cleanly() {
     assert!(!rules_of("See [insert unclosed text.").contains(&"ai-placeholder"));
     assert!(!rules_of("The load-bearingx frame held.").contains(&"chat-filler"));
 }
+
+#[test]
+fn unicode_casefold_length_change_and_later_prepositions_still_anchor() {
+    // 'İ' (2 bytes) -> 'i' (1 byte) and 'K' (3 bytes) -> 'k' (1 byte) must not shift `orig` offsets.
+    assert!(
+        !rules_of("\u{0130}stanbul studies show gains by CSIRO.").contains(&"unnamed-evidence")
+    );
+    assert!(
+        !rules_of("\u{212a}elvin research shows gains from the CSIRO.")
+            .contains(&"unnamed-evidence")
+    );
+    // Later `of <digit>` after an earlier non-numeric `of <word>` still anchors the magnitude.
+    assert!(
+        !rules_of("The audit of operations found a 90% reduction of 200 hours.")
+            .contains(&"unanchored-magnitude")
+    );
+    assert!(
+        !rules_of("It saves thousands of hours of 12 engineers.").contains(&"unanchored-magnitude")
+    );
+}

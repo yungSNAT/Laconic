@@ -373,3 +373,17 @@ fn toml_and_protect_parse_errors_and_edge_cases() {
     assert_eq!(find_in(&dir), Some(dir.join(TOML_PROJECT_FILE)));
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+#[test]
+fn multiline_toml_array_comments_with_apostrophes_or_brackets_parse_cleanly() {
+    let toml = "\
+[protect]
+phrases = [
+    # don't flag this idiom [keep]
+    \"deep dive\", # author's signature
+    \"gates and seams\",
+]
+";
+    let settings = Settings::parse("laconic.toml", toml).unwrap();
+    assert_eq!(settings.protect, ["deep dive", "gates and seams"]);
+}

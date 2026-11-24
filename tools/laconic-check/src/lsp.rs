@@ -15,7 +15,7 @@ use std::path::{Component, PathBuf};
 use crate::lint::{self, Finding, RuleRef};
 use crate::mcp::{self, Json, object, text};
 use crate::sarif;
-use crate::settings::{self, Settings};
+use crate::settings::{self, LineProtectCache, Settings};
 
 /// The longest message body, in bytes; a longer one is skipped without being held.
 const MAX_MESSAGE: usize = 16 << 20;
@@ -300,16 +300,18 @@ impl Server {
         let lines: Vec<&str> = body.lines().collect();
         let width = self.width();
         let found = lint::lint_counting_with(body, &settings.rules, settings.needs_opt_in()).0;
+        let mut protect_cache = LineProtectCache::default();
         found
             .into_iter()
-            .filter_map(|finding| {
+            .filter_map(|mut finding| {
                 let line = lines
                     .get(finding.line.checked_sub(1)?)
                     .copied()
                     .unwrap_or("");
-                if !settings.keeps(&finding, line) {
+                if !settings.keeps_cached(&finding, line, &mut protect_cache) {
                     return None;
                 }
+                finding.message = settings.format_message(&finding.rule, &finding.message);
                 let (start, end) = sarif::span(line, finding.column, width);
                 Some((finding, start, end))
             })

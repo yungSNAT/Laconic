@@ -26,12 +26,28 @@ fi
 args=()
 read -r -d '' -a args <<< "$LACONIC_ARGS" || true
 warn=
-for arg in ${args[@]+"${args[@]}"}; do
+i=0
+while (( i < ${#args[@]} )); do
+  arg=${args[i]}
+  if [[ "$arg" == -- ]]; then
+    break
+  fi
   if [[ "$arg" == --json || "$arg" == --sarif ]]; then
     echo "::error::the Action reads lint's text output, so args cannot include $arg"
     exit 2
   fi
+  if [[ "$arg" == --format ]]; then
+    i=$((i + 1))
+    if (( i >= ${#args[@]} )) || [[ "${args[i]}" != text ]]; then
+      echo "::error::the Action reads lint's text output, so args cannot include --format other than text"
+      exit 2
+    fi
+  elif [[ "$arg" == --format=* && "${arg#--format=}" != text ]]; then
+    echo "::error::the Action reads lint's text output, so args cannot include $arg"
+    exit 2
+  fi
   [[ "$arg" != --warn ]] || warn=1
+  i=$((i + 1))
 done
 if [[ ${#files[@]} -eq 0 ]]; then
   echo "No Markdown files to lint."
@@ -138,21 +154,32 @@ max_findings() {
       --config=*) config=${arg#*=} ;;
       --max-findings) i=$((i + 1)); max=${args[i]} ;;
       --config) i=$((i + 1)); config=${args[i]} ;;
-      --disable | --only) i=$((i + 1)) ;;
+      --disable | --only | --profile | --format) i=$((i + 1)) ;;
     esac
     i=$((i + 1))
   done
   if [[ -z "$max" ]]; then
-    [[ -n "$config" || ! -f .laconic-check ]] || config=.laconic-check
+    if [[ -z "$config" ]]; then
+      if [[ -f laconic.toml ]]; then
+        config=laconic.toml
+      elif [[ -f .laconic-check ]]; then
+        config=.laconic-check
+      fi
+    fi
     if [[ -n "$config" ]]; then
       while IFS= read -r line || [[ -n "$line" ]]; do
         # lint drops every byte order mark at the start of the file.
         while [[ -n "$first" && $line == "$bom"* ]]; do line=${line#"$bom"}; done
         first=
         line=$(trim "$line")
-        [[ -n "$line" && $line != '#'* && $line == *=* ]] || continue
+        [[ -n "$line" && $line != '#'* ]] || continue
+        [[ $line != '['* ]] || break
+        [[ $line == *=* ]] || continue
         key=$(trim "${line%%=*}")
-        [[ "$key" != max-findings ]] || max=$(trim "${line#*=}")
+        if [[ "$key" == max-findings || "$key" == max_findings ]]; then
+          val=${line#*=}
+          max=$(trim "${val%%#*}")
+        fi
       done < "$config"
     fi
   fi

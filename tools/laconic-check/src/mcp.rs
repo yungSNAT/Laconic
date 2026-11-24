@@ -7,7 +7,7 @@
 
 use std::io::{BufRead, Read, Write};
 
-use crate::settings::Settings;
+use crate::settings::{LineProtectCache, Settings};
 use crate::{lint, preserve};
 
 /// The longest text argument, in characters.
@@ -437,15 +437,19 @@ fn call_tool(params: Option<&Json>) -> Result<String, String> {
             let text = arg("text").ok_or("text is required")?;
             let settings = Settings::current_dir()?;
             let source: Vec<&str> = text.lines().collect();
+            let mut protect_cache = LineProtectCache::default();
             let lines: Vec<String> =
                 lint::lint_counting_with(text, &settings.rules, settings.needs_opt_in())
                     .0
                     .iter()
                     .filter(|f| {
                         let line = f.line.checked_sub(1).and_then(|i| source.get(i));
-                        settings.keeps(f, line.copied().unwrap_or(""))
+                        settings.keeps_cached(f, line.copied().unwrap_or(""), &mut protect_cache)
                     })
-                    .map(|f| format!("line {}:{}: {}: {}", f.line, f.column, f.rule, f.message))
+                    .map(|f| {
+                        let msg = settings.format_message(&f.rule, &f.message);
+                        format!("line {}:{}: {}: {msg}", f.line, f.column, f.rule)
+                    })
                     .collect();
             Ok(if lines.is_empty() {
                 "No findings.".into()

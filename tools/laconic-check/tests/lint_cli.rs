@@ -742,8 +742,18 @@ fn format_flag_confidence_scope_protect_and_substance_rules_work_end_to_end() {
     string(at(first, &["properties", "confidence"]));
     string(at(first, &["properties", "severity"]));
 
-    // Chat profile tightens `chat-filler` ('gates and seams') to a failing finding.
+    // Chat profile tightens `chat-filler` ('gates and seams') to a failing finding without `(advisory)`.
     let (code, out, err) = lint(&dir, &["--profile", "chat", "chat.md"]);
     assert_eq!((code, err.as_str()), (1, ""), "{out}");
     assert!(out.contains("chat-filler"), "{out}");
+    assert!(!out.contains("(advisory)"), "{out}");
+
+    // Docs profile relaxes `number-word` to advisory and tags its text message `(advisory)`.
+    std::fs::write(dir.join("num.md"), "We ran three tests.\n").unwrap();
+    let (code, out, err) = lint(&dir, &["--profile", "docs", "num.md"]);
+    assert_eq!((code, err.as_str()), (0, ""), "{out}");
+    assert!(
+        out.contains("number-word") && out.contains("(advisory)"),
+        "{out}"
+    );
 }

@@ -224,7 +224,7 @@ bottom line:
     assert_eq!(settings.disable, ["serial-comma"]);
     assert_eq!(settings.accept, ["color", "QBR"]);
     assert_eq!(
-        settings.protect,
+        settings.protect.phrases(),
         [
             "deep dive",
             "gates and seams",
@@ -274,7 +274,7 @@ fn toml_and_protect_parse_errors_and_edge_cases() {
     for (text, wanted) in [
         ("profile = \"unterminated\n", "f:1: unterminated string"),
         ("profile = 'unterminated\n", "f:1: unterminated string"),
-        ("profile = \"bad\\\n", "f:1: unterminated string"),
+        ("profile = \"bad\\\n", "f:1: unterminated escape"),
         (
             "disable = [\"em-dash\"\n",
             "f:1: unterminated list for 'disable'",
@@ -316,52 +316,78 @@ fn toml_and_protect_parse_errors_and_edge_cases() {
     // Escaped quotes, comments in multiline arrays, bare items in brackets, and find_in precedence.
     let escaped = Settings::parse(
         "f",
-        "only = [em-dash, # comment\n\"us-spelling\"]\n[protect]\nphrases = [\"a \\\"b\\\" \\\\ \\x\"]\n",
+        "only = [em-dash, # comment\n\"us-spelling\"]\n[protect] # section note\nphrases = [\"a \\\"b\\\" \\\\ \\u2019 \\U00002019\"] # trailing note\n",
     )
     .unwrap();
     assert_eq!(escaped.only, ["em-dash", "us-spelling"]);
     assert_eq!(
-        Settings::parse("f", "profile = 'report'\n")
+        Settings::parse("f", "profile = 'report' # comment\n")
             .unwrap()
             .profile,
         Some(crate::profile::Profile::Report)
     );
-    assert_eq!(escaped.protect, ["a \"b\" \\ \\x"]);
+    assert_eq!(escaped.protect.phrases(), ["a \"b\" \\ \u{2019} \u{2019}"]);
     assert_eq!(
-        protect::unquote("\"a \\\"b\\\" \\\\ \\x\"").unwrap(),
-        "a \"b\" \\ \\x"
+        protect::decode_value("\"\\b\\f\\n\\r\\t\\\\\\\"\"").unwrap(),
+        "\u{0008}\u{000c}\n\r\t\\\""
     );
-    assert!(protect::unquote("\"a\\\"").is_err());
-    assert!(protect::parse_list("[\"a").is_err());
-    assert!(protect::parse_list("[\"a\\\"").is_err());
+    for bad in [
+        "\"a\\\"",
+        "\"a\\x\"",
+        "\"a\\u12\"",
+        "\"a\\u12",
+        "\"a\\u12zz\"",
+        "\"a\\uD800\"",
+        "\"ok\" trailing",
+        "'ok' trailing",
+        "\"a\\",
+    ] {
+        assert!(protect::decode_value(bad).is_err(), "{bad}");
+    }
+    for bad_list in [
+        "[\"a",
+        "[\"a\"",
+        "[\"a\\\"",
+        "[\"a\\]",
+        "[\"a]",
+        "[\"a\" \"b\"]",
+        "[, \"a\"]",
+        "['a]",
+        "[\"a\"] trailing",
+    ] {
+        assert!(protect::parse_list(bad_list).is_err(), "{bad_list}");
+    }
     assert!(
-        protect::parse_list("[\"a\\]")
+        protect::decode_value("\"a\\x\"")
             .unwrap_err()
-            .contains("unterminated escape")
+            .contains("unsupported escape")
     );
     assert!(
-        protect::parse_list("[\"a]")
+        protect::parse_list("[\"a\" \"b\"]")
             .unwrap_err()
-            .contains("unterminated string")
+            .contains("expected ','")
     );
-    assert!(
-        protect::unquote("\"a\\")
-            .unwrap_err()
-            .contains("unterminated string")
-    );
+
+    let compiled = |s: &str| vec![protect::CompiledPhrase::new(s.to_owned())];
     assert!(!protect::is_protected(&[], "abc", 1));
-    assert!(!protect::is_protected(&["abc".into()], "abc", 0));
+    assert!(!protect::is_protected(&compiled("abc"), "abc", 0));
+    assert!(!protect::contains_column(&[(0, 3)], 0));
+    assert!(!protect::contains_column(&[], 1));
     assert!(!protect::is_protected(
-        &["deep dive".into()],
+        &compiled("deep dive"),
         "xdeep dive",
         2
     ));
     assert!(!protect::is_protected(
-        &["deep dive".into()],
+        &compiled("deep dive"),
         "deep divex",
         1
     ));
-    assert!(!protect::is_protected(&["deep dive".into()], "deepdive", 1));
+    assert!(!protect::is_protected(
+        &compiled("deep dive"),
+        "deepdive",
+        1
+    ));
 
     let dir = std::env::temp_dir().join(format!("laconic-find-in-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
@@ -385,5 +411,68 @@ phrases = [
 ]
 ";
     let settings = Settings::parse("laconic.toml", toml).unwrap();
-    assert_eq!(settings.protect, ["deep dive", "gates and seams"]);
+    assert_eq!(settings.protect.phrases(), ["deep dive", "gates and seams"]);
+}
+
+#[test]
+fn protect_never_double_unquotes_and_supports_toml_comments_and_format_message() {
+    let toml = "\
+profile = \"chat\" # chat mode
+max_findings = 3 # limit
+[protect] # author idioms
+phrases = [\"'tis the season\", '\"deep dive\"'] # inline comment
+\"'tis another\" # line comment
+'\"literal phrase\"'
+";
+    let settings = Settings::parse("laconic.toml", toml).unwrap();
+    assert_eq!(settings.max_findings, 3);
+    assert_eq!(
+        settings.protect.phrases(),
+        [
+            "'tis the season",
+            "\"deep dive\"",
+            "'tis another",
+            "\"literal phrase\"",
+        ]
+    );
+
+    assert_eq!(
+        settings.format_message(
+            &RuleId::ChatFiller.into(),
+            "architectural filler 'gates and seams' (advisory); name the module"
+        ),
+        "architectural filler 'gates and seams'; name the module"
+    );
+    let docs = Settings::parse("laconic.toml", "profile = \"docs\"\n").unwrap();
+    assert_eq!(
+        docs.format_message(&RuleId::NumberWord.into(), "write '3'"),
+        "write '3' (advisory)"
+    );
+    assert_eq!(
+        docs.format_message(&RuleId::StackedHedge.into(), "stacked hedge (advisory)"),
+        "stacked hedge (advisory)"
+    );
+}
+
+#[test]
+fn cached_protection_handles_long_line_with_many_findings_and_overlapping_spans() {
+    let settings = Settings::parse(
+        "laconic.toml",
+        "[protect]\nphrases = [\"deep dive\", \"dive into\"]\n",
+    )
+    .unwrap();
+    let unit = "Take a deep dive into color. ";
+    let line = unit.repeat(1_500);
+    let found = lint::lint(&line);
+    assert!(found.len() >= 1_500, "got {}", found.len());
+    let mut cache = LineProtectCache::default();
+    let kept: Vec<&str> = found
+        .iter()
+        .filter(|f| settings.keeps_cached(f, &line, &mut cache))
+        .map(|f| f.rule.name())
+        .collect();
+    assert_eq!(kept.len(), 1_500);
+    assert!(kept.iter().all(|&r| r == "us-spelling"));
+    assert!(!cache.contains(&[], 1, &line, 1));
+    assert!(!cache.contains(settings.protect.items(), 1, &line, 0));
 }

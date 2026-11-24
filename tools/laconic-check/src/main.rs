@@ -17,7 +17,7 @@ use std::process::ExitCode;
 
 use laconic_check::mcp::Json;
 use laconic_check::metrics::ProseMetrics;
-use laconic_check::settings::{self, Settings};
+use laconic_check::settings::{self, LineProtectCache, Settings};
 use laconic_check::{action, completions, hook, lint, lsp, mcp, preserve, sarif};
 
 fn usage_text() -> String {
@@ -239,13 +239,18 @@ fn run_lint(options: &Options) -> ExitCode {
         let (found, silenced) =
             lint::lint_counting_with(&text, &options.settings.rules, include_opt_in);
         suppressed += silenced;
-        for f in found {
+        let mut protect_cache = LineProtectCache::default();
+        for mut f in found {
             let line = f.line.checked_sub(1).and_then(|i| lines.get(i)).copied();
-            if !options.settings.keeps(&f, line.unwrap_or("")) {
+            if !options
+                .settings
+                .keeps_cached(&f, line.unwrap_or(""), &mut protect_cache)
+            {
                 continue;
             }
             let name = f.rule.name().to_owned();
             let advisory = options.settings.is_advisory(&f.rule);
+            f.message = options.settings.format_message(&f.rule, &f.message);
             if !advisory {
                 failing += 1;
             }

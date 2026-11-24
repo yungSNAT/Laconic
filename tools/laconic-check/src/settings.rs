@@ -11,6 +11,7 @@ use crate::lint::{self, Finding, Phrase, ProjectRule, RuleId, RuleRef};
 use crate::profile::Profile;
 
 pub(crate) mod protect;
+pub use protect::{LineProtectCache, ProtectList};
 
 /// The legacy dotfile `lint` reads when `laconic.toml` is absent.
 pub const PROJECT_FILE: &str = ".laconic-check";
@@ -44,7 +45,7 @@ pub struct Settings {
     /// Words `us-spelling` and `unglossed-term` do not flag, matched as written: whole word.
     pub accept: Vec<String>,
     /// Author signature idioms/phrases exempt from lint findings on matching spans.
-    pub protect: Vec<String>,
+    pub protect: ProtectList,
     /// The `[rules]` section's rules, in the order the file first names them.
     pub rules: Vec<Rc<ProjectRule>>,
 }
@@ -109,12 +110,13 @@ impl Settings {
                 continue;
             }
             if line.starts_with('[') {
-                section = match line {
+                let header = protect::strip_comment(line);
+                section = match header {
                     "[rules]" => Section::Rules,
                     "[protect]" => Section::Protect,
                     _ => {
                         return Err(at(format!(
-                            "unknown section '{line}'; expected [rules] or [protect]"
+                            "unknown section '{header}'; expected [rules] or [protect]"
                         )));
                     }
                 };
@@ -162,8 +164,9 @@ impl Settings {
                             .map_err(at)?;
                         }
                     } else {
-                        let phrase = protect::normalise_phrase(line).map_err(at)?;
-                        settings.protect.push(phrase);
+                        let decoded = protect::decode_value(line).map_err(at)?;
+                        let phrase = protect::normalise_phrase_text(&decoded).map_err(at)?;
+                        settings.push_protect(phrase);
                     }
                 }
                 Section::Top => {
@@ -189,10 +192,11 @@ impl Settings {
                     }
                     match key {
                         "max-findings" | "max_findings" => {
-                            settings.max_findings = count(value).map_err(at)?;
+                            let val = protect::strip_comment(value);
+                            settings.max_findings = count(val).map_err(at)?;
                         }
                         "profile" => {
-                            let val = protect::unquote(value).map_err(at)?;
+                            let val = protect::decode_value(value).map_err(at)?;
                             settings.profile = Some(profile(&val).map_err(at)?);
                         }
                         _ => return Err(at(format!("unknown key '{key}'"))),
@@ -259,6 +263,10 @@ impl Settings {
         self.profile.is_some_and(|p| p.enables_opt_in())
     }
 
+    fn push_protect(&mut self, phrase: String) {
+        self.protect.push(phrase);
+    }
+
     /// Effective advisory flag for `rule`, after any active register profile.
     pub fn is_advisory(&self, rule: &RuleRef) -> bool {
         match (self.profile, rule.house()) {
@@ -267,8 +275,43 @@ impl Settings {
         }
     }
 
+    /// Aligns a finding's `(advisory)` tag with its effective advisory state under the active
+    /// profile, so text output and Action runners agree when a profile tightens or relaxes a rule.
+    pub fn format_message(&self, rule: &RuleRef, message: &str) -> String {
+        let advisory = self.is_advisory(rule);
+        if advisory {
+            if message.contains("(advisory)") {
+                message.to_owned()
+            } else {
+                format!("{message} (advisory)")
+            }
+        } else {
+            message.replace(" (advisory)", "")
+        }
+    }
+
     /// Whether `lint` reports a finding, given the text of the line it is on.
     pub fn keeps(&self, finding: &Finding, line: &str) -> bool {
+        self.keeps_inner(finding, line, None)
+    }
+
+    /// Like [`Settings::keeps`], reusing per-line protected spans via `cache` so long lines with
+    /// many findings stay linear in line length.
+    pub fn keeps_cached(
+        &self,
+        finding: &Finding,
+        line: &str,
+        cache: &mut LineProtectCache,
+    ) -> bool {
+        self.keeps_inner(finding, line, Some(cache))
+    }
+
+    fn keeps_inner(
+        &self,
+        finding: &Finding,
+        line: &str,
+        cache: Option<&mut LineProtectCache>,
+    ) -> bool {
         let name = finding.rule.name();
         let listed = |names: &[String]| names.iter().any(|n| n == name);
         if listed(&self.disable) {
@@ -287,8 +330,16 @@ impl Settings {
                 return false;
             }
         }
-        if !self.protect.is_empty() && protect::is_protected(&self.protect, line, finding.column) {
-            return false;
+        if !self.protect.is_empty() {
+            let protected = match cache {
+                Some(cache) => {
+                    cache.contains(self.protect.items(), finding.line, line, finding.column)
+                }
+                None => protect::is_protected(self.protect.items(), line, finding.column),
+            };
+            if protected {
+                return false;
+            }
         }
         let word_at = || -> String {
             line.chars()
@@ -369,8 +420,8 @@ fn apply_list_key(
             }
         }
         ListTarget::Protect => {
-            for raw in items {
-                settings.protect.push(protect::normalise_phrase(&raw)?);
+            for decoded in items {
+                settings.push_protect(protect::normalise_phrase_text(&decoded)?);
             }
         }
     }

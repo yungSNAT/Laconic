@@ -57,8 +57,27 @@ pub fn run(files: &str, args: &str, exe: &Path, out: &mut impl Write) -> u8 {
         .split([' ', '\t', '\n'])
         .filter(|arg| !arg.is_empty())
         .collect();
-    for arg in &args {
-        if matches!(*arg, "--json" | "--sarif") {
+    let mut iter = args.iter();
+    while let Some(&arg) = iter.next() {
+        if arg == "--" {
+            break;
+        }
+        if matches!(arg, "--json" | "--sarif") {
+            let message = format!(
+                "::error::the Action reads lint's text output, so args cannot include {arg}"
+            );
+            return fail(out, &message);
+        }
+        if arg == "--format" {
+            if iter.next().copied() != Some("text") {
+                return fail(
+                    out,
+                    "::error::the Action reads lint's text output, so args cannot include --format other than text",
+                );
+            }
+        } else if let Some(fmt) = arg.strip_prefix("--format=")
+            && fmt != "text"
+        {
             let message = format!(
                 "::error::the Action reads lint's text output, so args cannot include {arg}"
             );
@@ -307,7 +326,7 @@ fn max_findings(args: &[&str]) -> usize {
             "--" => break,
             "--max-findings" => max = rest.next().copied(),
             "--config" => config = rest.next().copied(),
-            "--disable" | "--only" | "--profile" => {
+            "--disable" | "--only" | "--profile" | "--format" => {
                 rest.next();
             }
             _ => {

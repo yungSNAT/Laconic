@@ -169,6 +169,19 @@ fn has_from_to_digits(low: &str) -> bool {
         && rest[to_pos + 4..].bytes().any(|b| b.is_ascii_digit())
 }
 
+fn has_left_boundary(low: &str, pos: usize) -> bool {
+    pos == 0
+        || low[..pos]
+            .chars()
+            .next_back()
+            .is_some_and(|c| !is_word_char(c))
+}
+
+fn contains_word_cue(low: &str, cue: &str) -> bool {
+    low.match_indices(cue)
+        .any(|(pos, _)| has_left_boundary(low, pos))
+}
+
 fn has_magnitude_anchor(orig: &str, low: &str) -> bool {
     if has_citation(orig) || has_from_to_digits(low) {
         return true;
@@ -182,11 +195,14 @@ fn has_magnitude_anchor(orig: &str, low: &str) -> bool {
         "out of ",
         "per ",
     ];
-    if cues.iter().any(|cue| low.contains(cue)) {
+    if cues.iter().any(|cue| contains_word_cue(low, cue)) {
         return true;
     }
     for prep in ["across ", "over ", "of ", "in 19", "in 20"] {
         for (pos, _) in low.match_indices(prep) {
+            if !has_left_boundary(low, pos) {
+                continue;
+            }
             let tail = &low[pos + prep.len()..];
             if prep.starts_with("in ") || tail.as_bytes().first().is_some_and(u8::is_ascii_digit) {
                 return true;

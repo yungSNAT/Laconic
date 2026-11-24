@@ -176,3 +176,19 @@ fn unicode_casefold_length_change_and_later_prepositions_still_anchor() {
         !rules_of("It saves thousands of hours of 12 engineers.").contains(&"unanchored-magnitude")
     );
 }
+
+#[test]
+fn substrings_ending_in_per_or_of_do_not_anchor_magnitudes() {
+    for unanchored in [
+        "Our developer saves thousands of hours.",
+        "The paper claims 10x faster builds.",
+        "A cheaper option gives a 90% reduction.",
+        "The waterproof coat saves thousands of hours.",
+    ] {
+        assert!(
+            rules_of(unanchored).contains(&"unanchored-magnitude"),
+            "expected flag in {unanchored:?}: {:?}",
+            rules_of(unanchored)
+        );
+    }
+}

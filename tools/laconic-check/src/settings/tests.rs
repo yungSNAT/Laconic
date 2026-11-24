@@ -476,3 +476,45 @@ fn cached_protection_handles_long_line_with_many_findings_and_overlapping_spans(
     assert!(!cache.contains(&[], 1, &line, 1));
     assert!(!cache.contains(settings.protect.items(), 1, &line, 0));
 }
+
+#[test]
+fn protect_unicode_casefold_bare_comments_and_project_advisory_literal_stay_exact() {
+    // SHOULD 4 & 5: mid-word apostrophes and `=` inside trailing comments under [protect].
+    let toml = "\
+[protect]
+here's the thing # idiom
+\"deep dive\" # style = personal
+moving pieces # style = personal
+";
+    let settings = Settings::parse("laconic.toml", toml).unwrap();
+    assert_eq!(
+        settings.protect.phrases(),
+        ["here's the thing", "deep dive", "moving pieces"]
+    );
+
+    // SHOULD 2: 'İ' (U+0130) expands to 'i' + U+0307 and must not match plain 'i'.
+    let unicode =
+        Settings::parse("laconic.toml", "[protect]\nphrases = [\"three items\"]\n").unwrap();
+    let plain = "We have three items.\n";
+    let dotted = "We have three \u{0130}tems.\n";
+    assert!(lint::lint(plain).iter().all(|f| !unicode.keeps(f, plain)));
+    assert!(
+        lint::lint(dotted)
+            .iter()
+            .any(|f| f.rule == RuleId::NumberWord && unicode.keeps(f, dotted))
+    );
+
+    // SHOULD 3: literal ` (advisory)` in user `[rules]` replacement is preserved verbatim.
+    let project = Settings::parse(
+        ".laconic-check",
+        "[rules]\nplain: utilise = use (advisory)\n",
+    )
+    .unwrap();
+    let text = "We utilise it.\n";
+    let found = lint::lint_counting(text, &project.rules).0;
+    assert_eq!(found.len(), 1);
+    assert_eq!(
+        project.format_message(&found[0].rule, &found[0].message),
+        "'utilise': the project file prefers 'use (advisory)'"
+    );
+}

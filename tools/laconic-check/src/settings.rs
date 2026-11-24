@@ -143,7 +143,8 @@ impl Settings {
                     }
                 }
                 Section::Protect => {
-                    if let Some((key, value)) = line.split_once('=') {
+                    let clean = protect::strip_comment(line);
+                    if let Some((key, value)) = clean.split_once('=') {
                         let key = key.trim();
                         if key != "phrases" {
                             return Err(at(format!(
@@ -164,7 +165,7 @@ impl Settings {
                             .map_err(at)?;
                         }
                     } else {
-                        let decoded = protect::decode_value(line).map_err(at)?;
+                        let decoded = protect::decode_value(clean).map_err(at)?;
                         let phrase = protect::normalise_phrase_text(&decoded).map_err(at)?;
                         settings.push_protect(phrase);
                     }
@@ -275,18 +276,21 @@ impl Settings {
         }
     }
 
-    /// Aligns a finding's `(advisory)` tag with its effective advisory state under the active
-    /// profile, so text output and Action runners agree when a profile tightens or relaxes a rule.
+    /// Aligns a built-in finding's `(advisory)` tag with its effective advisory state under the
+    /// active profile, so text output and Action runners agree when a profile tightens or relaxes
+    /// a rule without modifying user-authored `[rules]` messages.
     pub fn format_message(&self, rule: &RuleRef, message: &str) -> String {
+        let Some(id) = rule.house() else {
+            return message.to_owned();
+        };
         let advisory = self.is_advisory(rule);
+        if advisory == id.rule().advisory {
+            return message.to_owned();
+        }
         if advisory {
-            if message.contains("(advisory)") {
-                message.to_owned()
-            } else {
-                format!("{message} (advisory)")
-            }
+            format!("{message} (advisory)")
         } else {
-            message.replace(" (advisory)", "")
+            message.replacen(" (advisory)", "", 1)
         }
     }
 

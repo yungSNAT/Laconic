@@ -474,6 +474,9 @@ fn action_rejects_non_text_format_prefers_laconic_toml_and_counts_chat_filler_as
         "--format sarif",
         "--format=sarif",
         "--format",
+        "--config -- --format=json",
+        "--config -- --json",
+        "--profile -- --format sarif",
     ] {
         for (stdout, code) in run_both("clean.md", bad_args) {
             assert_eq!(code, 2, "{bad_args}: {stdout}");
@@ -483,7 +486,7 @@ fn action_rejects_non_text_format_prefers_laconic_toml_and_counts_chat_filler_as
             );
         }
     }
-    for ok_args in ["--format text", "--format=text"] {
+    for ok_args in ["--format text", "--format=text", "--warn --"] {
         for (stdout, code) in run_both("clean.md", ok_args) {
             assert_eq!(code, 0, "{ok_args}: {stdout}");
         }

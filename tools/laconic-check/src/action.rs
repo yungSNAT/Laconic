@@ -75,13 +75,18 @@ pub fn run(files: &str, args: &str, exe: &Path, out: &mut impl Write) -> u8 {
                     "::error::the Action reads lint's text output, so args cannot include --format other than text",
                 );
             }
-        } else if let Some(fmt) = arg.strip_prefix("--format=")
-            && fmt != "text"
-        {
-            let message = format!(
-                "::error::the Action reads lint's text output, so args cannot include {arg}"
-            );
-            return fail(out, &message);
+        } else if let Some(fmt) = arg.strip_prefix("--format=") {
+            if fmt != "text" {
+                let message = format!(
+                    "::error::the Action reads lint's text output, so args cannot include {arg}"
+                );
+                return fail(out, &message);
+            }
+        } else if matches!(
+            arg,
+            "--config" | "--profile" | "--max-findings" | "--only" | "--disable"
+        ) {
+            iter.next();
         }
     }
     let warn = args.contains(&"--warn");

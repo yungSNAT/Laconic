@@ -45,6 +45,8 @@ while (( i < ${#args[@]} )); do
   elif [[ "$arg" == --format=* && "${arg#--format=}" != text ]]; then
     echo "::error::the Action reads lint's text output, so args cannot include $arg"
     exit 2
+  elif [[ "$arg" == --config || "$arg" == --profile || "$arg" == --max-findings || "$arg" == --only || "$arg" == --disable ]]; then
+    i=$((i + 1))
   fi
   [[ "$arg" != --warn ]] || warn=1
   i=$((i + 1))

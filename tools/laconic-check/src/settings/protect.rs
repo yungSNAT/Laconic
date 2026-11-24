@@ -23,18 +23,10 @@ pub(crate) struct CompiledPhrase {
 
 impl CompiledPhrase {
     pub(crate) fn new(text: String) -> Self {
-        let raw_chars: Vec<char> = text.chars().collect();
-        let exact = raw_chars.iter().any(|c| c.is_uppercase());
-        let starts_word = raw_chars.first().is_some_and(|c| c.is_alphanumeric());
-        let ends_word = raw_chars.last().is_some_and(|c| c.is_alphanumeric());
-        let chars = if exact {
-            raw_chars
-        } else {
-            raw_chars
-                .into_iter()
-                .map(|c| c.to_lowercase().next().unwrap_or(c))
-                .collect()
-        };
+        let chars: Vec<char> = text.chars().collect();
+        let exact = chars.iter().any(|c| c.is_uppercase());
+        let starts_word = chars.first().is_some_and(|c| c.is_alphanumeric());
+        let ends_word = chars.last().is_some_and(|c| c.is_alphanumeric());
         Self {
             text,
             chars,
@@ -44,7 +36,7 @@ impl CompiledPhrase {
         }
     }
 
-    fn match_at(&self, text: &[char], lower: &[char], start: usize) -> Option<usize> {
+    fn match_at(&self, text: &[char], start: usize) -> Option<usize> {
         if self.starts_word && start > 0 && is_word_char(text, start - 1) {
             return None;
         }
@@ -65,7 +57,7 @@ impl CompiledPhrase {
             } else if self.exact {
                 c == p
             } else {
-                lower[at] == p
+                c.to_lowercase().eq(p.to_lowercase())
             };
             if !same {
                 return None;
@@ -142,10 +134,12 @@ fn is_word_char(text: &[char], at: usize) -> bool {
     })
 }
 
-/// Strips an unquoted `# ...` comment to the end of a single line, respecting quoted strings.
+/// Strips an unquoted `# ...` comment to the end of a single line, respecting quoted strings
+/// whilst leaving mid-word apostrophes in bare phrases (`here's the thing # idiom`) unquoted.
 pub(crate) fn strip_comment(line: &str) -> &str {
     let mut in_quote: Option<char> = None;
     let mut escape = false;
+    let mut prev: Option<char> = None;
     for (idx, c) in line.char_indices() {
         if let Some(q) = in_quote {
             if q == '"' && escape {
@@ -155,13 +149,19 @@ pub(crate) fn strip_comment(line: &str) -> &str {
             } else if c == q {
                 in_quote = None;
             }
+            prev = Some(c);
             continue;
         }
         match c {
-            '"' | '\'' => in_quote = Some(c),
+            '"' | '\''
+                if prev.is_none_or(|p| p.is_whitespace() || matches!(p, '=' | '[' | ',' | ':')) =>
+            {
+                in_quote = Some(c);
+            }
             '#' => return line[..idx].trim_end(),
             _ => {}
         }
+        prev = Some(c);
     }
     line.trim_end()
 }
@@ -305,14 +305,10 @@ pub(crate) fn normalise_phrase_text(decoded: &str) -> Result<String, String> {
 /// Computes sorted, merged `[start, end)` char ranges of all protected phrases on `line`.
 pub(crate) fn protected_spans(phrases: &[CompiledPhrase], line: &str) -> Vec<(usize, usize)> {
     let text: Vec<char> = line.chars().collect();
-    let lower: Vec<char> = text
-        .iter()
-        .map(|c| c.to_lowercase().next().unwrap_or(*c))
-        .collect();
     let mut spans = Vec::new();
     for phrase in phrases {
         for start in 0..text.len() {
-            if let Some(end) = phrase.match_at(&text, &lower, start) {
+            if let Some(end) = phrase.match_at(&text, start) {
                 spans.push((start, end));
             }
         }

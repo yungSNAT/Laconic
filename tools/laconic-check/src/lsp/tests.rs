@@ -1096,3 +1096,42 @@ fn text_the_server_cannot_place_gets_no_fix() {
     assert!(published(&replies[2]).is_empty(), "{replies:?}");
     assert!(actions(&replies, 7).is_empty());
 }
+
+#[test]
+fn project_rule_with_literal_advisory_keeps_its_message_and_fix() {
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("target")
+        .join(format!("lsp-project-advisory-{}", std::process::id()));
+    fs::create_dir_all(&root).unwrap();
+    fs::write(
+        root.join(PROJECT_FILE),
+        "[rules]\nplain: utilise = use (advisory)\n",
+    )
+    .unwrap();
+    let init = format!(
+        r#"{{"jsonrpc":"2.0","id":1,"method":"initialize","params":{{"rootUri":"{}","capabilities":{{"workspace":{{"workspaceEdit":{{"documentChanges":true}}}}}}}}}}"#,
+        file_uri(&root)
+    );
+    let uri = file_uri(&root.join("doc.md"));
+    let (replies, _) = session(&[
+        &init,
+        &open(&uri, "markdown", "We utilise it.\n"),
+        &ask(2, &uri, (0, 3), (0, 10), &[]),
+    ]);
+    fs::remove_dir_all(&root).unwrap();
+    assert_eq!(
+        at(&replies[1], "params.diagnostics.0.message")
+            .as_str()
+            .unwrap(),
+        "'utilise': the project file prefers 'use (advisory)'"
+    );
+    assert_eq!(
+        at(
+            &replies[2],
+            "result.0.edit.documentChanges.0.edits.0.newText"
+        )
+        .as_str()
+        .unwrap(),
+        "use (advisory)"
+    );
+}

@@ -1,7 +1,7 @@
 // Copyright 2026 Ryan Duguid
 // SPDX-License-Identifier: Apache-2.0
 
-//! `laconic-check action-lint`: what the composite Action's `lint.sh` does. It runs `lint`,
+//! `laconic-check action-lint`: what the composite Action's retired `lint.sh` did. It runs `lint`,
 //! with the binary in `LACONIC_CHECK`, on the files named in `LACONIC_FILES`, one path a line,
 //! or on every Markdown file Git tracks, and prints each finding as a workflow annotation: an
 //! error, or a warning for an advisory finding. `LACONIC_ARGS` holds further `lint` options.

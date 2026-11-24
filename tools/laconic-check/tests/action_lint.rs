@@ -251,8 +251,8 @@ fn git(dir: &Path, args: &[&str]) -> Vec<u8> {
 }
 
 /// A fresh folder for one case.
-fn folder(case: &Case, tag: &str) -> PathBuf {
-    let dir = Path::new(env!("CARGO_TARGET_TMPDIR")).join(format!("action-{tag}-{}", case.name));
+fn folder(case: &Case) -> PathBuf {
+    let dir = Path::new(env!("CARGO_TARGET_TMPDIR")).join(format!("action-{}", case.name));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
     for (name, text) in case.files {
@@ -293,8 +293,8 @@ fn list(case: &Case, dir: &Path) -> String {
 
 /// Runs `command` in the case's folder as the Action would, returning its standard output
 /// and exit status. Standard error must be empty unless Git is what failed.
-fn run(case: &Case, tag: &str, mut command: Command) -> (String, i32) {
-    let dir = folder(case, tag);
+fn run(case: &Case, mut command: Command) -> (String, i32) {
+    let dir = folder(case);
     let out = command
         .current_dir(&dir)
         .env("GIT_CEILING_DIRECTORIES", dir.parent().unwrap())
@@ -321,7 +321,7 @@ fn action_lint_gives_the_recorded_results() {
     for case in cases().iter().filter(|c| !c.unix_only || cfg!(unix)) {
         let mut command = Command::new(exe());
         command.arg("action-lint");
-        assert_eq!(run(case, "rust", command), expected(case), "{}", case.name);
+        assert_eq!(run(case, command), expected(case), "{}", case.name);
     }
 }
 

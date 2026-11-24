@@ -83,11 +83,15 @@ jobs:
         env:
           VERSION: ${{ steps.release.outputs.version }}
         run: bash tools/laconic-check/action/install.sh
-      - name: Output formats the Action cannot read are refused
+      - name: Output formats the Action cannot read and old versions are refused
         shell: bash
         env:
           BIN: ${{ steps.install-test.outputs.bin }}
         run: |
+          status=0
+          out=$(VERSION=0.5.0 bash tools/laconic-check/action/install.sh) || status=$?
+          test "$status" -eq 2
+          test "$out" = "::error::the Action requires laconic-check 0.6.0 or later, not '0.5.0'"
           for arg in --json --sarif; do
             status=0
             out=$(LACONIC_CHECK=true LACONIC_FILES=tools/laconic-check/action/tests/clean.md \

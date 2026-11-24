@@ -446,3 +446,57 @@ fn action_rejects_non_text_format_prefers_laconic_toml_and_counts_chat_filler_as
     );
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+#[test]
+fn warn_as_option_value_or_operand_still_enforces_max_findings() {
+    let dir = Path::new(env!("CARGO_TARGET_TMPDIR"))
+        .join(format!("action-warn-arg-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(dir.join("many")).unwrap();
+    std::fs::write(dir.join("laconic.toml"), "max_findings = 1\n").unwrap();
+    // A valid config file named `--warn` is also clean Markdown when treated as a file after `--`.
+    std::fs::write(dir.join("--warn"), "max-findings = 1\n").unwrap();
+    let mut files = String::new();
+    let pad = "a".repeat(200);
+    for i in 0..130 {
+        let name = format!("many/{pad}-{i:03}.md");
+        let body = if i == 0 || i == 129 {
+            "The color is red.\n"
+        } else {
+            CLEAN
+        };
+        std::fs::write(dir.join(&name), body).unwrap();
+        files.push_str(&name);
+        files.push('\n');
+    }
+
+    let run_action = |args_in: &str| -> (String, i32) {
+        let out = Command::new(exe())
+            .arg("action-lint")
+            .current_dir(&dir)
+            .env("LACONIC_CHECK", exe())
+            .env("LACONIC_FILES", &files)
+            .env("LACONIC_ARGS", args_in)
+            .output()
+            .unwrap();
+        (
+            String::from_utf8(out.stdout).unwrap(),
+            out.status.code().unwrap(),
+        )
+    };
+
+    for args_in in ["--config --warn", "-- --warn"] {
+        let (stdout, code) = run_action(args_in);
+        assert_eq!(code, 1, "{args_in}: {stdout}");
+        assert!(
+            stdout.contains(
+                "2 failing findings across all the files, more than --max-findings allows (1)"
+            ),
+            "{args_in}: {stdout}"
+        );
+    }
+
+    let (stdout, code) = run_action("--warn");
+    assert_eq!(code, 0, "--warn: {stdout}");
+    let _ = std::fs::remove_dir_all(&dir);
+}

@@ -72,6 +72,7 @@ The manifests other than Claude Code's still declare plugin 0.5.0, so a build fr
 
 ### laconic-check: fixed
 
+- `laconic-check action-lint` only treats `--warn` as warning mode when passed as an option before `--`, so a configuration file or Markdown file named `--warn` still enforces `--max-findings` across batches.
 - `unglossed-term` passes the Style Manual's example BHP, Australian forms such as ABC, CSIRO and ANZAC, widely known names such as NASA and COVID, repository files named in prose (README, LICENSE), words in capitals for emphasis ('NOTE', 'FAILED') and an acronym named in the sentence ('is called SLSA', 'SLSA stands for'). On the outside corpus it flags 17 of 75 held-out articles, down from 21.
 - `lint` columns after a character whose lower case is longer, such as 'İ', no longer shift by one on that line.
 - An argument that is not valid Unicode, such as a Latin-1 file name on Linux, is a usage error (exit 2) naming it with replacement characters, where `laconic-check` panicked (exit 101).

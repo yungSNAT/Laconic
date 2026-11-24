@@ -57,6 +57,7 @@ pub fn run(files: &str, args: &str, exe: &Path, out: &mut impl Write) -> u8 {
         .split([' ', '\t', '\n'])
         .filter(|arg| !arg.is_empty())
         .collect();
+    let mut warn = false;
     let mut iter = args.iter();
     while let Some(&arg) = iter.next() {
         if arg == "--" {
@@ -87,9 +88,10 @@ pub fn run(files: &str, args: &str, exe: &Path, out: &mut impl Write) -> u8 {
             "--config" | "--profile" | "--max-findings" | "--only" | "--disable"
         ) {
             iter.next();
+        } else if arg == "--warn" {
+            warn = true;
         }
     }
-    let warn = args.contains(&"--warn");
     if files.is_empty() {
         let _ = writeln!(out, "No Markdown files to lint.");
         return 0;

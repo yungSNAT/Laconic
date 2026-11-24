@@ -59,6 +59,8 @@ jobs:
           echo "version=$version" >> "$GITHUB_OUTPUT"
       - name: A clean file passes
         uses: ./
+        env:
+          MSYS2_ENV_CONV_EXCL: "*"
         with:
           version: ${{ steps.release.outputs.version }}
           files: tools/laconic-check/action/tests/clean.md
@@ -66,6 +68,8 @@ jobs:
         id: fault
         continue-on-error: true
         uses: ./
+        env:
+          MSYS2_ENV_CONV_EXCL: "*"
         with:
           version: ${{ steps.release.outputs.version }}
           files: tools/laconic-check/action/tests/fault.md

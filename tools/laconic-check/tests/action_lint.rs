@@ -1,10 +1,8 @@
 // Copyright 2026 Ryan Duguid
 // SPDX-License-Identifier: Apache-2.0
 
-//! `action-lint` against cases recorded from the Action's shell script, `action/lint.sh`:
-//! `tests/action/recorded.txt` holds each case's standard output and exit status as the script
-//! gave them. `shell_script_gives_the_recorded_results` reruns the script on every case, so the
-//! recording cannot drift from it; delete that test and the recording test with the script.
+//! `action-lint` against the cases in `tests/action/recorded.txt` (originally recorded from the
+//! retired `action/lint.sh` shell script).
 
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -327,40 +325,6 @@ fn action_lint_gives_the_recorded_results() {
     }
 }
 
-/// While `action/lint.sh` exists: the same cases through the script itself.
-#[cfg(unix)]
-#[test]
-fn shell_script_gives_the_recorded_results() {
-    if Command::new("bash").arg("--version").output().is_err() {
-        return;
-    }
-    let script = Path::new(env!("CARGO_MANIFEST_DIR")).join("action/lint.sh");
-    for case in cases() {
-        let mut command = Command::new("bash");
-        command.arg(&script);
-        assert_eq!(
-            run(&case, "shell", command),
-            expected(&case),
-            "{}",
-            case.name
-        );
-    }
-}
-
-/// Prints each case's result from the script in `recorded.txt`'s form.
-#[cfg(unix)]
-#[test]
-#[ignore = "records the script's results; run by hand with --nocapture"]
-fn record_shell_results() {
-    let script = Path::new(env!("CARGO_MANIFEST_DIR")).join("action/lint.sh");
-    for case in cases() {
-        let mut command = Command::new("bash");
-        command.arg(&script);
-        let (stdout, code) = run(&case, "record", command);
-        println!("RECORD== {} {code}\nRECORD{stdout}", case.name);
-    }
-}
-
 /// The recording lists every case, once.
 #[test]
 fn every_case_is_recorded_once() {
@@ -386,23 +350,18 @@ fn a_signalled_lint_gives_128_plus_the_signal() {
     std::fs::write(&fake, "#!/bin/sh\nkill -TERM $$\n").unwrap();
     std::fs::set_permissions(&fake, std::fs::Permissions::from_mode(0o755)).unwrap();
     std::fs::write(dir.join("a.md"), CLEAN).unwrap();
-    let script = Path::new(env!("CARGO_MANIFEST_DIR")).join("action/lint.sh");
-    let (mut rust, mut shell) = (Command::new(exe()), Command::new("bash"));
-    rust.arg("action-lint");
-    shell.arg(script);
-    for command in [&mut rust, &mut shell] {
-        let out = command
-            .current_dir(&dir)
-            .env("LACONIC_CHECK", &fake)
-            .env("LACONIC_FILES", "a.md")
-            .env("LACONIC_ARGS", "")
-            .output()
-            .unwrap();
-        assert_eq!(
-            (out.stdout.as_slice(), out.status.code()),
-            (&b""[..], Some(143))
-        );
-    }
+    let out = Command::new(exe())
+        .arg("action-lint")
+        .current_dir(&dir)
+        .env("LACONIC_CHECK", &fake)
+        .env("LACONIC_FILES", "a.md")
+        .env("LACONIC_ARGS", "")
+        .output()
+        .unwrap();
+    assert_eq!(
+        (out.stdout.as_slice(), out.status.code()),
+        (&b""[..], Some(143))
+    );
 }
 
 #[test]
@@ -435,8 +394,7 @@ fn action_rejects_non_text_format_prefers_laconic_toml_and_counts_chat_filler_as
         files.push('\n');
     }
 
-    let run_both = |files_in: &str, args_in: &str| -> Vec<(String, i32)> {
-        let mut results = Vec::new();
+    let run_action = |files_in: &str, args_in: &str| -> (String, i32) {
         let out = Command::new(exe())
             .arg("action-lint")
             .current_dir(&dir)
@@ -445,27 +403,10 @@ fn action_rejects_non_text_format_prefers_laconic_toml_and_counts_chat_filler_as
             .env("LACONIC_ARGS", args_in)
             .output()
             .unwrap();
-        results.push((
+        (
             String::from_utf8(out.stdout).unwrap(),
             out.status.code().unwrap(),
-        ));
-        #[cfg(unix)]
-        if Command::new("bash").arg("--version").output().is_ok() {
-            let script = Path::new(env!("CARGO_MANIFEST_DIR")).join("action/lint.sh");
-            let out = Command::new("bash")
-                .arg(&script)
-                .current_dir(&dir)
-                .env("LACONIC_CHECK", exe())
-                .env("LACONIC_FILES", files_in)
-                .env("LACONIC_ARGS", args_in)
-                .output()
-                .unwrap();
-            results.push((
-                String::from_utf8(out.stdout).unwrap(),
-                out.status.code().unwrap(),
-            ));
-        }
-        results
+        )
     };
 
     for bad_args in [
@@ -478,34 +419,30 @@ fn action_rejects_non_text_format_prefers_laconic_toml_and_counts_chat_filler_as
         "--config -- --json",
         "--profile -- --format sarif",
     ] {
-        for (stdout, code) in run_both("clean.md", bad_args) {
-            assert_eq!(code, 2, "{bad_args}: {stdout}");
-            assert!(
-                stdout.contains("::error::the Action reads lint's text output"),
-                "{bad_args}: {stdout}"
-            );
-        }
-    }
-    for ok_args in ["--format text", "--format=text", "--warn --"] {
-        for (stdout, code) in run_both("clean.md", ok_args) {
-            assert_eq!(code, 0, "{ok_args}: {stdout}");
-        }
-    }
-
-    for (stdout, code) in run_both("chat.md", "--profile chat --max-findings 0") {
-        assert_eq!(code, 1, "{stdout}");
-        assert!(stdout.contains("::error file=chat.md"), "{stdout}");
-        assert!(!stdout.contains("::warning file=chat.md"), "{stdout}");
-    }
-
-    for (stdout, code) in run_both(&files, "") {
-        assert_eq!(code, 1, "{stdout}");
+        let (stdout, code) = run_action("clean.md", bad_args);
+        assert_eq!(code, 2, "{bad_args}: {stdout}");
         assert!(
-            stdout.contains(
-                "2 failing findings across all the files, more than --max-findings allows (1)"
-            ),
-            "{stdout}"
+            stdout.contains("::error::the Action reads lint's text output"),
+            "{bad_args}: {stdout}"
         );
     }
+    for ok_args in ["--format text", "--format=text", "--warn --"] {
+        let (stdout, code) = run_action("clean.md", ok_args);
+        assert_eq!(code, 0, "{ok_args}: {stdout}");
+    }
+
+    let (stdout, code) = run_action("chat.md", "--profile chat --max-findings 0");
+    assert_eq!(code, 1, "{stdout}");
+    assert!(stdout.contains("::error file=chat.md"), "{stdout}");
+    assert!(!stdout.contains("::warning file=chat.md"), "{stdout}");
+
+    let (stdout, code) = run_action(&files, "");
+    assert_eq!(code, 1, "{stdout}");
+    assert!(
+        stdout.contains(
+            "2 failing findings across all the files, more than --max-findings allows (1)"
+        ),
+        "{stdout}"
+    );
     let _ = std::fs::remove_dir_all(&dir);
 }

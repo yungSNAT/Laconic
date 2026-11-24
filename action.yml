@@ -2,7 +2,7 @@ name: laconic-check
 description: Flag Australian English and house-style candidates in Markdown prose, with an annotation for each finding.
 inputs:
   version:
-    description: The laconic-check release to download, such as 0.6.0.
+    description: The laconic-check release to download, 0.6.0 or later.
     required: false
     default: 0.6.0
   files:
@@ -10,7 +10,7 @@ inputs:
     required: false
     default: ""
   args:
-    description: Further lint options, such as --warn, separated by spaces or new lines; not --json or --sarif, since the Action reads text output. The Action splits args at spaces, tabs and new lines and keeps quotation marks as written, so an option's value cannot contain a space; for a project file whose path has one, put it in the working directory as .laconic-check, which lint reads without --config. Options added in 0.4.0, such as --max-findings, need 0.4.0 or later.
+    description: Further lint options, such as --warn, separated by spaces or new lines; not --json or --sarif, since the Action reads text output. The Action splits args at spaces, tabs and new lines and keeps quotation marks as written, so an option's value cannot contain a space; for a project file whose path has one, put it in the working directory as .laconic-check, which lint reads without --config.
     required: false
     default: ""
 runs:
@@ -28,4 +28,4 @@ runs:
         LACONIC_CHECK: ${{ steps.install.outputs.bin }}
         LACONIC_FILES: ${{ inputs.files }}
         LACONIC_ARGS: ${{ inputs.args }}
-      run: bash "$GITHUB_ACTION_PATH/tools/laconic-check/action/lint.sh"
+      run: "$LACONIC_CHECK" action-lint

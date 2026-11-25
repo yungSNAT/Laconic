@@ -64,12 +64,8 @@ The manifests other than Claude Code's still declare plugin 0.5.0, so a build fr
 
 ### Changed
 
-- The composite Action (`action.yml`) now runs `laconic-check action-lint` instead of `tools/laconic-check/action/lint.sh`, requiring `laconic-check` 0.6.0 or later (#206).
+- The composite Action (`action.yml`) now runs `laconic-check action-lint` instead of the removed `tools/laconic-check/action/lint.sh` script, requiring `laconic-check` 0.6.0 or later (#206).
 - Name `laconic.toml` beside `.laconic-check` in `--help`, completions, `mcp` and `action.yml`.
-
-### Removed
-
-- The composite Action's shell script `tools/laconic-check/action/lint.sh`, replaced by `laconic-check action-lint` (#206).
 
 ### Fixed
 
@@ -115,6 +111,9 @@ The manifests other than Claude Code's still declare plugin 0.5.0, so a build fr
 
 ### Fixed
 
+- `unglossed-term` passes the Style Manual's example BHP, Australian forms such as ABC, CSIRO and ANZAC, widely known names such as NASA and COVID, repository files named in prose (README, LICENSE), words in capitals for emphasis ('NOTE', 'FAILED') and an acronym named in the sentence ('is called SLSA', 'SLSA stands for'). On the outside corpus it flags 17 of 75 held-out articles, down from 21 (#201).
+- `lint` columns after a character whose lower case is longer, such as 'İ', no longer shift by one on that line.
+- An argument that is not valid Unicode, such as a Latin-1 file name on Linux, is a usage error (exit 2) naming it with replacement characters, where `laconic-check` panicked (exit 101) (#192).
 - Each `laconic-check` binary archive carries `LICENSE` and `NOTICE` beside the binary, and the release workflow fails if an archive holds anything else; the archives of 0.1.0 to 0.5.0 held only the binary.
 - The `web` workflow takes the browser page's snapshot again, up to 3 times, when Chromium took it before the checker had run (this failed one run on `main`). When a check fails, it shows the page's statuses.
 - `preserve` no longer reports '00' as dropped when an edit writes a time on the hour without its minutes, such as '5:00 p.m.' as '5pm'. A colon number is a time only after a word such as 'at' or 'until', before 'am' or 'pm', or after 'to' or 'and' that follows a time, so a ratio such as '5:30' stays 2 numbers.

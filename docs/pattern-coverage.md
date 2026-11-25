@@ -1,6 +1,6 @@
 # A humaniser skill's patterns in Laconic
 
-A comparable humaniser skill, as published on 10 November 2026, lists 26 patterns. This table shows where Laconic covers each one: a `laconic-check lint` rule that flags some of its forms ([rules](rules.md)), and the section of the prose skill's [pattern catalogue](../skills/laconic-prose/references/patterns.md) that repairs it. A rule never flags every form a pattern lists; 'part' marks one that flags a few of its phrases. Checked by hand on 17 November 2026.
+A comparable humaniser skill, in its version of 10 November 2026, lists 26 patterns. This table shows where Laconic covers each one: a `laconic-check lint` rule that flags some of its forms ([rules](rules.md)), and the section of the prose skill's [pattern catalogue](../skills/laconic-prose/references/patterns.md) that repairs it. A rule never flags every form a pattern lists; 'part' marks one that flags a few of its phrases. Checked by hand on 17 November 2026.
 
 | # | Pattern | `lint` rule | Prose skill section |
 | --- | --- | --- | --- |

@@ -2,13 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 //! `laconic-check mcp`: an MCP server on standard input and output that exposes `lint` and
-//! `preserve` as tools. It speaks newline-delimited JSON-RPC 2.0 through the small JSON
+//! `preserve` as tools and `laconic-check instructions` as the prompt `instructions`. It speaks newline-delimited JSON-RPC 2.0 through the small JSON
 //! reader and writer below, so the crate keeps no dependencies.
 
 use std::io::{BufRead, Read, Write};
 
 use crate::settings::{LineProtectCache, Settings};
-use crate::{lint, preserve};
+use crate::{instructions, lint, preserve};
 
 /// The longest text argument, in characters.
 const MAX_INPUT: usize = 200_000;
@@ -401,6 +401,68 @@ fn tools() -> Json {
     ])
 }
 
+fn capabilities() -> Json {
+    object(vec![("tools", object(vec![])), ("prompts", object(vec![]))])
+}
+
+const INSTRUCTIONS: &str = "What a coding agent needs to use laconic-check in a repository: the checks, how to read and act on a finding, CI gates and setup. The same text as `laconic-check instructions`.";
+
+fn prompts() -> Json {
+    let topics: Vec<&str> = instructions::TOPICS.iter().map(|(name, _)| *name).collect();
+    Json::Array(vec![object(vec![
+        ("name", text("instructions")),
+        ("description", text(INSTRUCTIONS)),
+        (
+            "arguments",
+            Json::Array(vec![object(vec![
+                ("name", text("topic")),
+                (
+                    "description",
+                    text(&format!(
+                        "Optional: {} for the project file or every rule.",
+                        topics.join(" or ")
+                    )),
+                ),
+                ("required", Json::Bool(false)),
+            ])]),
+        ),
+    ])])
+}
+
+/// `prompts/get` for `instructions`, with an optional `topic` argument.
+fn get_prompt(params: Option<&Json>) -> Result<Json, (i32, String)> {
+    let invalid = |message: String| Err((-32602, format!("invalid params: {message}")));
+    let name = params.and_then(|p| p.get("name")).and_then(Json::as_str);
+    if name != Some("instructions") {
+        return invalid(format!("unknown prompt {}", name.unwrap_or("(none)")));
+    }
+    let topic = match params
+        .and_then(|p| p.get("arguments"))
+        .and_then(|a| a.get("topic"))
+    {
+        None | Some(Json::Null) => None,
+        Some(Json::String(topic)) if topic.is_empty() => None,
+        Some(Json::String(topic)) => Some(topic.as_str()),
+        Some(_) => return invalid("topic must be a string".into()),
+    };
+    let Some(body) = instructions::render(topic) else {
+        return invalid(format!("unknown topic {}", topic.unwrap_or_default()));
+    };
+    Ok(object(vec![
+        ("description", text(INSTRUCTIONS)),
+        (
+            "messages",
+            Json::Array(vec![object(vec![
+                ("role", text("user")),
+                (
+                    "content",
+                    object(vec![("type", text("text")), ("text", text(&body))]),
+                ),
+            ])]),
+        ),
+    ]))
+}
+
 /// A tool's report, or the message of a failed call.
 fn call_tool(params: Option<&Json>) -> Result<String, String> {
     let name = params
@@ -550,7 +612,7 @@ pub fn handle_line(line: &str) -> Option<String> {
                 "supportedVersions",
                 Json::Array(STATELESS_VERSIONS.map(text).into()),
             ),
-            ("capabilities", object(vec![("tools", object(vec![]))])),
+            ("capabilities", capabilities()),
             (
                 "_meta",
                 object(vec![("io.modelcontextprotocol/serverInfo", server_info())]),
@@ -569,7 +631,7 @@ pub fn handle_line(line: &str) -> Option<String> {
                 .unwrap_or(PROTOCOL_VERSIONS[0]);
             Ok(object(vec![
                 ("protocolVersion", text(version)),
-                ("capabilities", object(vec![("tools", object(vec![]))])),
+                ("capabilities", capabilities()),
                 ("serverInfo", server_info()),
             ]))
         }
@@ -581,6 +643,13 @@ pub fn handle_line(line: &str) -> Option<String> {
             ("cacheScope", text("public")),
         ])),
         "tools/list" => Ok(object(vec![("tools", tools())])),
+        "prompts/list" if stateless => Ok(object(vec![
+            ("prompts", prompts()),
+            ("ttlMs", Json::Number(TTL_MS.into())),
+            ("cacheScope", text("public")),
+        ])),
+        "prompts/list" => Ok(object(vec![("prompts", prompts())])),
+        "prompts/get" => get_prompt(params),
         "tools/call" => Ok(match call_tool(params) {
             Ok(report) => object(vec![("content", content(&report))]),
             Err(message) => object(vec![
@@ -810,6 +879,65 @@ mod tests {
     }
 
     #[test]
+    fn the_instructions_prompt_lists_renders_each_topic_and_rejects_others() {
+        let r = result(r#"{"jsonrpc":"2.0","id":1,"method":"initialize"}"#);
+        let caps = r.get("capabilities").unwrap();
+        assert_eq!(caps.get("prompts"), Some(&object(vec![])));
+        assert_eq!(
+            result(r#"{"jsonrpc":"2.0","id":1,"method":"prompts/list"}"#).get("prompts"),
+            Some(&prompts())
+        );
+        let body = |params: &str| {
+            let r = result(&format!(
+                r#"{{"jsonrpc":"2.0","id":1,"method":"prompts/get","params":{params}}}"#
+            ));
+            let Some(Json::Array(messages)) = r.get("messages") else {
+                panic!("{r:?}");
+            };
+            assert_eq!(messages.len(), 1);
+            assert_eq!(messages[0].get("role"), Some(&text("user")));
+            let content = messages[0].get("content").unwrap();
+            content
+                .get("text")
+                .and_then(Json::as_str)
+                .unwrap()
+                .to_owned()
+        };
+        assert_eq!(
+            body(r#"{"name":"instructions"}"#),
+            instructions::render(None).unwrap()
+        );
+        assert_eq!(
+            body(r#"{"name":"instructions","arguments":{"topic":""}}"#),
+            instructions::render(None).unwrap()
+        );
+        for (topic, _) in instructions::TOPICS {
+            assert_eq!(
+                body(&format!(
+                    r#"{{"name":"instructions","arguments":{{"topic":"{topic}"}}}}"#
+                )),
+                instructions::render(Some(topic)).unwrap()
+            );
+        }
+        for params in [
+            r#"{"name":"lint"}"#,
+            r#"{}"#,
+            r#"{"name":"instructions","arguments":{"topic":"update"}}"#,
+            r#"{"name":"instructions","arguments":{"topic":1}}"#,
+        ] {
+            let reply = parse(
+                &handle_line(&format!(
+                    r#"{{"jsonrpc":"2.0","id":1,"method":"prompts/get","params":{params}}}"#
+                ))
+                .unwrap(),
+            )
+            .unwrap();
+            let code = reply.get("error").and_then(|e| e.get("code"));
+            assert_eq!(code, Some(&Json::Number("-32602".into())), "{params}");
+        }
+    }
+
+    #[test]
     fn initialise_agrees_a_protocol_it_speaks_and_reports_this_version() {
         let r = result(
             r#"{"jsonrpc":"2.0","id":"x","method":"initialize","params":{"protocolVersion":"2025-03-26"}}"#,
@@ -874,7 +1002,10 @@ mod tests {
             );
             assert_eq!(
                 r.get("capabilities"),
-                Some(&object(vec![("tools", object(vec![]))]))
+                Some(&object(vec![
+                    ("tools", object(vec![])),
+                    ("prompts", object(vec![]))
+                ]))
             );
             let info = r
                 .get("_meta")

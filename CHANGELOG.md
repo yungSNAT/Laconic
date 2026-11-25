@@ -52,6 +52,10 @@ The manifests other than Claude Code's still declare plugin 0.5.0, so a build fr
 - Pin CI agent installs and disable lifecycle scripts (#28).
 - Keep scenario prompts out of Claude CLI arguments and reject model values that could become options (#30).
 
+### laconic-check: added
+
+- `laconic-check instructions [config|rules]` prints what a coding agent needs to use the checker in a repository, the project file's keys or every rule with its kind; `laconic-check mcp` offers the same text as the prompt `instructions`, and the completions cover it.
+
 ## [laconic-check 0.6.1] - 2026-11-25
 
 ### Added

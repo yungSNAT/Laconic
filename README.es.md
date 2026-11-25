@@ -25,13 +25,11 @@ Para humanizar un texto escrito por IA, pide al agente que lo humanice. La skill
 
 <table>
 <tr>
-<td align="center" width="33%"><h3>4.92 de 5</h3>calidad de humanización, frente a 4.54 y 4.50<br><sub><a href="#against-other-humanisers">rúbrica neutral, 20 textos, juez ciego</a></sub></td>
-<td align="center" width="33%"><h3>65% de la longitud original</h3>frente a 81% de ambos rivales<br><sub><a href="#against-other-humanisers">solo longitud; las comprobaciones de hechos van al lado</a></sub></td>
 <td align="center" width="33%"><h3>4.63 frente a 4.07</h3>frente a la simple 'Answer concisely.'<br><sub><a href="#evaluation">rúbrica de la casa, 45 casos; 6 hallazgos bloqueantes frente a 29</a></sub></td>
 </tr>
 </table>
 
-Las 3 cifras vienen del propio arnés de Laconic el 20 de octubre de 2026, con un único modelo generador. [Evaluación](#evaluation) da los límites y los comandos para repetirlas.
+La cifra viene del propio arnés de Laconic el 20 de octubre de 2026, con un único modelo generador. [Evaluación](#evaluation) da los límites y los comandos para repetirla.
 
 <a id="install"></a>
 ## Instalación
@@ -164,36 +162,6 @@ Laconic supera a la instrucción simple por 0.56 ponderado. Los cambios son neut
 </details>
 
 Límites: de 18 a 90 respuestas por configuración de un único modelo generador; los casos están en `evals/cases.jsonl` y la rúbrica en `evals/rubric.md`. Estos casos también orientaron la redacción de las reglas, así que las puntuaciones no son una prueba con datos reservados. Las comas seriales siguen siendo el desliz más común.
-
-<a id="against-other-humanisers"></a>
-### Frente a otros humanizadores
-
-El 20 de octubre de 2026, 3 configuraciones instaladas humanizaron 20 textos escritos por IA para un lector australiano (`evals/humanise-cases.jsonl`: correos a clientes, una descripción de PR, notas de versión, un informe al consejo, una oferta de empleo y otros), 2 ensayos cada uno, generados y juzgados a ciegas por Claude Opus 5.5. Cada configuración tenía solo su propia skill, con las herramientas Skill y Read, y se le indicó usarla: la skill de prosa de Laconic (commit `c7e3048`), [humanizer](https://github.com/blader/humanizer) (commit `8c307f3`) y [avoid-ai-writing](https://github.com/conorbronsdon/avoid-ai-writing) (commit `cb16d10`).
-
-| Medida | Laconic | `humanizer` | `avoid-ai-writing` |
-|---|---|---|---|
-| Puntuación ponderada, rúbrica neutral (1 a 5) | 4.92 | 4.54 | 4.50 |
-| Puntuación ponderada, rúbrica de la casa | 4.87 | 4.50 | 4.42 |
-| Corrección, rúbrica neutral | 4.80 | 4.13 | 4.18 |
-| Concisión, rúbrica neutral | 4.95 | 4.20 | 3.95 |
-| Hallazgos bloqueantes | 0 | 0 | 0 |
-| Comprobaciones regex de hechos y patrones superadas (ver abajo) | 40 de 40 | 40 de 40 | 35 de 40 |
-| Longitud media respecto a su original, en palabras | 65% | 81% | 81% |
-| Hallazgos del detector de avoid-ai-writing por texto (original: 2.6) | 0.03 | 0 | 0.05 |
-| Hallazgos de dslop por texto, métricas de ritmo incluidas (original: 1.80) | 0.50 | 0.83 | 0.63 |
-| Hallazgos de `laconic-check` 0.1.0 por texto (original: 1.85) | 0.15 | 0.45 | 0.28 |
-| Coste de generación de 40 textos | $4.54 | $5.84 | $15.78 |
-
-Con la rúbrica neutral, que deja fuera la mecánica de la casa de Laconic (cifras, comas seriales y rayas largas) pero sigue pidiendo ortografía australiana, Laconic supera a `humanizer` por 0.38 ponderado y a `avoid-ai-writing` por 0.43. Los intervalos del 95%, de un bootstrap emparejado que remuestrea los 20 textos con ambos ensayos, son +0.26 a +0.51 y +0.26 a +0.59. La ventaja se mantiene al quitar esa mecánica de la rúbrica. Las notas del juez sobre las otras configuraciones incluyen contenido que el original no tenía, como una experiencia añadida a una carta de presentación y una cifra en dólares deducida para una solicitud de subvención. Las 3 configuraciones redujeron los hallazgos de estos detectores muy por debajo de los niveles de los originales en esta muestra.
-
-<details>
-<summary>Cómo se revisaron las comprobaciones regex</summary>
-
-Cuatro comprobaciones regex se ampliaron tras inspeccionar respuestas que las fallaban con paráfrasis fieles ('in stages', 'a second person will check', 'five to seven', 'Don't install any personal'). Las mismas comprobaciones revisadas se aplicaron a todas las configuraciones, y la tabla da los resultados revisados; antes del cambio, Laconic superó 37 y `humanizer` 34 de 40. La fila de `laconic-check` es de la versión 0.1.0; las versiones posteriores añaden reglas y cuentan más hallazgos.
-
-</details>
-
-Límites: 40 textos por configuración de un único modelo generador, juzgados por la misma familia de modelos, con estos 20 prompts y estas configuraciones instaladas. Cada comprobador refleja el criterio de la casa de su autor, y el detector de `avoid-ai-writing` es el motor propio de esa skill. Superar las comprobaciones regex es una prueba parcial de que los hechos sobrevivieron, no prueba de que lo hiciera cada matiz. [evals/README.md](evals/README.md) da los comandos para repetirlo.
 
 <a id="checker"></a>
 ## Comprobador
@@ -353,7 +321,7 @@ El 13 de noviembre de 2026, `preserve` se ejecutó sobre las 363 reescrituras de
 | Nombres alterados | 28 | 20 listan un nombre para revisar | 20 | 20 |
 | Todas las unidades conservadas | 258 | 17 pasan; 224 fallan solo por palabras de sentido; 0 fallan por un mes, código en línea o URL; 17 fallan por un número, cantidad o cita | 23 pasan; 222; 0; 13 | 64 pasan; 182; 0; 12 |
 
-En los mismos documentos, el `validate.js` de avoid-ai-writing falla 23 de los 105 alterados y la comprobación de fidelidad de Zero Slop los 105; pasan 233 y 15 de los 258 conservados, frente a 23 de `preserve` y 64 con `--loose` ([evals/README.md](evals/README.md#against-other-fact-checkers), 16 de noviembre de 2026). Según la tabla 1 del artículo, cada humanizador alteró al menos una unidad en 7 a 13 de los 20 textos reescritos que tienen alguna (del 35% al 65%; Undetectable AI 11 de 20); [evals/README.md](evals/README.md#by-humaniser) da la tabla con los resultados de `preserve` para cada uno.
+Según la tabla 1 del artículo, cada humanizador alteró al menos una unidad en 7 a 13 de los 20 textos reescritos que tienen alguna (del 35% al 65%; Undetectable AI 11 de 20); [evals/README.md](evals/README.md#by-humaniser) da la tabla con los resultados de `preserve` para cada uno.
 
 `laconic-check mcp` ofrece `lint` y `preserve` como herramientas MCP por la entrada y salida estándar, sin nada más que instalar. La herramienta `preserve` acepta `loose: true` para lo que hace `--loose`, y la herramienta `lint` aplica el archivo `laconic.toml` o `.laconic-check` del directorio en el que se ejecuta el servidor, como hace `lint`, releído en cada llamada; uno mal formado convierte la llamada en un error que nombra su línea (ambos desde 0.6.0):
 

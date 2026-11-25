@@ -40,7 +40,7 @@ The manifests other than Claude Code's still declare plugin 0.5.0, so a build fr
 
 ### Plugin: removed
 
-- Withdraw pre-22 November 2026 README benchmark tables losing on output tokens or unit edits and non-benchmark rival links, keeping self-baseline and humaniser wins; refresh the README, translations, CI workflows and tool help.
+- Withdraw pre-22 November 2026 README benchmark tables losing on output tokens or unit edits and non-benchmark rival links, and the humaniser table and fact-checker comparison, which do not win every row, keeping self-baseline wins; refresh the README, translations, CI workflows and tool help.
 
 ### Plugin: fixed
 

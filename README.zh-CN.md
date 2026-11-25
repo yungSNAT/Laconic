@@ -25,13 +25,11 @@ Laconic 是面向编程智能体和聊天助手的 AI“去 AI 味”（humanize
 
 <table>
 <tr>
-<td align="center" width="33%"><h3>4.92（满分 5）</h3>润色质量，对比 4.54 和 4.50<br><sub><a href="#against-other-humanisers">中立评分标准，20 篇文本，盲评</a></sub></td>
-<td align="center" width="33%"><h3>原文长度的 65%</h3>两款对比工具均为 81%<br><sub><a href="#against-other-humanisers">仅比较长度；事实检查另列</a></sub></td>
 <td align="center" width="33%"><h3>4.63 对 4.07</h3>对比简单指令 'Answer concisely.'<br><sub><a href="#evaluation">本项目评分标准，45 个案例；阻断问题 6 个对 29 个</a></sub></td>
 </tr>
 </table>
 
-以上 3 项数据均来自 Laconic 自带的评测框架，测于 2026 年 10 月 20 日，使用单一生成模型。[评估](#evaluation)一节给出了局限和复现命令。
+该数据来自 Laconic 自带的评测框架，测于 2026 年 10 月 20 日，使用单一生成模型。[评估](#evaluation)一节给出了局限和复现命令。
 
 <a id="install"></a>
 ## 安装
@@ -164,36 +162,6 @@ Laconic 的加权分比简单指令高 0.56。这些改动对评审质量没有�
 </details>
 
 局限：每种配置 18 到 90 个回答，来自单一生成模型；案例在 `evals/cases.jsonl`，评分标准在 `evals/rubric.md`。这些案例也指导了规则的措辞，因此得分不是留出集测试。连续逗号仍是最常见的疏漏。
-
-<a id="against-other-humanisers"></a>
-### 对比其他去 AI 味工具
-
-2026 年 10 月 20 日，3 种已安装的配置为一位澳大利亚读者润色了 20 篇 AI 写的文本（`evals/humanise-cases.jsonl`：客户邮件、一份 PR 描述、发布说明、一份董事会报告、一则招聘广告等），每篇 2 次试验，由 Claude Opus 5.5 生成并盲评。每种配置只有自己的技能，配有 Skill 和 Read 工具，并被要求使用它：Laconic 的写作技能（提交 `c7e3048`）、[humanizer](https://github.com/blader/humanizer)（提交 `8c307f3`）和 [avoid-ai-writing](https://github.com/conorbronsdon/avoid-ai-writing)（提交 `cb16d10`）。
-
-| 指标 | Laconic | `humanizer` | `avoid-ai-writing` |
-|---|---|---|---|
-| 加权分，中立评分标准（1 到 5） | 4.92 | 4.54 | 4.50 |
-| 加权分，本项目评分标准 | 4.87 | 4.50 | 4.42 |
-| 正确性，中立评分标准 | 4.80 | 4.13 | 4.18 |
-| 简洁性，中立评分标准 | 4.95 | 4.20 | 3.95 |
-| 阻断问题 | 0 | 0 | 0 |
-| 通过的正则事实与模式检查（见下文） | 40 个中 40 个 | 40 个中 40 个 | 40 个中 35 个 |
-| 相对原文的平均长度，按单词计 | 65% | 81% | 81% |
-| 每篇文本的 avoid-ai-writing 检测器问题数（原文：2.6） | 0.03 | 0 | 0.05 |
-| 每篇文本的 dslop 问题数，含节奏指标（原文：1.80） | 0.50 | 0.83 | 0.63 |
-| 每篇文本的 `laconic-check` 0.1.0 问题数（原文：1.85） | 0.15 | 0.45 | 0.28 |
-| 生成 40 篇文本的成本 | $4.54 | $5.84 | $15.78 |
-
-在中立评分标准下（去掉了 Laconic 的本项目细则，即数字、连续逗号和长破折号，但仍要求澳大利亚拼写），Laconic 的加权分比 `humanizer` 高 0.38，比 `avoid-ai-writing` 高 0.43。用配对自助法对 20 篇文本（连同两次试验）重抽样得到的 95% 区间分别为 +0.26 到 +0.51 和 +0.26 到 +0.59。把这些细则从评分标准中去掉后，领先依然存在。评审对其他配置的记录包括原文没有的内容，例如求职信中添加的一段经历，以及为一份经费申请推算出的美元数额。在这个样本中，3 种配置都把这些检测器的问题数降到远低于原文的水平。
-
-<details>
-<summary>正则检查是如何修订的</summary>
-
-在检查了因忠实改写（'in stages'、'a second person will check'、'five to seven'、'Don't install any personal'）而未通过的回答后，有四项正则检查被放宽。同样的修订检查应用于所有配置，表中给出的是修订后的结果；修订前，40 篇中 Laconic 通过 37 篇，`humanizer` 通过 34 篇。`laconic-check` 一行来自 0.1.0 版本；之后的版本增加了规则，会计出更多问题。
-
-</details>
-
-局限：每种配置 40 篇文本，来自单一生成模型，由同一模型家族评审，基于这 20 个提示和这些已安装配置。每个检查器都反映其作者的偏好，`avoid-ai-writing` 检测器就是该技能自己的引擎。通过正则检查只能部分证明事实得以保留，不能证明每个限定词都保留了下来。复现命令见 [evals/README.md](evals/README.md)。
 
 <a id="checker"></a>
 ## 检查器
@@ -353,7 +321,7 @@ repos:
 | 名称被改动 | 28 | 20 篇列出待查名称 | 20 | 20 |
 | 所有单元都保留 | 258 | 17 篇通过；224 篇只因语义词失败；0 篇因月份、行内代码或 URL 失败；17 篇因数字、数量或引文失败 | 23 篇通过；222；0；13 | 64 篇通过；182；0；12 |
 
-在同样的文档上，avoid-ai-writing 的 `validate.js` 在 105 篇改动文档中判 23 篇失败，Zero Slop 的忠实度检查判全部 105 篇失败；在 258 篇保留文档中，它们分别通过 233 篇和 15 篇，而 `preserve` 通过 23 篇，带 `--loose` 时通过 64 篇（[evals/README.md](evals/README.md#against-other-fact-checkers)，2026 年 11 月 16 日）。按论文的表 1，每款工具在其改写的、含有单元的 20 篇文本中，有 7 到 13 篇（35% 到 65%；Undetectable AI 为 20 篇中 11 篇）至少改动了一个单元；[evals/README.md](evals/README.md#by-humaniser) 给出包含 `preserve` 对每款工具结果的表格。
+按论文的表 1，每款工具在其改写的、含有单元的 20 篇文本中，有 7 到 13 篇（35% 到 65%；Undetectable AI 为 20 篇中 11 篇）至少改动了一个单元；[evals/README.md](evals/README.md#by-humaniser) 给出包含 `preserve` 对每款工具结果的表格。
 
 `laconic-check mcp` 通过标准输入输出把 `lint` 和 `preserve` 作为 MCP 工具提供，无需另外安装任何东西。`preserve` 工具接受 `loose: true`，作用与 `--loose` 相同；`lint` 工具与 `lint` 一样，应用服务器运行目录中的 `laconic.toml` 或 `.laconic-check` 文件，每次调用都重新读取；文件格式错误时，调用会返回一个指出其行号的错误（两者均自 0.6.0 起）：
 

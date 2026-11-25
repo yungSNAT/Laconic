@@ -25,13 +25,11 @@ AI가 쓴 글을 사람이 쓴 글처럼 바꾸려면 에이전트에게 휴머�
 
 <table>
 <tr>
-<td align="center" width="33%"><h3>5점 만점에 4.92</h3>휴머나이즈 품질, 상대는 4.54와 4.50<br><sub><a href="#against-other-humanisers">중립 루브릭, 텍스트 20개, 블라인드 심사</a></sub></td>
-<td align="center" width="33%"><h3>원문 길이의 65%</h3>두 경쟁 도구는 모두 81%<br><sub><a href="#against-other-humanisers">길이만 비교, 사실 검사는 같은 표에 함께 제시</a></sub></td>
 <td align="center" width="33%"><h3>4.63 대 4.07</h3>단순한 'Answer concisely.'와 비교<br><sub><a href="#evaluation">자체 루브릭, 사례 45개, 차단 결함 6개 대 29개</a></sub></td>
 </tr>
 </table>
 
-3개 수치 모두 2026년 10월 20일 Laconic 자체 평가 도구에서 생성 모델 하나로 얻었습니다. 한계와 재실행 명령은 [평가](#evaluation)에 있습니다.
+이 수치는 2026년 10월 20일 Laconic 자체 평가 도구에서 생성 모델 하나로 얻었습니다. 한계와 재실행 명령은 [평가](#evaluation)에 있습니다.
 
 <a id="install"></a>
 ## 설치
@@ -164,36 +162,6 @@ Laconic은 단순 지시보다 가중 점수가 0.56 높습니다. 변경은 심
 </details>
 
 한계: 생성 모델 하나에서 나온 구성당 답변 18~90개입니다. 사례는 `evals/cases.jsonl`, 루브릭은 `evals/rubric.md`에 있습니다. 이 사례들은 규칙 문구를 다듬는 데도 쓰였으므로 점수는 보류 데이터 시험이 아닙니다. 연속 쉼표가 여전히 가장 흔한 실수입니다.
-
-<a id="against-other-humanisers"></a>
-### 다른 휴머나이저와 비교
-
-2026년 10월 20일, 설치된 3개 구성이 호주 독자를 위해 AI가 쓴 텍스트 20개(`evals/humanise-cases.jsonl`: 고객 이메일, PR 설명, 릴리스 노트, 이사회 보고서, 채용 공고 등)를 휴머나이즈했고, 각 2회 시행으로 Claude Opus 5.5가 생성하고 블라인드 심사했습니다. 각 구성은 Skill과 Read 도구와 함께 자기 스킬만 가졌고 그것을 쓰라고 지시받았습니다. Laconic의 산문 스킬(커밋 `c7e3048`), [humanizer](https://github.com/blader/humanizer)(커밋 `8c307f3`), [avoid-ai-writing](https://github.com/conorbronsdon/avoid-ai-writing)(커밋 `cb16d10`)입니다.
-
-| 지표 | Laconic | `humanizer` | `avoid-ai-writing` |
-|---|---|---|---|
-| 가중 점수, 중립 루브릭(1~5) | 4.92 | 4.54 | 4.50 |
-| 가중 점수, 자체 루브릭 | 4.87 | 4.50 | 4.42 |
-| 정확성, 중립 루브릭 | 4.80 | 4.13 | 4.18 |
-| 간결성, 중립 루브릭 | 4.95 | 4.20 | 3.95 |
-| 차단 결함 | 0 | 0 | 0 |
-| 통과한 정규식 사실 및 패턴 검사(아래 참고) | 40개 중 40 | 40개 중 40 | 40개 중 35 |
-| 원문 대비 평균 길이, 단어 기준 | 65% | 81% | 81% |
-| 텍스트당 avoid-ai-writing 탐지기 지적(원문: 2.6) | 0.03 | 0 | 0.05 |
-| 텍스트당 dslop 지적, 리듬 지표 포함(원문: 1.80) | 0.50 | 0.83 | 0.63 |
-| 텍스트당 `laconic-check` 0.1.0 지적(원문: 1.85) | 0.15 | 0.45 | 0.28 |
-| 텍스트 40개 생성 비용 | $4.54 | $5.84 | $15.78 |
-
-Laconic의 자체 세부 규칙(숫자, 연속 쉼표, 엠 대시)은 빼되 호주식 철자는 여전히 요구하는 중립 루브릭에서 Laconic은 가중 점수로 `humanizer`보다 0.38, `avoid-ai-writing`보다 0.43 앞섭니다. 두 시행과 함께 텍스트 20개를 다시 표집하는 대응 부트스트랩의 95% 구간은 +0.26 ~ +0.51과 +0.26 ~ +0.59입니다. 그 세부 규칙을 루브릭에서 빼도 우위는 유지됩니다. 다른 구성에 대한 심사 메모에는 자기소개서에 덧붙인 경력, 보조금 신청서에서 추론해 낸 달러 금액처럼 원문에 없던 내용이 있습니다. 이 표본에서 3개 구성 모두 이 탐지기들의 지적을 원문 수준보다 훨씬 낮췄습니다.
-
-<details>
-<summary>정규식 검사를 수정한 방법</summary>
-
-충실한 바꿔 쓰기('in stages', 'a second person will check', 'five to seven', 'Don't install any personal')로 실패한 답변을 살펴본 뒤 정규식 검사 4개를 넓혔습니다. 수정한 같은 검사를 모든 구성에 적용했으며, 표는 수정 후 결과입니다. 변경 전에는 40개 중 Laconic이 37개, `humanizer`가 34개를 통과했습니다. `laconic-check` 행은 버전 0.1.0 결과이며, 이후 버전은 규칙을 더해 더 많은 지적을 셉니다.
-
-</details>
-
-한계: 생성 모델 하나에서 나온 구성당 텍스트 40개이고, 같은 모델 계열이 이 프롬프트 20개와 이 설치 구성으로 심사했습니다. 각 검사기는 작성자의 기준을 반영하며, `avoid-ai-writing` 탐지기는 그 스킬 자체의 엔진입니다. 정규식 검사 통과는 사실이 살아남았다는 부분적 증거일 뿐, 모든 단서가 살아남았다는 증명이 아닙니다. 재실행 명령은 [evals/README.md](evals/README.md)에 있습니다.
 
 <a id="checker"></a>
 ## 검사기
@@ -353,7 +321,7 @@ GitHub Actions에서는 복합 Action이 러너(Linux x86_64, Windows x86_64, Ap
 | 이름이 바뀜 | 28 | 20 확인할 이름 나열 | 20 | 20 |
 | 모든 단위 유지 | 258 | 17 통과, 224 의미 단어만으로 실패, 0 월·인라인 코드·URL로 실패, 17 숫자·양·인용으로 실패 | 23 통과; 222; 0; 13 | 64 통과; 182; 0; 12 |
 
-같은 문서에서 avoid-ai-writing의 `validate.js`는 바뀐 105개 중 23개를, Zero Slop의 충실도 검사는 105개 모두를 실패시킵니다. 유지된 258개 중 각각 233개와 15개를 통과시키며, `preserve`는 23개, `--loose`는 64개입니다([evals/README.md](evals/README.md#against-other-fact-checkers), 2026년 11월 16일). 논문의 표 1에 따르면 각 휴머나이저는 단위가 있는 재작성 텍스트 20개 중 7~13개(35%~65%, Undetectable AI는 20개 중 11개)에서 단위를 하나 이상 바꿨습니다. 각각에 대한 `preserve` 결과가 담긴 표는 [evals/README.md](evals/README.md#by-humaniser)에 있습니다.
+논문의 표 1에 따르면 각 휴머나이저는 단위가 있는 재작성 텍스트 20개 중 7~13개(35%~65%, Undetectable AI는 20개 중 11개)에서 단위를 하나 이상 바꿨습니다. 각각에 대한 `preserve` 결과가 담긴 표는 [evals/README.md](evals/README.md#by-humaniser)에 있습니다.
 
 `laconic-check mcp`는 `lint`와 `preserve`를 표준 입출력으로 MCP 도구로 제공하며, 따로 설치할 것이 없습니다. `preserve` 도구는 `--loose`와 같은 동작을 위해 `loose: true`를 받고, `lint` 도구는 `lint`처럼 서버가 실행되는 디렉터리의 `laconic.toml` 또는 `.laconic-check` 파일을 호출마다 다시 읽어 적용합니다. 형식이 잘못된 파일이면 호출이 그 줄을 알려 주는 오류가 됩니다(둘 다 0.6.0부터).
 

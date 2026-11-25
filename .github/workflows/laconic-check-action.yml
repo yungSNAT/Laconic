@@ -6,12 +6,18 @@ on:
   pull_request:
     paths:
       - action.yml
+      - tools/laconic-check/Cargo.toml
+      - tools/laconic-check/Cargo.lock
+      - tools/laconic-check/src/**
       - tools/laconic-check/action/**
       - .github/workflows/laconic-check-action.yml
   push:
     branches: [main]
     paths:
       - action.yml
+      - tools/laconic-check/Cargo.toml
+      - tools/laconic-check/Cargo.lock
+      - tools/laconic-check/src/**
       - tools/laconic-check/action/**
       - .github/workflows/laconic-check-action.yml
   workflow_call:
@@ -26,11 +32,64 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 10
+    timeout-minutes: 15
+    env:
+      MSYS2_ENV_CONV_EXCL: "*"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - name: Install the Rust toolchain rust-toolchain.toml pins
+        if: github.event_name != 'workflow_call'
+        run: rustup toolchain install
+      - name: Build checkout laconic-check
+        if: github.event_name != 'workflow_call'
+        id: build-main
+        shell: bash
+        run: |
+          cargo build --locked --manifest-path tools/laconic-check/Cargo.toml
+          exe="tools/laconic-check/target/debug/laconic-check"
+          if [[ "$RUNNER_OS" == Windows ]]; then exe="$exe.exe"; fi
+          bin="$(pwd)/$exe"
+          if command -v cygpath > /dev/null; then bin=$(cygpath -m "$bin"); fi
+          test -x "$bin"
+          echo "bin=$bin" >> "$GITHUB_OUTPUT"
+      - name: Test checkout action-lint (CRLF, refusals and project/<id> batches)
+        if: github.event_name != 'workflow_call'
+        shell: bash
+        env:
+          BIN: ${{ steps.build-main.outputs.bin }}
+        run: |
+          for arg in --json --sarif --format=json --format=sarif; do
+            status=0
+            out=$(LACONIC_CHECK=true LACONIC_FILES=tools/laconic-check/action/tests/clean.md \
+              LACONIC_ARGS="--warn $arg" "$BIN" action-lint) || status=$?
+            test "$status" -eq 2
+            test "$out" = "::error::the Action reads lint's text output, so args cannot include $arg"
+          done
+          temp=$RUNNER_TEMP
+          if command -v cygpath > /dev/null; then temp=$(cygpath -u "$temp"); fi
+          tmp=$(mktemp -d "${temp}/action-main.XXXXXX")
+          trap 'rm -rf "$tmp"' EXIT
+          printf 'max_findings = 1\n\n[rules]\nplain: utilise = use\n' > "$tmp/laconic.toml"
+          mkdir -p "$tmp/many"
+          pad=$(printf '%0200d' 0 | tr 0 p)
+          files=""
+          for i in $(seq 1 130); do
+            name="many/$pad-$i.md"
+            if [[ "$i" -eq 1 || "$i" -eq 130 ]]; then
+              printf 'Teams utilise tools.\n' > "$tmp/$name"
+            else
+              cp tools/laconic-check/action/tests/clean.md "$tmp/$name"
+            fi
+            files+="$name"$'\r\n'
+          done
+          status=0
+          out=$(cd "$tmp" && LACONIC_CHECK="$BIN" LACONIC_FILES="$files" \
+            LACONIC_ARGS=$'--only\r\nproject/plain\r\n' "$BIN" action-lint) || status=$?
+          test "$status" -eq 1
+          test "$(printf '%s\n' "$out" | grep -c 'title=laconic-check project/plain::')" -eq 2
+          printf '%s\n' "$out" | grep -q '2 failing findings across all the files, more than --max-findings allows (1)'
       # A version bump in action.yml names a release that is published only after the bump
       # merges, so until then the steps install the latest published release, with a warning.
       # The release workflow's run, on the tag, must find the release action.yml names.
@@ -59,8 +118,6 @@ jobs:
           echo "version=$version" >> "$GITHUB_OUTPUT"
       - name: A clean file passes
         uses: ./
-        env:
-          MSYS2_ENV_CONV_EXCL: "*"
         with:
           version: ${{ steps.release.outputs.version }}
           files: tools/laconic-check/action/tests/clean.md
@@ -68,8 +125,6 @@ jobs:
         id: fault
         continue-on-error: true
         uses: ./
-        env:
-          MSYS2_ENV_CONV_EXCL: "*"
         with:
           version: ${{ steps.release.outputs.version }}
           files: tools/laconic-check/action/tests/fault.md

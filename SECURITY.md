@@ -1,6 +1,6 @@
 # Security policy
 
-Laconic runs code on your machine: its hooks and plugins start with your coding agent, and its MCP server is a local binary (or a deprecated Node script that launches one). Please report suspected vulnerabilities privately.
+Laconic runs code on your machine: its hooks and plugins start with your coding agent, and its MCP server is a local binary. Please report suspected vulnerabilities privately.
 
 ## Report a vulnerability
 

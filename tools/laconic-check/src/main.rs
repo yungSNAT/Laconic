@@ -52,10 +52,10 @@ fn usage_text() -> String {
          fails on.\n\
          A clean result does not check meaning.\n\
          mcp serves lint and preserve as MCP tools over standard input and output; its\n\
-         lint applies the .laconic-check file in the directory it runs in.\n\
+         lint applies the laconic.toml or .laconic-check file in the directory it runs in.\n\
          lsp is a language server over standard input and output: it publishes lint's\n\
          findings for open Markdown documents, and their fixes as quick fixes, with the\n\
-         settings of the .laconic-check file in the workspace folder that holds each one.\n\
+         settings of the laconic.toml or .laconic-check file in the workspace folder that holds each one.\n\
          hook reads a Claude Code or Codex Stop event on standard input and, once a turn,\n\
          asks the agent to look at lint's failing findings in the uncommitted Markdown of\n\
          the repository that holds the event's directory before it finishes.\n\

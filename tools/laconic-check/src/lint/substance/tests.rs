@@ -120,8 +120,26 @@ fn ai_placeholder_catches_residue_brackets_and_todo_tbd() {
         rules_of("Finish the checklist TODO before sending."),
         ["ai-placeholder"]
     );
+    assert_eq!(rules_of("See [TODO]."), ["ai-placeholder"]);
+    assert_eq!(rules_of("See [TODO: add details]."), ["ai-placeholder"]);
+    assert_eq!(rules_of("See [TBD]."), ["ai-placeholder"]);
+    assert_eq!(rules_of("See [TBD - owner]."), ["ai-placeholder"]);
+    assert_eq!(rules_of("See [insert TODO here]."), ["ai-placeholder"]);
+    assert_eq!(rules_of("See [TODO and finish."), ["ai-placeholder"]);
+    assert_eq!(rules_of("See [see TODO]."), ["ai-placeholder"]);
     assert!(!rules_of("Run `TODO` and `[insert x]` in code.").contains(&"ai-placeholder"));
     assert!(!rules_of("Check the todo list tomorrow.").contains(&"ai-placeholder"));
+    for clean in [
+        "Click [Add details](https://example.com) to continue.",
+        "Open [Your profile](https://example.com/profile) to edit settings.",
+        "Read [the house color guide](https://example.com/guide).",
+    ] {
+        assert!(
+            !rules_of(clean).contains(&"ai-placeholder"),
+            "unexpected flag in {clean:?}: {:?}",
+            rules_of(clean)
+        );
+    }
 }
 
 #[test]

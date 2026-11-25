@@ -261,6 +261,9 @@ pub(super) enum Survival {
         reference: String,
         #[arg(long, allow_negative_numbers = true, default_value_t = 2)]
         trials: i64,
+        /// Planned setup names to require [default: the 8 built-in setups].
+        #[arg(long, num_args = 1..)]
+        setups: Option<Vec<String>>,
     },
 }
 

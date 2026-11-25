@@ -34,3 +34,31 @@ path = "fuzz_targets/mcp.rs"
 test = false
 doc = false
 bench = false
+
+[[bin]]
+name = "lsp"
+path = "fuzz_targets/lsp.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "hook"
+path = "fuzz_targets/hook.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "action-lint"
+path = "fuzz_targets/action_lint.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "settings"
+path = "fuzz_targets/settings.rs"
+test = false
+doc = false
+bench = false

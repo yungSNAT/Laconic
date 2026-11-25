@@ -158,7 +158,7 @@ fn cases() -> Vec<Case> {
         case(
             "a_carriage_return_in_a_name_is_refused",
             PLAIN,
-            "two.md\r\nclean.md\r\n",
+            "two\rclean.md",
             "",
         ),
         unix(tracked(
@@ -196,12 +196,7 @@ fn cases() -> Vec<Case> {
             "many",
             "--config=loose.cfg",
         ),
-        case(
-            "a_project_rule_is_printed_not_annotated",
-            RULES,
-            "rule.md",
-            "",
-        ),
+        case("a_project_rule_is_annotated", RULES, "rule.md", ""),
         case(
             "config_option_names_the_project_file",
             STRICT,
@@ -498,5 +493,56 @@ fn warn_as_option_value_or_operand_still_enforces_max_findings() {
 
     let (stdout, code) = run_action("--warn");
     assert_eq!(code, 0, "--warn: {stdout}");
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn crlf_inputs_and_multi_batch_project_rules_work() {
+    let dir = Path::new(env!("CARGO_TARGET_TMPDIR"))
+        .join(format!("action-crlf-project-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(dir.join("many")).unwrap();
+    std::fs::write(
+        dir.join("laconic.toml"),
+        "max_findings = 1\n\n[rules]\nplain: utilise = use\n",
+    )
+    .unwrap();
+    let mut files = String::new();
+    let pad = "p".repeat(200);
+    for i in 0..130 {
+        let name = format!("many/{pad}-{i:03}.md");
+        let body = if i == 0 || i == 129 {
+            "Teams utilise tools.\n"
+        } else {
+            CLEAN
+        };
+        std::fs::write(dir.join(&name), body).unwrap();
+        files.push_str(&name);
+        files.push_str("\r\n");
+    }
+
+    let out = Command::new(exe())
+        .arg("action-lint")
+        .current_dir(&dir)
+        .env("LACONIC_CHECK", exe())
+        .env("LACONIC_FILES", &files)
+        .env("LACONIC_ARGS", "--only\r\nproject/plain\r\n")
+        .output()
+        .unwrap();
+    let stdout = String::from_utf8(out.stdout).unwrap();
+    assert_eq!(out.status.code(), Some(1), "{stdout}");
+    assert_eq!(
+        stdout
+            .matches("title=laconic-check project/plain::")
+            .count(),
+        2,
+        "{stdout}"
+    );
+    assert!(
+        stdout.contains(
+            "2 failing findings across all the files, more than --max-findings allows (1)"
+        ),
+        "{stdout}"
+    );
     let _ = std::fs::remove_dir_all(&dir);
 }

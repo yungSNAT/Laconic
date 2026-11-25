@@ -21,7 +21,7 @@
 
 Laconic は、コーディングエージェントとチャットアシスタント向けの AI「ヒューマナイザー」（humanizer）であり、「no AI slop」（AI っぽい水増しをなくす）スキルです。モデルに答えを先に述べさせ、未確認の点を明示させ、答え終えたら止めさせます。また、読み手に必要な事実、手順、注意点をすべて残すよう指示します。すべてのオリジナルの文を Australian Government Style Manual に従って書き、スキルに記載された独自ルールで上書きするよう指示します。
 
-AI が書いた文章を人が書いたように直すには、エージェントにヒューマナイズを頼んでください。散文スキルは AI の文章パターンを取り除き、事実、数値、注意点をすべて残すように書かれており、演出された個性で水増しせず文章を短くします。この約束を検証する[事実保持ベンチマーク](evals/README.md#fact-survival-benchmark)はまだ結果が出ていません。2026 年 11 月 14 日、公開テキスト 99 本について、Laconic の作者が実行した[外部の単位照合チェッカー](#fact-changes-on-a-public-set)は、モデルによっては Laconic の書き換えが `humanizer` と同程度か、それ以上の頻度で数値、日付、名前、引用を失うことを見つけました。どちらの差もはっきりと 0 から離れてはいません。
+AI が書いた文章を人が書いたように直すには、エージェントにヒューマナイズを頼んでください。散文スキルは AI の文章パターンを取り除き、事実、数値、注意点をすべて残すように書かれており、演出された個性で水増しせず文章を短くします。この約束を検証する[事実保持ベンチマーク](evals/README.md#fact-survival-benchmark)はまだ結果が出ていません。
 
 <table>
 <tr>
@@ -59,16 +59,6 @@ npx skills add yungSNAT/laconic --global --agent "*" --yes
 ## 使い方
 
 エージェントを再起動し、`/laconic` と入力します。'stop laconic' と言うまで、そのセッションの間有効です。
-
-<a id="when-to-choose-something-else"></a>
-## 別のものを選ぶべきとき
-
-- **トークンコストが最優先なら:** [caveman](https://github.com/JuliusBrussee/caveman) はそのために作られており、エージェントが読む内容も圧縮します。[Chisle](https://github.com/JayPokale/Chisle) は出力トークンがさらに少なくなります。Laconic の 47 ケース（[トークンコスト](#token-cost-against-caveman-and-chisle)、2026 年 11 月 17 日）では、Laconic のコンパクトルールの出力トークンは caveman より 14%、Chisle より 44% 多くなりました。セッション内と同じくルールをプロンプトキャッシュから読んだ場合、回答 1 件のコストは caveman より 17%、Chisle より 45% 高くなりました。毎回ルールをキャッシュに書き込む単発のコールド呼び出しでは、caveman より 11% 安く（caveman のルールのほうが長いため）、Chisle より 5% 高くなりました。セッションモードはタスクあたりコンパクトルールより約 27% 高くつきました。
-- **別の種類の英語が必要なら:** Laconic はオーストラリア英語でのみ書きます。[LanguageTool](https://github.com/languagetool-org/languagetool) は、書き終えた文章についてオーストラリア、イギリス、カナダ、ニュージーランド、南アフリカ、アメリカの英語の文法と文体をチェックします。
-- **詳細を付け加える書き換えを受け入れるなら:** [humanizer](https://github.com/blader/humanizer) 4.0.0（2026 年 11 月 10 日）は、文章が具体性に欠ける箇所でモデルに 'add a specific detail you know to be true' と指示します。Laconic は事実を付け加えず、`laconic-check preserve --strict` は保護対象の数値、URL、引用などを追加した編集を失敗にします。
-- **文章ガイドだけが欲しいなら:** Laconic の文章ガイドの土台である [No AI Slop](https://github.com/petergyang/no-ai-slop) は、応答ルールとオーストラリア英語なしでそれを提供します。
-- **Microsoft Word で編集するなら:** [PerfectIt](https://www.perfectit.com/) は Word 上で、Australian Government Style 用を含むスタイルシートに照らして一貫性をチェックします。Laconic はエージェント、チャットアシスタント、CI で動き、Word では動きません。
-- **自分たちのハウススタイルを CI でチェックしたいなら:** [Vale](https://github.com/vale-cli/vale) は、正規表現、ルールの種類、パッケージで設定したルールに照らして文章をチェックします。`laconic-check` は Laconic のルールにプロジェクト独自の語の置き換えと禁止フレーズを加えるだけです。
 
 <a id="what-changes"></a>
 ## 何が変わるか
@@ -173,59 +163,7 @@ Laconic は単純な指示より加重で 0.56 上回ります。変更は審査
 
 </details>
 
-限界: 生成モデル 1 つによる構成あたり 18〜90 件の回答です。ケースは `evals/cases.jsonl`、ルーブリックは `evals/rubric.md` にあります。これらのケースはルールの文言の調整にも使ったため、スコアはホールドアウトのテストではありません。以下の Claude Code の Concise スタイルとの比較では、2026 年 11 月 1 日に書かれ、ルールの調整には使っていない `evals/holdout-cases.jsonl` の固定ケース 10 件を使います。シリアルカンマが今も最も多いミスです。
-
-<a id="against-claude-codes-concise-style"></a>
-### Claude Code の Concise スタイルとの比較
-
-2026 年 11 月 17 日、3 つの構成がホールドアウトの 10 ケースに各 3 試行で回答し、ツールなしの Claude Code 2.1.325 上で Claude Opus 5.5（`claude-opus-5-5`、high effort）が生成と審査を行いました。3 つの構成は、Laconic のコンパクトルール、Claude Code 組み込みの Concise 出力スタイル（`"outputStyle": "Concise"`）、単純な指示 'Answer concisely.' です。審査者はケースごとに 3 件の回答をシャッフルした文字ラベルの下でまとめて見ており、構成の名前は知りませんでしたが、文体は見えました。審査は 2 回行いました。1 回は文体を採点しないよう指示する `evals/rubric-correctness.md` に従って正確さだけを、もう 1 回は手作業でラベル付けした較正用回答 10 件すべてと一致した後に Laconic 独自のルーブリック `evals/rubric.md` に従って審査しました。
-
-| 指標 | Laconic | Concise スタイル | 'Answer concisely.' |
-| --- | --- | --- | --- |
-| 正確さ、文体を除く（1〜5） | 4.80 | 4.27 | 4.47 |
-| Concise スタイルとの差（95% 区間） | +0.53（0.00〜+1.17） | | +0.20（−0.13〜+0.53） |
-| ブロッキング指摘、文体を除く | 0 | 4 | 1 |
-| 加重スコア、Laconic 独自のルーブリック（1〜5） | 4.69 | 4.06 | 4.11 |
-| Concise スタイルとの差（95% 区間） | +0.63（+0.29〜+1.00） | | +0.05（−0.10〜+0.22） |
-| ブロッキング指摘、Laconic 独自のルーブリック | 1 | 13 | 10 |
-| `laconic-check` 0.5.0 の指摘がない回答 | 30 件中 24 | 30 件中 16 | 30 件中 13 |
-| 合格した正規表現チェック | 12 件中 9 | 12 件中 9 | 12 件中 9 |
-| 平均回答長（文字） | 782 | 614 | 627 |
-| 平均出力トークン、思考を含む | 475 | 327 | 298 |
-| 回答あたりの平均コスト、コールド呼び出し 1 回、Claude Code の報告値 | US$0.022 | US$0.019 | US$0.016 |
-| それに対する Laconic のコスト（95% 区間） | | 1.18 倍（1.07〜1.29） | 1.39 倍（1.30〜1.50） |
-
-Laconic 独自のルーブリックは、Laconic だけが求めるオーストラリア英語と独自の細則を採点し、審査者はそれを加重スコアだけでなく正確さとブロッキング指摘にも適用しました。そのため、審査した行のうち文体に中立なのは最初の 3 行だけです。正確さだけで見ると Laconic は Concise スタイルより 0.53 高いものの、10 ケースでは区間が差なしに届くため、明確な優位ではありません。ブロッキング指摘は Laconic が 0 件、Concise スタイルが 4 件でした。最初の審査のメモによると、Concise スタイルは給与関連メール 3 通のうち 2 通で 2026 年 11 月 26 日または 28 日の曜日を誤り、3 通目では締め切りを埋もれさせ、レビュー用メモ 3 件のうち 2 件でタスクが確認していないテストカバレッジを主張し、監査対象のテキストを 1 回誤って引用しました。'Answer concisely.' も同様のミスをしました。Laconic は Concise スタイルより出力トークンが 46% 多く、回答あたりのコストは 18% 高くなりました。3 構成とも、Laconic のルールが独自のハイフンを求める '2026–27' で Style Manual のエンダッシュを残したため、そのケースの正規表現チェックに失敗しました。
-
-限界: 構成あたり 30 件の回答で、生成したモデル自身が審査し、ケースは Laconic の作者が書いたものです。文体を除く審査には較正セットがありませんでした。各区間は 10 ケースをリサンプリングしています（10,000 回、シード 2282）。各呼び出しはプロンプトをプロンプトキャッシュに書き込んだため、コストの行は単発のコールド呼び出しのものです。セッション内のようにルールがキャッシュされていれば Laconic の余分な出力はおそらくより大きく効きますが、今回の実行では測っていません。Claude Code とその Concise スタイルはソフトウェア開発のセッション向けで、これらのケースの大半は執筆と助言のタスクです。実行スクリプト、回答ごとのスコア、トークン数とコスト、この表を再計算するスクリプトは [`evals/runs/concise-style-2026-11-17`](evals/runs/concise-style-2026-11-17/) にあり、回答そのものは保存していません。
-
-<a id="token-cost-against-caveman-and-chisle"></a>
-### caveman、Chisle とのトークンコスト比較
-
-2026 年 11 月 17 日、3 つのルールセットが `evals/cases.jsonl` の 47 ケースすべてに回答し、ツールなしの Claude Code 2.1.325 上で Claude Opus 5.5（`claude-opus-5-5`、high effort）が生成と審査を行いました。3 つのルールセットは、Laconic のコンパクトルール、[caveman](https://github.com/JuliusBrussee/caveman) 4.1.0 の `skills/caveman/SKILL.md`、[Chisle](https://github.com/JayPokale/Chisle) 3.12.1 の `skills/chisle/SKILL.md` で、それぞれ front matter を除いてシステムプロンプトに追加しました。コールド呼び出し（2 試行）はそれぞれ新しい作業ディレクトリから実行したため、ルールをプロンプトキャッシュに書き込みました。キャッシュ呼び出し（1 試行、審査なし）は準備用の呼び出しの後に 1 つのディレクトリから実行したため、同じセッション内の呼び出しと同様にルールをキャッシュから読みました。審査者はケースごとに 3 件のコールド回答をシャッフルした文字ラベルの下でまとめて見ており、プロンプトにはルールセットの名前はありませんでした。ただし文体は見えており、Laconic の回答 94 件のうち 3 件が Laconic に触れていました（2 件は作業ディレクトリの引用、1 件はスキル名の記載による）。審査は 2 回行いました。1 回は文体を採点しないよう指示する `evals/rubric-correctness.md` に従って正確さだけを、もう 1 回は Laconic 独自のルーブリック `evals/rubric.md` に従って審査しました。
-
-| 指標 | Laconic | caveman | Chisle |
-| --- | --- | --- | --- |
-| 平均出力トークン、思考を含む、コールド呼び出し | 745 | 655 | 516 |
-| それに対する Laconic の出力トークン（95% 区間） | | 1.14 倍（1.04〜1.27） | 1.44 倍（1.27〜1.68） |
-| 平均入力トークン、コールド呼び出し | 3,218 | 4,285 | 3,861 |
-| 平均出力トークン、思考を含む、キャッシュ呼び出し | 780 | 637 | 492 |
-| 回答あたりの平均コスト、ルールをキャッシュから読む場合 | US$0.018 | US$0.016 | US$0.013 |
-| それに対する Laconic のコスト、ルールをキャッシュから読む場合（95% 区間） | | 1.17 倍（1.05〜1.29） | 1.45 倍（1.25〜1.61） |
-| 回答あたりの平均コスト、コールド呼び出し 1 回、キャッシュ書き込みを含む | US$0.028 | US$0.031 | US$0.026 |
-| それに対する Laconic のコスト、コールド呼び出し（95% 区間） | | 0.89 倍（0.83〜0.94） | 1.05 倍（0.96〜1.15） |
-| 平均回答長（文字）、コールド呼び出し | 1,297 | 1,198 | 977 |
-| 正確さ、文体を除く（1〜5） | 4.68 | 4.44 | 4.38 |
-| Laconic の差（95% 区間） | | +0.24（+0.06〜+0.45） | +0.30（+0.10〜+0.53） |
-| ブロッキング指摘、文体を除く | 2 | 5 | 7 |
-| 加重スコア、Laconic 独自のルーブリック（1〜5） | 4.63 | 4.11 | 4.11 |
-| ブロッキング指摘、Laconic 独自のルーブリック | 8 | 43 | 44 |
-| 合格した正規表現チェック、コールド呼び出し | 18 件中 18 | 18 件中 16 | 18 件中 16 |
-| `laconic-check` 0.5.0 の指摘がない回答、コールド呼び出し | 94 件中 70 | 94 件中 36 | 94 件中 39 |
-
-最も多く書いたのは Laconic で、出力トークンは caveman より 14%、Chisle より 44% 多くなりました。コールド呼び出しでは、caveman の長いルールをキャッシュに書き込むコストが Laconic の余分な出力を上回ったため、回答は Laconic のほうが 11% 安くなりました。セッション内と同じくルールをキャッシュから読む場合は、Laconic の余分な出力により回答が caveman より 17%、Chisle より 45% 高くなりました。正確さだけで見ると Laconic は caveman を 0.24、Chisle を 0.30 上回りました。文体を除いたブロッキング指摘 2 件は、計算ミス 1 件と RFC 7636 のテスト値の誤引用 1 件でした。Laconic 独自のルーブリックは、比較対象のどちらも求めないオーストラリア英語と独自の細則も正確さとブロッキング指摘として採点しており、その基準での比較対象のブロッキング指摘の大半は、シリアルカンマ、二重引用符、単語で書いた数字、アメリカ式の綴りに関するものです。その審査では、典型的な所要期間を示すことを禁じたケースで比較対象の両方が 2 回答とも期間を示したのに対し、Laconic は示しませんでした。Laconic のブロッキング指摘には、ツールがないと告げられて、タスクが到達できるとしたファイルを編集しなかった回答 1 件（Chisle の回答 1 件も同様）、重大な計算ミスのある回答 1 件、タスクが禁じた限界についての注記を付け加えた回答 2 件が含まれます。
-
-限界: モデルは 1 つで、そのモデル自身が回答を審査し、ケースは Laconic のルールの文言の調整にも使ったものです。文体を除く審査には較正セットがありませんでした。トークンとコストの数値は、呼び出しごとに Claude Code が報告した値です。caveman 独自の評価はシステムプロンプトをスキルで置き換えますが、今回の実行では追加しました。比較対象のどちらについても、エージェントが読む内容の圧縮は試しておらず、どちらも独自のプロンプトとモデルによる数値を公開していますが、今回の実行はそれを再現していません。区間は 47 ケースをリサンプリングしています（10,000 回、シード 2282）。実行スクリプト、回答ごとのスコア、トークン数とコスト、この表を再計算するスクリプトは [`evals/runs/token-cost-2026-11-17`](evals/runs/token-cost-2026-11-17/) にあり、回答そのものは保存していません。
+限界: 生成モデル 1 つによる構成あたり 18〜90 件の回答です。ケースは `evals/cases.jsonl`、ルーブリックは `evals/rubric.md` にあります。これらのケースはルールの文言の調整にも使ったため、スコアはホールドアウトのテストではありません。シリアルカンマが今も最も多いミスです。
 
 <a id="against-other-humanisers"></a>
 ### 他のヒューマナイザーとの比較
@@ -256,22 +194,6 @@ Laconic の独自細則（数字、シリアルカンマ、エムダッシュ）
 </details>
 
 限界: 生成モデル 1 つによる構成あたり 40 本のテキストで、同じモデルファミリーが、この 20 のプロンプトとこれらのインストール構成で審査しました。各チェッカーは作者の考えを反映しており、`avoid-ai-writing` の検出器はそのスキル自体のエンジンです。正規表現チェックに合格したことは事実が残ったことの部分的な証拠であり、すべての限定が残った証明ではありません。再実行のコマンドは [evals/README.md](evals/README.md) にあります。
-
-<a id="fact-changes-on-a-public-set"></a>
-### 公開セットでの事実の変化
-
-2026 年 11 月 14 日、Laconic の散文スキルと [humanizer](https://github.com/blader/humanizer) 4.0.0 が、それぞれ [AI Humanizer Benchmark](https://huggingface.co/datasets/ai-humanizer-benchmark/ai-humanizer-benchmark) の 2026 年 9 月〜11 月サイクルの公開テキスト 99 本を、各 2 試行、異なるモデルで 2 ラウンドにわたり書き換えました。外部のチェッカー [humanizer-fact-audit](https://github.com/zwang-devv/humanizer-fact-audit) が、元のテキストの数値、日付、人名や組織名、3 語以上の引用のうち少なくとも 1 つを失った書き換えを数えました。手法は、書き換えを行う前にコミットしました。
-
-| ラウンド | Laconic | `humanizer` | 差（95% 区間） |
-|---|---|---|---|
-| Claude Opus 5.5 | 134 件中 18（13.43%） | 134 件中 10（7.46%） | +5.97 ポイント（0.00〜+12.32） |
-| `gpt-6.1-sol`（Codex） | 134 件中 20（14.93%） | 134 件中 20（14.93%） | 0.00 ポイント（−2.21〜+2.14） |
-
-Opus 5.5 では、Laconic は `humanizer` より多くの書き換えで単位を失い（18 対 10）、どのグループでも多く失いました。数値と日付は 440 件中 9 対 5、名前は 164 件中 12 対 9、引用は 70 件中 5 対 0 です。`gpt-6.1-sol` では 2 つのスキルは同数でした。どちらの区間も 0 を除外しないため、どちらのラウンドも明確な差を示していません。Laconic の書き換えは両ラウンドとも短く、元の語数の 0.94 と 0.90 で、相手は 1.01 と 0.93 でした。
-
-限界: チェッカーは単位を照合するため、引用の無害な言い換えを指摘することがあります。変わった条件、否定、捏造された主張は見えないため、事実への忠実さの完全なテストではありません。テキスト 99 本のうち 32 本にはチェックできる単位がないため、割合はスキルあたり 134 件の書き換えを対象とします。各ラウンドは書き換えにモデル 1 つを使い、新しいコンテキストごとにテキスト 3 本を与えました。指示はインストールしたプラグインではなくテキストとして与えました。Opus のラウンドは Codex のラウンドの後に、手法を変えずに追加しました。比較対象の選定、手法の作成、両ラウンドの実行は Laconic の作者が行いました。固定したリビジョンは [evals/README.md](evals/README.md#public-set-fact-check) にあります。
-
-2026 年 11 月 17 日に Claude Opus 5.5 が 2026-10 サイクルのテキスト 33 本を各 1 回、呼び出しごとに 1 本ずつ書き換えたところ、Laconic のスキルは単位を含む文書 20 本のうち 5 本で単位を変えました。`humanizer` も同じで、avoid-ai-writing と `work-humanizer` は 1 本、`--verify` 付きの patina は 0 本、依頼文だけの場合は 8 本でした。商用ヒューマナイザー 11 個は 7〜13 本を変えました。テキストあたり 1 回の書き換えでは、スキル間の差を示すには少なすぎます（[ヒューマナイザー別](evals/README.md#by-humaniser)）。
 
 <a id="checker"></a>
 ## チェッカー
@@ -309,18 +231,19 @@ Homebrew のフォーミュラと winget のマニフェストは tap と winget
 
 | オプション | 効果 |
 | --- | --- |
-| `--json` | JSON オブジェクトを 1 つ出力します。それぞれ `file`、`line`、`column`、`rule`、`advisory`、`message`、`url` を持つ `findings`、続いて `failing` の件数と、コメントで `suppressed` された指摘の数です。 |
-| `--sarif` | GitHub の code scanning などの SARIF ビューア向けに [SARIF 2.1.0](https://docs.oasis-open.org/sarif/sarif/v2.1.0/sarif-v2.1.0.html) のログを出力します。すべてのルールを説明とリンク付きで含め、各指摘を `warning` レベル（助言なら `note`）の結果として含めます。位置は、code scanning がリポジトリのパスに対応付けるファイルの絶対 `file` URI と、SARIF の数え方どおり UTF-16 コード単位の列で示します。`--json` とは併用できません。0.6.0 から。 |
-| `--metrics` | 指摘の後に、各ファイルの文章指標と、ファイルが 2 つ以上ならその合計を出力します。`--json` では `files` と `overall` を持つ `metrics` オブジェクトを加えます。`--sarif` とは併用できません。0.6.0 より後。 |
-| `--profile <name>` | 文章の用途別プリセットを適用します: `email`、`report`、`docs`、`chat`、`essay`。`.laconic-check` の `profile = <name>` 行も同じ働きをし、`--profile` がそれより優先します。0.6.0 より後。 |
+| `--format <format>` | 出力形式を選びます: `text`（既定値）、`json`（`--json` と同じ）、`sarif`（`--sarif` と同じ）。 |
+| `--json` | `scope`（'Checks house style, prose patterns and substance heuristics; never infers authorship.'）、`findings`（それぞれ `file`、`line`、`column`、`rule`、`advisory`、`severity`、`confidence`、`message`、`url` を持つ）、`failing`、`suppressed` を含む JSON オブジェクトを 1 つ出力します。 |
+| `--sarif` | GitHub の code scanning などの SARIF ビューア向けに [SARIF 2.1.0](https://docs.oasis-open.org/sarif/sarif/v2.1.0/sarif-v2.1.0.html) のログを出力します。すべてのルールを説明とリンク付きで含め、各指摘を `warning` レベル（助言なら `note`）の結果として含めます。各結果には `severity` と `confidence` が付き、実行全体には `scope` が付きます。位置は、code scanning がリポジトリのパスに対応付けるファイルの絶対 `file` URI と、SARIF の数え方どおり UTF-16 コード単位の列で示します。`--json` とは併用できません。0.6.0 から。 |
+| `--metrics` | 指摘の後に、各ファイルの文章指標と、ファイルが 2 つ以上ならその合計を出力します。`--json` では `files` と `overall` を持つ `metrics` オブジェクトを加えます。`--sarif` とは併用できません。0.6.0 から。 |
+| `--profile <name>` | 文章の用途別プリセットを適用します: `email`、`report`、`docs`、`chat`、`essay`。`laconic.toml` または `.laconic-check` の `profile = <name>` 行も同じ働きをし、`--profile` がそれより優先します。0.6.0 から。 |
 | `--disable <rules>` | これらのルールの指摘を捨てます。カンマ区切りで、繰り返し指定できます。 |
 | `--only <rules>` | これらのルールの指摘だけを残します。`--disable` が優先します。 |
 | `--max-findings <n>` | 失敗となる指摘が n 件を超えた場合だけ失敗します（既定値 0）。 |
 | `--warn` | 指摘では失敗しません。 |
 | `--commit-msg` | 各ファイルを Git のコミットメッセージとして読み、コメント行とはさみ線より下は除きます。 |
-| `--config <file>` | `.laconic-check` の代わりにこのファイルから設定を読みます。 |
+| `--config <file>` | `laconic.toml` または `.laconic-check` の代わりにこのファイルから設定を読みます。 |
 
-プロファイルは、どのルールを実行し、どのルールで失敗するかを変えます。指定しなければ `lint` は変わりません。`email`、`report`、`essay` は [`unglossed-term`](docs/rules.md#unglossed-term) を有効にします。これは 'Full Name (ACR)' や 'ACR stands for' のような説明が前にない、大文字 3〜8 字の略語を指摘する助言ルールで、'BHP' のような広く知られた形や強調のための大文字の語は通します。どのプロファイルも、ほかのオプトインのルールをいくつか有効にします。どれかは [docs/rules.md](docs/rules.md) の各ルールに書かれています。`--only unglossed-term` はプロファイルなしでこれを有効にします。この 3 つのプロファイルでは `stacked-hedge` で失敗し、さらに `email` と `essay` では `bold-label`、`essay` では `clause-dashes`、`report` では `hyphen-consistency` と `acronym-before-definition` でも失敗します。`chat` は `stacked-hedge`、`bold-label`、`clause-dashes` で失敗させ、`acronym-before-definition` と `hyphen-consistency` を外します。`docs` は `bold-label` と `acronym-before-definition` を外し、`number-word` を助言にします。プロファイルで失敗するようになった指摘は、メッセージから '(advisory)' が消えます。
+プロファイルは、どのルールを実行し、どのルールで失敗するかを変えます。指定しなければ `lint` は変わりません。`email`、`report`、`essay` は [`unglossed-term`](docs/rules.md#unglossed-term) を有効にします。これは 'Full Name (ACR)' や 'ACR stands for' のような説明が前にない、大文字 3〜8 字の略語を指摘する助言ルールで、'BHP' のような広く知られた形や強調のための大文字の語は通します。どのプロファイルも、ほかのオプトインのルールをいくつか有効にします。どれかは [docs/rules.md](docs/rules.md) の各ルールに書かれています。`--only unglossed-term` はプロファイルなしでこれを有効にします。この 3 つのプロファイルでは `stacked-hedge` で失敗し、さらに `email` と `essay` では `bold-label`、`essay` では `clause-dashes`、`report` では `hyphen-consistency` と `acronym-before-definition` でも失敗します。`chat` は `stacked-hedge`、`bold-label`、`clause-dashes` で失敗させ、`acronym-before-definition` と `hyphen-consistency` を外します。`docs` は `bold-label` と `acronym-before-definition` を外し、`number-word` を助言にします。プロファイルは 5 つのオプトインの根拠・チャット定型句ルールも有効にします（0.6.0 から、既定ではすべて助言）。`email` は `ai-placeholder`、`report` と `essay` は `unanchored-magnitude`、`unattributed-superlative`、`unnamed-evidence`、`ai-placeholder`、`docs` は `unattributed-superlative` と `ai-placeholder`、`chat` は `ai-placeholder` を有効にし、`chat-filler` で失敗させます。プロファイルで失敗するようになった指摘は、メッセージから '(advisory)' が消えます。
 
 ```text
 $ printf 'Each member gets a QBR plan. This could potentially slip a week.\n' > memo.md
@@ -345,13 +268,23 @@ $ laconic-check lint --metrics notes.md
 metrics: notes.md: words=14 sentences=2 mean_word_len=5.43 long_words=35.7% nominalisations=14.3% triads=1 sentence_len=mean 7.0 / median 7.0
 ```
 
-`lint` を実行するディレクトリにある `.laconic-check` ファイルには、`disable`、`only`、`max-findings` の `key = value` 行と、`#` のコメント行を書きます。`accept` 行は、`us-spelling` が指摘しない英字のみの語を並べ、それぞれ同じ大文字小文字で単語単位で照合します。そのため `accept = color` でも文頭の 'Color' は指摘されます（0.6.0 から）。コマンドラインのルールはそのリストに追加され、`--max-findings` はその件数を置き換えます。
+`lint` を実行するディレクトリにある `laconic.toml` または `.laconic-check` ファイル（`laconic.toml` が優先）には、`disable`、`only`、`profile`、`accept`、`max_findings`（`.laconic-check` では `max-findings`）の `key = value` 行と、`#` のコメント行を書きます。`accept` 行は、`us-spelling` が指摘しない英字のみの語を並べ、それぞれ同じ大文字小文字で単語単位で照合します。そのため `accept = color` でも文頭の 'Color' は指摘されます（0.6.0 から）。`[protect]` セクションには、一致した範囲を指摘対象から外す著者のフレーズ（`phrases = [...]` または 1 行に 1 フレーズ）を書きます（0.6.0 から）。コマンドラインのルールはそのリストに追加され、`--max-findings` はその件数を置き換えます。
 
 ```text
 # The CSS property names color and center are expected here.
 accept = color, center
 # This project uses serial commas.
 disable = serial-comma
+```
+
+```toml
+# laconic.toml uses TOML arrays, max_findings and [protect] phrase exemptions.
+accept = ["color", "center"]
+disable = ["serial-comma"]
+max_findings = 0
+
+[protect]
+phrases = ["deep dive"]
 ```
 
 設定の後の `[rules]` セクションには、プロジェクト独自のルールを 1 行に 1 フレーズずつ書きます。`id: phrase = replacement` は置き換えを提案し、`id: phrase =` はそのフレーズを禁止します（0.6.0 から）。各指摘はルールを `project/<id>` と表示し、`disable`、`only`、`--disable`、`--only`、抑制コメントがこれを受け付けます。複数の行が同じ id を共有できます。フレーズは英字と数字からなる 1 語以上で、語の内部にはハイフンやアポストロフィを使えます。文章中で単語単位に、改行をまたいでも照合し、コード、URL、引用の中では照合しません。小文字で書けば大文字小文字を問わず照合し、大文字を含めば書いたとおりにだけ照合します。置き換え後と完全に同じに書かれたテキストは指摘しないため、`github = GitHub` は 'GitHub' をそのままにします。プロジェクトの指摘も Laconic 自身の指摘と同様に `lint` を失敗させます。ルール参照のリンクはなく、`--json` では `url` が `null` になり、SARIF のログは Laconic のルールの後にリンクなしでそれらのルールを並べます。形式の誤った行や未知のセクションがあると、`lint` はその行番号とともに止まります。
@@ -394,12 +327,12 @@ GitHub Actions では、コンポジット Action がランナー（Linux x86_64
 - uses: actions/checkout@v7
 - uses: yungSNAT/Laconic@<commit>
   with:
-    version: 0.6.0     # the laconic-check release; 0.6.0 by default
+    version: 0.6.1     # the laconic-check release; 0.6.1 by default
     files: README.md   # one path a line; default: every .md and .markdown file Git tracks
     args: --warn       # further lint options
 ```
 
-代わりに GitHub の code scanning に指摘を一覧表示するには、`laconic-check` を PATH に置き（リリースに `--sarif` が入るまでは `cargo install --locked --git https://github.com/yungSNAT/Laconic --rev <commit> laconic-check`）、ジョブに `security-events: write` を与えてログをアップロードします。`--warn` では指摘でステップが失敗しないため、使い方の誤りや読み取りエラーのときだけ失敗し、そのときは不完全なものはアップロードされません。指摘でもジョブを失敗させるには、上の Action か、`--warn` なしの別の `lint` ステップを追加してください。
+代わりに GitHub の code scanning に指摘を一覧表示するには、`laconic-check` 0.6.0 以降を PATH に置き、ジョブに `security-events: write` を与えてログをアップロードします。`--warn` では指摘でステップが失敗しないため、使い方の誤りや読み取りエラーのときだけ失敗し、そのときは不完全なものはアップロードされません。指摘でもジョブを失敗させるには、上の Action か、`--warn` なしの別の `lint` ステップを追加してください。
 
 ```yaml
 - run: laconic-check lint --sarif --warn README.md docs/*.md > laconic-check.sarif
@@ -422,7 +355,7 @@ GitHub Actions では、コンポジット Action がランナー（Linux x86_64
 
 同じ文書で、avoid-ai-writing の `validate.js` は変わった 105 件のうち 23 件を、Zero Slop の忠実性チェックは 105 件すべてを失敗とします。保持された 258 件のうち、それぞれ 233 件と 15 件を合格とし、`preserve` は 23 件、`--loose` 付きでは 64 件です（[evals/README.md](evals/README.md#against-other-fact-checkers)、2026 年 11 月 16 日）。論文の表 1 によると、各ヒューマナイザーは、単位を含む書き換え対象のテキスト 20 本のうち 7〜13 本（35%〜65%、Undetectable AI は 20 本中 11 本）で少なくとも 1 つの単位を変えました。それぞれについての `preserve` の結果を含む表は [evals/README.md](evals/README.md#by-humaniser) にあります。
 
-`laconic-check mcp` は、`lint` と `preserve` を標準入出力で MCP ツールとして提供し、ほかに何もインストールする必要はありません。`preserve` ツールは `--loose` と同じ動作のために `loose: true` を受け付け、`lint` ツールは `lint` と同様にサーバーが動くディレクトリの `.laconic-check` ファイルを呼び出しごとに読み直して適用します。ファイルの形式が誤っていれば、呼び出しはその行を示すエラーになります（どちらも 0.6.0 から）。
+`laconic-check mcp` は、`lint` と `preserve` を標準入出力で MCP ツールとして提供し、ほかに何もインストールする必要はありません。`preserve` ツールは `--loose` と同じ動作のために `loose: true` を受け付け、`lint` ツールは `lint` と同様にサーバーが動くディレクトリの `laconic.toml` または `.laconic-check` ファイルを呼び出しごとに読み直して適用します。ファイルの形式が誤っていれば、呼び出しはその行を示すエラーになります（どちらも 0.6.0 から）。
 
 ```bash
 claude mcp add --scope user laconic-check -- laconic-check mcp
@@ -430,13 +363,13 @@ claude mcp add --scope user laconic-check -- laconic-check mcp
 
 laconic-check 0.3.0 以降に含まれています。
 
-`laconic-check lsp` は標準入出力で動く言語サーバーで、入力中にエディタが `lint` の指摘を表示します（0.6.0 から）。開いている Markdown 文書が変わるたびにチェックし、各指摘を警告として（助言ならヒントとして）ルールへのリンク付きで示します。文書を含むワークスペースフォルダー（入れ子の場合は最も内側）の `.laconic-check` ファイルを適用し、読めないファイルや解析できないファイルは 1 行目にエラーとして表示します。0.6.0 より後は、ルールが唯一の置き換えを知っている箇所にクイックフィックスも提示します。米国式の綴り、言葉で書いた数、ラテン語の略語、時刻や日付の書式、二重引用符、見えない文字などです。修正は指摘されたテキストだけを変え、選んだときにだけ適用されます（Neovim では `gra`、Helix では `space a`）。書き直しが必要なルール、たとえば全角ダッシュ、決まり文句、シリアルコンマの候補には修正がありません。修正は文書のバージョンを示すため、テキストが変わった後に届いた修正はエディタが誤った位置に適用せず拒否します。そうした編集を受け付けると表明しないエディタには修正を提示しません。例外は、表明せずに受け付ける Neovim です。Neovim は文書が初めて変更される前に作られた修正を確かめないため、文書が開かれてから一度変更された後にだけ修正を受け取ります。`.laconic-check` または `.git` を含むフォルダーをワークスペースフォルダーとする Neovim 0.11 以降では:
+`laconic-check lsp` は標準入出力で動く言語サーバーで、入力中にエディタが `lint` の指摘を表示します（0.6.0 から）。開いている Markdown 文書が変わるたびにチェックし、各指摘を警告として（助言ならヒントとして）ルールへのリンク付きで示します。文書を含むワークスペースフォルダー（入れ子の場合は最も内側）の `laconic.toml` または `.laconic-check` ファイルを適用し、読めないファイルや解析できないファイルは 1 行目にエラーとして表示します。0.6.0 からは、ルールが唯一の置き換えを知っている箇所にクイックフィックスも提示します。米国式の綴り、言葉で書いた数、ラテン語の略語、時刻や日付の書式、二重引用符、見えない文字などです。修正は指摘されたテキストだけを変え、選んだときにだけ適用されます（Neovim では `gra`、Helix では `space a`）。書き直しが必要なルール、たとえば全角ダッシュ、決まり文句、シリアルコンマの候補には修正がありません。修正は文書のバージョンを示すため、テキストが変わった後に届いた修正はエディタが誤った位置に適用せず拒否します。そうした編集を受け付けると表明しないエディタには修正を提示しません。例外は、表明せずに受け付ける Neovim です。Neovim は文書が初めて変更される前に作られた修正を確かめないため、文書が開かれてから一度変更された後にだけ修正を受け取ります。`laconic.toml`、`.laconic-check` または `.git` を含むフォルダーをワークスペースフォルダーとする Neovim 0.11 以降では:
 
 ```lua
 vim.lsp.config('laconic_check', {
   cmd = { 'laconic-check', 'lsp' },
   filetypes = { 'markdown' },
-  root_markers = { '.laconic-check', '.git' },
+  root_markers = { 'laconic.toml', '.laconic-check', '.git' },
 })
 vim.lsp.enable('laconic_check')
 ```
@@ -453,7 +386,7 @@ name = "markdown"
 language-servers = ["laconic-check"]
 ```
 
-`laconic-check hook` は Claude Code と Codex 向けの Stop フックで、追加するまでは無効です（0.6.0 から）。エージェントがターンを終えようとすると、セッションのディレクトリを含むリポジトリの未コミットの Markdown（ステージ済み、未ステージ、未追跡）を、リポジトリ最上位の `.laconic-check` ファイルでチェックします。`lint` が失敗する状態なら、まず失敗となる指摘を見るようエージェントに求め、最大 50 件を一覧にします。求めるのはターンごとに 1 回なので、指摘が誤検知でもエージェントは終えられます。エージェントの編集だけでなく、あなた自身の未コミットの編集もチェックします。Claude Code では `.claude/settings.json` または `~/.claude/settings.json` に次を追加してください。Codex は同じブロックを `~/.codex/hooks.json` から読み、新しいフックは `/hooks` で確認するまで信頼されていないものとして表示します。
+`laconic-check hook` は Claude Code と Codex 向けの Stop フックで、追加するまでは無効です（0.6.0 から）。エージェントがターンを終えようとすると、セッションのディレクトリを含むリポジトリの未コミットの Markdown（ステージ済み、未ステージ、未追跡）を、リポジトリ最上位の `laconic.toml` または `.laconic-check` ファイルでチェックします。`lint` が失敗する状態なら、まず失敗となる指摘を見るようエージェントに求め、最大 50 件を一覧にします。求めるのはターンごとに 1 回なので、指摘が誤検知でもエージェントは終えられます。エージェントの編集だけでなく、あなた自身の未コミットの編集もチェックします。Claude Code では `.claude/settings.json` または `~/.claude/settings.json` に次を追加してください。Codex は同じブロックを `~/.codex/hooks.json` から読み、新しいフックは `/hooks` で確認するまで信頼されていないものとして表示します。
 
 ```json
 {

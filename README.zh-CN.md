@@ -21,7 +21,7 @@
 
 Laconic 是面向编程智能体和聊天助手的 AI“去 AI 味”（humanizer）与“no AI slop”技能。它让模型先给出答案，标明尚未核实的内容，答完即止，并要求模型保留读者需要的每一个事实、步骤和限定条件。它要求模型按照 Australian Government Style Manual 写出每一句原创文字，并按技能中列出的本项目规则覆盖其中部分要求。
 
-要把 AI 写的文字改得更像人写的，请让智能体对其进行润色（humanise）。写作技能会去除 AI 写作模式，其设计目标是保留每一个事实、数字和限定条件，并让文字更短，而不是用刻意表演的个性来填充。检验这一承诺的[事实保留基准](evals/README.md#fact-survival-benchmark)尚未出结果。2026 年 11 月 14 日，在 99 篇公开文本上，由 Laconic 作者运行的[外部单元比对检查器](#fact-changes-on-a-public-set)发现：视模型而定，Laconic 改写丢失数字、日期、名称或引文的频率与 `humanizer` 相当或更高；两项差异都没有明显偏离 0。
+要把 AI 写的文字改得更像人写的，请让智能体对其进行润色（humanise）。写作技能会去除 AI 写作模式，其设计目标是保留每一个事实、数字和限定条件，并让文字更短，而不是用刻意表演的个性来填充。检验这一承诺的[事实保留基准](evals/README.md#fact-survival-benchmark)尚未出结果。
 
 <table>
 <tr>
@@ -59,16 +59,6 @@ npx skills add yungSNAT/laconic --global --agent "*" --yes
 ## 使用
 
 重启智能体，然后输入 `/laconic`。它会在本次会话中一直生效，直到你说 'stop laconic'。
-
-<a id="when-to-choose-something-else"></a>
-## 何时选择其他工具
-
-- **最看重 token 成本：** [caveman](https://github.com/JuliusBrussee/caveman) 正是为此而做，还会压缩智能体读取的内容；[Chisle](https://github.com/JayPokale/Chisle) 写出的输出 token 更少。在 Laconic 的 47 个案例上（[token 成本](#token-cost-against-caveman-and-chisle)，2026 年 11 月 17 日），Laconic 精简规则的输出 token 比 caveman 多 14%，比 Chisle 多 44%。规则从提示缓存读取时（与会话中一样），每个回答的成本比 caveman 高 17%，比 Chisle 高 45%；在每次都把规则写入缓存的单次冷调用中，成本比 caveman 低 11%（caveman 的规则更长），比 Chisle 高 5%。会话模式每项任务的成本比精简规则高约 27%。
-- **需要其他英语变体：** Laconic 只写澳大利亚英语。[LanguageTool](https://github.com/languagetool-org/languagetool) 可在文字写成后检查澳大利亚、英国、加拿大、新西兰、南非和美国英语的语法与文体。
-- **接受会增加细节的改写：** [humanizer](https://github.com/blader/humanizer) 4.0.0（2026 年 11 月 10 日）在文本空泛之处要求模型 'add a specific detail you know to be true'。Laconic 不增加事实；若编辑增加了它所保护的数字、URL、引文或其他内容，`laconic-check preserve --strict` 会判为失败。
-- **只想要写作指南：** Laconic 写作指南所依据的 [No AI Slop](https://github.com/petergyang/no-ai-slop) 提供了同样的指南，但不含回答规则和澳大利亚英语。
-- **在 Microsoft Word 中编辑：** [PerfectIt](https://www.perfectit.com/) 在 Word 中按样式表检查一致性，包括一份 Australian Government Style 样式表。Laconic 运行于智能体、聊天助手和 CI 中，不在 Word 里运行。
-- **想在 CI 中检查自己的项目文风：** [Vale](https://github.com/vale-cli/vale) 按你配置的规则检查文字，支持正则表达式、规则类型和规则包；`laconic-check` 只是在 Laconic 的规则之外加上项目自己的替换词和禁用短语。
 
 <a id="what-changes"></a>
 ## 变化
@@ -173,59 +163,7 @@ Laconic 的加权分比简单指令高 0.56。这些改动对评审质量没有�
 
 </details>
 
-局限：每种配置 18 到 90 个回答，来自单一生成模型；案例在 `evals/cases.jsonl`，评分标准在 `evals/rubric.md`。这些案例也指导了规则的措辞，因此得分不是留出集测试；下文与 Claude Code Concise 风格的比较使用 `evals/holdout-cases.jsonl` 中的 10 个冻结案例，它们写于 2026 年 11 月 1 日，未用于调整规则。连续逗号仍是最常见的疏漏。
-
-<a id="against-claude-codes-concise-style"></a>
-### 对比 Claude Code 的 Concise 风格
-
-2026 年 11 月 17 日，3 种配置回答了 10 个留出案例，每个 3 次试验，由 Claude Opus 5.5（`claude-opus-5-5`，高强度）在不带工具的 Claude Code 2.1.325 中生成并评审：Laconic 的精简规则、Claude Code 内置的 Concise 输出风格（`"outputStyle": "Concise"`）和简单指令 'Answer concisely.'。评审在打乱的字母标签下同时查看每个案例的 3 个回答，不知道配置名称，但能看出文风。它评审了两次：一次只看正确性，依据 `evals/rubric-correctness.md`，该标准要求不对文风打分；另一次依据 Laconic 自己的评分标准 `evals/rubric.md`，此前它与 10 个人工标注的校准回答全部一致。
-
-| 指标 | Laconic | Concise 风格 | 'Answer concisely.' |
-| --- | --- | --- | --- |
-| 正确性，排除文风（1 到 5） | 4.80 | 4.27 | 4.47 |
-| 与 Concise 风格的差值（95% 区间） | +0.53（0.00 到 +1.17） | | +0.20（−0.13 到 +0.53） |
-| 阻断问题，排除文风 | 0 | 4 | 1 |
-| 加权分，Laconic 自己的评分标准（1 到 5） | 4.69 | 4.06 | 4.11 |
-| 与 Concise 风格的差值（95% 区间） | +0.63（+0.29 到 +1.00） | | +0.05（−0.10 到 +0.22） |
-| 阻断问题，Laconic 自己的评分标准 | 1 | 13 | 10 |
-| 没有 `laconic-check` 0.5.0 问题的回答 | 30 个中 24 个 | 30 个中 16 个 | 30 个中 13 个 |
-| 通过的正则检查 | 12 个中 9 个 | 12 个中 9 个 | 12 个中 9 个 |
-| 平均回答长度（字符） | 782 | 614 | 627 |
-| 平均输出 token，含思考 | 475 | 327 | 298 |
-| 每个回答的平均成本，单次冷调用，按 Claude Code 报告 | US$0.022 | US$0.019 | US$0.016 |
-| Laconic 相对它的成本（95% 区间） | | 1.18 倍（1.07 到 1.29） | 1.39 倍（1.30 到 1.50） |
-
-Laconic 自己的评分标准会给澳大利亚英语和本项目细则打分，而只有 Laconic 要求这些；评审不仅在加权分中，也在正确性和阻断问题中应用了它们，因此评审行中只有前 3 行与文风无关。只看正确性，Laconic 比 Concise 风格高 0.53，但在 10 个案例上区间触及零差异，所以这并非明确领先；Laconic 没有阻断问题，Concise 风格有 4 个。第一次评审的记录显示：Concise 风格在 3 封工资邮件中的 2 封里把 2026 年 11 月 26 日或 28 日的星期几写错，在第三封里把截止日期埋没了；在 3 份审查说明中的 2 份里声称了任务并未证实的测试覆盖率；还有一次错误引用了被审核的文本；'Answer concisely.' 也有类似疏漏。Laconic 的输出 token 比 Concise 风格多 46%，每个回答的成本高 18%。在 Laconic 规则要求使用本项目连字符的 '2026–27' 中，3 种配置都保留了 Style Manual 的短破折号，因此都没通过该案例的正则检查。
-
-局限：每种配置 30 个回答，来自同一个模型，它也负责评审，案例由 Laconic 作者编写；排除文风的评审没有校准集。每个区间都对 10 个案例重抽样（10,000 次，种子 2282）。每次调用都把提示写入了提示缓存，因此成本行是单次冷调用的数据；若像会话中那样缓存规则，Laconic 多出的输出很可能占更大比重，但本次运行没有测量这一点。Claude Code 及其 Concise 风格面向软件工程会话，而这些案例大多是写作和咨询任务。运行脚本、逐个回答的得分、token 数和成本，以及重新计算此表的脚本都在 [`evals/runs/concise-style-2026-11-17`](evals/runs/concise-style-2026-11-17/)；回答本身未保存。
-
-<a id="token-cost-against-caveman-and-chisle"></a>
-### 与 caveman 和 Chisle 的 token 成本对比
-
-2026 年 11 月 17 日，3 套规则回答了 `evals/cases.jsonl` 中全部 47 个案例，由 Claude Opus 5.5（`claude-opus-5-5`，高强度）在不带工具的 Claude Code 2.1.325 中生成并评审：Laconic 的精简规则、[caveman](https://github.com/JuliusBrussee/caveman) 4.1.0 的 `skills/caveman/SKILL.md` 和 [Chisle](https://github.com/JayPokale/Chisle) 3.12.1 的 `skills/chisle/SKILL.md`，每套都去掉 front matter 后追加到系统提示中。冷调用（2 次试验）各自从新的工作目录运行，因此会把规则写入提示缓存；缓存调用（1 次试验，不评审）在一次预热调用之后从同一目录运行，因此像同一会话中的调用那样从缓存读取规则。评审在打乱的字母标签下同时查看每个案例的 3 个冷调用回答，其提示中没有点名任何规则集，但它能看出文风，而且 Laconic 的 94 个回答中有 3 个提到了 Laconic：2 个是引用了工作目录，1 个是说出了技能名称。它评审了两次：一次只看正确性，依据要求不对文风打分的 `evals/rubric-correctness.md`；另一次依据 Laconic 自己的评分标准 `evals/rubric.md`。
-
-| 指标 | Laconic | caveman | Chisle |
-| --- | --- | --- | --- |
-| 平均输出 token，含思考，冷调用 | 745 | 655 | 516 |
-| Laconic 相对它的输出 token（95% 区间） | | 1.14 倍（1.04 到 1.27） | 1.44 倍（1.27 到 1.68） |
-| 平均输入 token，冷调用 | 3,218 | 4,285 | 3,861 |
-| 平均输出 token，含思考，缓存调用 | 780 | 637 | 492 |
-| 每个回答的平均成本，规则从缓存读取 | US$0.018 | US$0.016 | US$0.013 |
-| Laconic 相对它的成本，规则从缓存读取（95% 区间） | | 1.17 倍（1.05 到 1.29） | 1.45 倍（1.25 到 1.61） |
-| 每个回答的平均成本，单次冷调用，含缓存写入 | US$0.028 | US$0.031 | US$0.026 |
-| Laconic 相对它的成本，冷调用（95% 区间） | | 0.89 倍（0.83 到 0.94） | 1.05 倍（0.96 到 1.15） |
-| 平均回答长度（字符），冷调用 | 1,297 | 1,198 | 977 |
-| 正确性，排除文风（1 到 5） | 4.68 | 4.44 | 4.38 |
-| Laconic 的差值（95% 区间） | | +0.24（+0.06 到 +0.45） | +0.30（+0.10 到 +0.53） |
-| 阻断问题，排除文风 | 2 | 5 | 7 |
-| 加权分，Laconic 自己的评分标准（1 到 5） | 4.63 | 4.11 | 4.11 |
-| 阻断问题，Laconic 自己的评分标准 | 8 | 43 | 44 |
-| 通过的正则检查，冷调用 | 18 个中 18 个 | 18 个中 16 个 | 18 个中 16 个 |
-| 没有 `laconic-check` 0.5.0 问题的回答，冷调用 | 94 个中 70 个 | 94 个中 36 个 | 94 个中 39 个 |
-
-Laconic 写得最多：输出 token 比 caveman 多 14%，比 Chisle 多 44%。在冷调用中，把 caveman 较长的规则写入缓存的成本超过了 Laconic 多出的输出，因此用 Laconic 的回答便宜 11%；规则从缓存读取时（与会话中一样），Laconic 多出的输出使回答比 caveman 贵 17%，比 Chisle 贵 45%。只看正确性，Laconic 比 caveman 高 0.24，比 Chisle 高 0.30；它在排除文风时的 2 个阻断问题是一个算术错误和一个引错的 RFC 7636 测试值。Laconic 自己的评分标准还把两款对比工具都不要求的澳大利亚英语和本项目细则计入正确性和阻断问题，而按此标准，对比工具的阻断问题大多与此有关：连续逗号、双引号、用单词写的数字和美式拼写。在那次评审中，两款对比工具在禁止给出典型时间范围的案例里，两个回答都给出了时间范围，而 Laconic 一个也没给；Laconic 的阻断问题包括：一个回答在被告知没有工具后，没有编辑任务说它能访问的文件（Chisle 也有一个回答如此），一个回答有重大算术错误，还有 2 个回答添加了任务禁止的局限性免责声明。
-
-局限：只用一个模型，它也负责评审回答，而这些案例也指导过 Laconic 规则的措辞；排除文风的评审没有校准集。token 和成本数据是 Claude Code 对每次调用的报告。caveman 自己的评估是用其技能替换系统提示，而本次运行是追加。两款对比工具对智能体读取内容的压缩都没有被测试，两者都用自己的提示和模型发布数据，本次运行没有复现这些数据。区间对 47 个案例重抽样（10,000 次，种子 2282）。运行脚本、逐个回答的得分、token 数和成本，以及重新计算此表的脚本都在 [`evals/runs/token-cost-2026-11-17`](evals/runs/token-cost-2026-11-17/)；回答本身未保存。
+局限：每种配置 18 到 90 个回答，来自单一生成模型；案例在 `evals/cases.jsonl`，评分标准在 `evals/rubric.md`。这些案例也指导了规则的措辞，因此得分不是留出集测试。连续逗号仍是最常见的疏漏。
 
 <a id="against-other-humanisers"></a>
 ### 对比其他去 AI 味工具
@@ -256,22 +194,6 @@ Laconic 写得最多：输出 token 比 caveman 多 14%，比 Chisle 多 44%。�
 </details>
 
 局限：每种配置 40 篇文本，来自单一生成模型，由同一模型家族评审，基于这 20 个提示和这些已安装配置。每个检查器都反映其作者的偏好，`avoid-ai-writing` 检测器就是该技能自己的引擎。通过正则检查只能部分证明事实得以保留，不能证明每个限定词都保留了下来。复现命令见 [evals/README.md](evals/README.md)。
-
-<a id="fact-changes-on-a-public-set"></a>
-### 公开数据集上的事实变化
-
-2026 年 11 月 14 日，Laconic 的写作技能和 [humanizer](https://github.com/blader/humanizer) 4.0.0 各自改写了 [AI Humanizer Benchmark](https://huggingface.co/datasets/ai-humanizer-benchmark/ai-humanizer-benchmark) 2026 年 9 月至 11 月各期的 99 篇公开文本，每篇 2 次试验，分 2 轮使用不同模型。外部检查器 [humanizer-fact-audit](https://github.com/zwang-devv/humanizer-fact-audit) 统计了至少丢失原文中一个数字、日期、人名或机构名，或 3 个及以上单词的引文的改写。方法在任何改写之前就已提交。
-
-| 轮次 | Laconic | `humanizer` | 差值（95% 区间） |
-|---|---|---|---|
-| Claude Opus 5.5 | 134 篇中 18 篇（13.43%） | 134 篇中 10 篇（7.46%） | +5.97 个百分点（0.00 到 +12.32） |
-| `gpt-6.1-sol`（Codex） | 134 篇中 20 篇（14.93%） | 134 篇中 20 篇（14.93%） | 0.00 个百分点（−2.21 到 +2.14） |
-
-在 Opus 5.5 下，Laconic 丢失单元的改写比 `humanizer` 多（18 对 10），而且每一组丢失的单元都更多：数字和日期 440 个中 9 个对 5 个，名称 164 个中 12 个对 9 个，引文 70 个中 5 个对 0 个。在 `gpt-6.1-sol` 下2 款技能持平。两个区间都不排除 0，因此两轮都没有显示明确差异。两轮中 Laconic 的改写都更短：分别为原文单词数的 0.94 和 0.90，对方为 1.01 和 0.93。
-
-局限：检查器比对的是单元，可能把无害的引文改写标为问题；它看不到被改动的条件、否定或编造的说法，因此不是对事实忠实度的完整检验。99 篇文本中有 32 篇没有它可检查的单元，因此比例覆盖每款技能 134 篇改写。每轮用一个模型改写，每个新上下文 3 篇文本；指令以文本形式提供，而非已安装的插件。Opus 一轮是在 Codex 一轮之后加的，方法未变。对比工具由 Laconic 作者选择，方法由其编写，两轮也由其运行。固定版本见 [evals/README.md](evals/README.md#public-set-fact-check)。
-
-在 2026-10 期的 33 篇文本上，由 Claude Opus 5.5 于 2026 年 11 月 17 日每篇改写一次、每次调用一篇，Laconic 的技能在含有单元的 20 篇文档中改动了 5 篇的某个单元，`humanizer` 也是 5 篇；avoid-ai-writing 和 `work-humanizer` 各 1 篇，带 `--verify` 的 patina 为 0 篇，只给请求时为 8 篇；11 款商业去 AI 味工具改动了 7 到 13 篇。每篇只改写一次，数量太少，无法显示技能之间的差异（[按工具](evals/README.md#by-humaniser)）。
 
 <a id="checker"></a>
 ## 检查器
@@ -309,18 +231,19 @@ Homebrew 配方和 winget 清单是为 tap 和 winget 目录附上的，但 tap 
 
 | 选项 | 作用 |
 | --- | --- |
-| `--json` | 输出一个 JSON 对象：`findings`，每项含 `file`、`line`、`column`、`rule`、`advisory`、`message` 和 `url`，然后是 `failing` 计数和被注释 `suppressed` 的问题数。 |
-| `--sarif` | 为 GitHub code scanning 和其他 SARIF 查看器输出 [SARIF 2.1.0](https://docs.oasis-open.org/sarif/sarif/v2.1.0/sarif-v2.1.0.html) 日志：包含每条规则及其描述和链接，每个问题作为级别为 `warning`（若为建议则为 `note`）的结果，用文件的绝对 `file` URI 定位（code scanning 会把它映射到仓库路径），列按 SARIF 的计数方式以 UTF-16 码元计。不能与 `--json` 同用；自 0.6.0 起。 |
-| `--metrics` | 在问题之后，打印每个文件的文字指标；有 2 个或更多文件时，还打印合计。配合 `--json` 时，增加一个含 `files` 和 `overall` 的 `metrics` 对象。不能与 `--sarif` 同用；0.6.0 之后。 |
-| `--profile <name>` | 应用一种文体预设：`email`、`report`、`docs`、`chat` 或 `essay`。`.laconic-check` 中的 `profile = <name>` 行作用相同，`--profile` 优先于它。0.6.0 之后。 |
+| `--format <format>` | 选择输出格式：`text`（默认）、`json`（与 `--json` 相同）或 `sarif`（与 `--sarif` 相同）。 |
+| `--json` | 输出一个 JSON 对象，包含 `scope`（'Checks house style, prose patterns and substance heuristics; never infers authorship.'）、`findings`（每项含 `file`、`line`、`column`、`rule`、`advisory`、`severity`、`confidence`、`message` 和 `url`）、`failing` 和 `suppressed`。 |
+| `--sarif` | 为 GitHub code scanning 和其他 SARIF 查看器输出 [SARIF 2.1.0](https://docs.oasis-open.org/sarif/sarif/v2.1.0/sarif-v2.1.0.html) 日志：包含每条规则及其描述和链接，每个问题作为级别为 `warning`（若为建议则为 `note`）的结果，每条结果带 `severity` 和 `confidence` 属性且整次运行带 `scope`，用文件的绝对 `file` URI 定位（code scanning 会把它映射到仓库路径），列按 SARIF 的计数方式以 UTF-16 码元计。不能与 `--json` 同用；自 0.6.0 起。 |
+| `--metrics` | 在问题之后，打印每个文件的文字指标；有 2 个或更多文件时，还打印合计。配合 `--json` 时，增加一个含 `files` 和 `overall` 的 `metrics` 对象。不能与 `--sarif` 同用；自 0.6.0 起。 |
+| `--profile <name>` | 应用一种文体预设：`email`、`report`、`docs`、`chat` 或 `essay`。`laconic.toml` 或 `.laconic-check` 中的 `profile = <name>` 行作用相同，`--profile` 优先于它。自 0.6.0 起。 |
 | `--disable <rules>` | 丢弃这些规则的问题；用逗号分隔，可重复。 |
 | `--only <rules>` | 只保留这些规则的问题；`--disable` 优先。 |
 | `--max-findings <n>` | 只有失败问题多于 n 个时才失败（默认 0）。 |
 | `--warn` | 永不因问题而失败。 |
 | `--commit-msg` | 把每个文件当作 Git 提交信息读取，忽略注释行和剪刀线以下的内容。 |
-| `--config <file>` | 从此文件而不是 `.laconic-check` 读取设置。 |
+| `--config <file>` | 从此文件而不是 `laconic.toml` 或 `.laconic-check` 读取设置。 |
 
-预设决定运行哪些规则、哪些规则会导致失败；不指定时，`lint` 不变。`email`、`report` 和 `essay` 会启用 [`unglossed-term`](docs/rules.md#unglossed-term)，这是一条建议性规则，针对前文没有 'Full Name (ACR)' 或 'ACR stands for' 之类说明、由 3 到 8 个大写字母组成的缩写；'BHP' 之类广为人知的形式和用于强调的大写词会通过。每个预设还会启用其他一些可选规则；[docs/rules.md](docs/rules.md) 在各条规则下注明是哪些。`--only unglossed-term` 可在不用预设时启用它。这 3 个预设会因 `stacked-hedge` 失败，`email` 和 `essay` 还会因 `bold-label`，`essay` 还会因 `clause-dashes`，`report` 还会因 `hyphen-consistency` 和 `acronym-before-definition` 失败。`chat` 会因 `stacked-hedge`、`bold-label` 和 `clause-dashes` 失败，并去掉 `acronym-before-definition` 和 `hyphen-consistency`；`docs` 去掉 `bold-label` 和 `acronym-before-definition`，并把 `number-word` 改为建议性。因预设而导致失败的问题，其消息中不再有 '(advisory)'：
+预设决定运行哪些规则、哪些规则会导致失败；不指定时，`lint` 不变。`email`、`report` 和 `essay` 会启用 [`unglossed-term`](docs/rules.md#unglossed-term)，这是一条建议性规则，针对前文没有 'Full Name (ACR)' 或 'ACR stands for' 之类说明、由 3 到 8 个大写字母组成的缩写；'BHP' 之类广为人知的形式和用于强调的大写词会通过。每个预设还会启用其他一些可选规则；[docs/rules.md](docs/rules.md) 在各条规则下注明是哪些。`--only unglossed-term` 可在不用预设时启用它。这 3 个预设会因 `stacked-hedge` 失败，`email` 和 `essay` 还会因 `bold-label`，`essay` 还会因 `clause-dashes`，`report` 还会因 `hyphen-consistency` 和 `acronym-before-definition` 失败。`chat` 会因 `stacked-hedge`、`bold-label` 和 `clause-dashes` 失败，并去掉 `acronym-before-definition` 和 `hyphen-consistency`；`docs` 去掉 `bold-label` 和 `acronym-before-definition`，并把 `number-word` 改为建议性。预设还会启用 5 条可选的实质启发式和聊天套话规则（自 0.6.0 起，默认均为建议性）：`email` 启用 `ai-placeholder`；`report` 和 `essay` 启用 `unanchored-magnitude`、`unattributed-superlative`、`unnamed-evidence` 和 `ai-placeholder`；`docs` 启用 `unattributed-superlative` 和 `ai-placeholder`；`chat` 启用 `ai-placeholder` 并因 `chat-filler` 失败。因预设而导致失败的问题，其消息中不再有 '(advisory)'：
 
 ```text
 $ printf 'Each member gets a QBR plan. This could potentially slip a week.\n' > memo.md
@@ -345,13 +268,23 @@ $ laconic-check lint --metrics notes.md
 metrics: notes.md: words=14 sentences=2 mean_word_len=5.43 long_words=35.7% nominalisations=14.3% triads=1 sentence_len=mean 7.0 / median 7.0
 ```
 
-在运行 `lint` 的目录中，`.laconic-check` 文件包含 `disable`、`only` 和 `max-findings` 的 `key = value` 行，以及 `#` 注释行。`accept` 行列出 `us-spelling` 不再标记的纯字母单词，每个词按整词并区分大小写匹配，因此 `accept = color` 仍会标记句首的 'Color'（自 0.6.0 起）。命令行上的规则会追加到其列表中，`--max-findings` 会替换其计数：
+在运行 `lint` 的目录中，`laconic.toml` 或 `.laconic-check` 文件（优先读取 `laconic.toml`）包含 `disable`、`only`、`profile`、`accept` 和 `max_findings`（`.laconic-check` 中为 `max-findings`）的 `key = value` 行，以及 `#` 注释行。`accept` 行列出 `us-spelling` 不再标记的纯字母单词，每个词按整词并区分大小写匹配，因此 `accept = color` 仍会标记句首的 'Color'（自 0.6.0 起）。`[protect]` 部分列出可豁免匹配区间内问题的作者短语（`phrases = [...]` 或每行一个短语，自 0.6.0 起）。命令行上的规则会追加到其列表中，`--max-findings` 会替换其计数：
 
 ```text
 # The CSS property names color and center are expected here.
 accept = color, center
 # This project uses serial commas.
 disable = serial-comma
+```
+
+```toml
+# laconic.toml uses TOML arrays, max_findings and [protect] phrase exemptions.
+accept = ["color", "center"]
+disable = ["serial-comma"]
+max_findings = 0
+
+[protect]
+phrases = ["deep dive"]
 ```
 
 在设置之后，`[rules]` 部分存放项目自己的规则，每行一个短语：`id: phrase = replacement` 建议替换词，`id: phrase =` 禁用该短语（自 0.6.0 起）。每个问题把其规则命名为 `project/<id>`，`disable`、`only`、`--disable`、`--only` 和抑制注释都接受它；多行可以共用一个 id。短语是由字母和数字组成的一个或多个单词，单词内部可以有连字符或撇号。它在正文中按整词匹配，可以跨越换行，但从不在代码、URL 或引文中匹配。全小写时不区分大小写；含大写字母时只按原样匹配。与替换词完全一致的文字不会被标记，所以 `github = GitHub` 不会动 'GitHub'。项目问题与 Laconic 自身的问题一样会使 `lint` 失败。它们没有规则参考链接：在 `--json` 中 `url` 为 `null`，SARIF 日志把它们的规则列在 Laconic 规则之后，不带链接。格式错误的行或未知部分会让 `lint` 停止并给出该行的行号：
@@ -394,12 +327,12 @@ repos:
 - uses: actions/checkout@v7
 - uses: yungSNAT/Laconic@<commit>
   with:
-    version: 0.6.0     # the laconic-check release; 0.6.0 by default
+    version: 0.6.1     # the laconic-check release; 0.6.1 by default
     files: README.md   # one path a line; default: every .md and .markdown file Git tracks
     args: --warn       # further lint options
 ```
 
-若想改为在 GitHub code scanning 中列出问题，把 `laconic-check` 放到 PATH 中（在某个发布版包含 `--sarif` 之前，用 `cargo install --locked --git https://github.com/yungSNAT/Laconic --rev <commit> laconic-check`），给作业 `security-events: write` 权限并上传日志。使用 `--warn` 时，问题不会使该步骤失败，因此它只会因用法或读取错误而失败，这时也不会上传不完整的内容；如果也想因问题使作业失败，请添加上面的 Action 或另一个不带 `--warn` 的 `lint` 步骤：
+若想改为在 GitHub code scanning 中列出问题，把 `laconic-check` 放到 PATH 中，使用 0.6.0 或更高版本，给作业 `security-events: write` 权限并上传日志。使用 `--warn` 时，问题不会使该步骤失败，因此它只会因用法或读取错误而失败，这时也不会上传不完整的内容；如果也想因问题使作业失败，请添加上面的 Action 或另一个不带 `--warn` 的 `lint` 步骤：
 
 ```yaml
 - run: laconic-check lint --sarif --warn README.md docs/*.md > laconic-check.sarif
@@ -422,7 +355,7 @@ repos:
 
 在同样的文档上，avoid-ai-writing 的 `validate.js` 在 105 篇改动文档中判 23 篇失败，Zero Slop 的忠实度检查判全部 105 篇失败；在 258 篇保留文档中，它们分别通过 233 篇和 15 篇，而 `preserve` 通过 23 篇，带 `--loose` 时通过 64 篇（[evals/README.md](evals/README.md#against-other-fact-checkers)，2026 年 11 月 16 日）。按论文的表 1，每款工具在其改写的、含有单元的 20 篇文本中，有 7 到 13 篇（35% 到 65%；Undetectable AI 为 20 篇中 11 篇）至少改动了一个单元；[evals/README.md](evals/README.md#by-humaniser) 给出包含 `preserve` 对每款工具结果的表格。
 
-`laconic-check mcp` 通过标准输入输出把 `lint` 和 `preserve` 作为 MCP 工具提供，无需另外安装任何东西。`preserve` 工具接受 `loose: true`，作用与 `--loose` 相同；`lint` 工具与 `lint` 一样，应用服务器运行目录中的 `.laconic-check` 文件，每次调用都重新读取；文件格式错误时，调用会返回一个指出其行号的错误（两者均自 0.6.0 起）：
+`laconic-check mcp` 通过标准输入输出把 `lint` 和 `preserve` 作为 MCP 工具提供，无需另外安装任何东西。`preserve` 工具接受 `loose: true`，作用与 `--loose` 相同；`lint` 工具与 `lint` 一样，应用服务器运行目录中的 `laconic.toml` 或 `.laconic-check` 文件，每次调用都重新读取；文件格式错误时，调用会返回一个指出其行号的错误（两者均自 0.6.0 起）：
 
 ```bash
 claude mcp add --scope user laconic-check -- laconic-check mcp
@@ -430,13 +363,13 @@ claude mcp add --scope user laconic-check -- laconic-check mcp
 
 它包含在 laconic-check 0.3.0 及更高版本中。
 
-`laconic-check lsp` 是通过标准输入输出运行的语言服务器，让编辑器在你输入时显示 `lint` 的问题（自 0.6.0 起）。每当打开的 Markdown 文档发生变化，它就检查一遍，并把每个问题标为警告（若为建议则为提示），链接到对应规则。它应用包含该文档的工作区文件夹（文件夹嵌套时取最内层）中的 `.laconic-check` 文件，并把无法读取或解析的文件作为错误显示在第一行。0.6.0 之后，凡规则知道唯一替换写法之处，它还提供快速修复，例如美式拼写、用文字写的数字、拉丁缩写、时间或日期格式、双引号和不可见字符。修复只改动被标出的文字，而且只在你选择时才应用（Neovim 中为 `gra`，Helix 中为 `space a`）。需要改写的规则，例如长破折号、套话和可能的连续逗号，不提供修复。修复会注明文档的版本，因此编辑器会拒绝在文本改动之后才到达的修复，而不会把它应用到错误的位置。不声明接受这种编辑的编辑器得不到修复，唯一的例外是 Neovim，它接受这种编辑但不作声明。Neovim 不检查文档第一次改动之前生成的修复，因此只有在文档打开后发生过改动时它才会得到修复。在 Neovim 0.11 或更高版本中（它会把包含 `.laconic-check` 或 `.git` 的文件夹作为工作区文件夹）：
+`laconic-check lsp` 是通过标准输入输出运行的语言服务器，让编辑器在你输入时显示 `lint` 的问题（自 0.6.0 起）。每当打开的 Markdown 文档发生变化，它就检查一遍，并把每个问题标为警告（若为建议则为提示），链接到对应规则。它应用包含该文档的工作区文件夹（文件夹嵌套时取最内层）中的 `laconic.toml` 或 `.laconic-check` 文件，并把无法读取或解析的文件作为错误显示在第一行。自 0.6.0 起，凡规则知道唯一替换写法之处，它还提供快速修复，例如美式拼写、用文字写的数字、拉丁缩写、时间或日期格式、双引号和不可见字符。修复只改动被标出的文字，而且只在你选择时才应用（Neovim 中为 `gra`，Helix 中为 `space a`）。需要改写的规则，例如长破折号、套话和可能的连续逗号，不提供修复。修复会注明文档的版本，因此编辑器会拒绝在文本改动之后才到达的修复，而不会把它应用到错误的位置。不声明接受这种编辑的编辑器得不到修复，唯一的例外是 Neovim，它接受这种编辑但不作声明。Neovim 不检查文档第一次改动之前生成的修复，因此只有在文档打开后发生过改动时它才会得到修复。在 Neovim 0.11 或更高版本中（它会把包含 `laconic.toml`、`.laconic-check` 或 `.git` 的文件夹作为工作区文件夹）：
 
 ```lua
 vim.lsp.config('laconic_check', {
   cmd = { 'laconic-check', 'lsp' },
   filetypes = { 'markdown' },
-  root_markers = { '.laconic-check', '.git' },
+  root_markers = { 'laconic.toml', '.laconic-check', '.git' },
 })
 vim.lsp.enable('laconic_check')
 ```
@@ -453,7 +386,7 @@ name = "markdown"
 language-servers = ["laconic-check"]
 ```
 
-`laconic-check hook` 是适用于 Claude Code 和 Codex 的 Stop 钩子，添加之前处于关闭状态（自 0.6.0 起）。当智能体即将结束本轮时，它会用仓库顶层的 `.laconic-check` 文件，检查包含会话目录的仓库中未提交的 Markdown（已暂存、未暂存和未跟踪的）。如果 `lint` 会失败，它会请智能体先查看失败的问题，并列出最多 50 个。每轮只请求一次，因此当某个问题是误报时，智能体仍可结束。它也会检查你自己未提交的编辑，而不只是智能体的。在 Claude Code 中，把下面的内容加到 `.claude/settings.json` 或 `~/.claude/settings.json`；Codex 从 `~/.codex/hooks.json` 读取同样的配置块，并会把新钩子标为不受信任，直到你在 `/hooks` 中审核它：
+`laconic-check hook` 是适用于 Claude Code 和 Codex 的 Stop 钩子，添加之前处于关闭状态（自 0.6.0 起）。当智能体即将结束本轮时，它会用仓库顶层的 `laconic.toml` 或 `.laconic-check` 文件，检查包含会话目录的仓库中未提交的 Markdown（已暂存、未暂存和未跟踪的）。如果 `lint` 会失败，它会请智能体先查看失败的问题，并列出最多 50 个。每轮只请求一次，因此当某个问题是误报时，智能体仍可结束。它也会检查你自己未提交的编辑，而不只是智能体的。在 Claude Code 中，把下面的内容加到 `.claude/settings.json` 或 `~/.claude/settings.json`；Codex 从 `~/.codex/hooks.json` 读取同样的配置块，并会把新钩子标为不受信任，直到你在 `/hooks` 中审核它：
 
 ```json
 {

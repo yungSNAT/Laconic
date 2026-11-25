@@ -21,7 +21,7 @@
 
 Laconic es un 'humanizador' de IA y una skill 'sin relleno de IA' (no AI slop) para agentes de programación y asistentes de chat. Hace que el modelo dé primero la respuesta, marque lo que no ha verificado y se detenga cuando la respuesta está completa, y le indica que conserve cada hecho, paso y salvedad que el lector necesita. Le indica que escriba cada frase original según el Australian Government Style Manual, con las excepciones de la casa que enumera la skill.
 
-Para humanizar un texto escrito por IA, pide al agente que lo humanice. La skill de prosa elimina los patrones de escritura de IA, está escrita para conservar cada hecho, número y salvedad, y deja el texto más corto, sin rellenarlo con una personalidad impostada. El [benchmark de supervivencia de hechos](evals/README.md#fact-survival-benchmark) que pone a prueba esta promesa aún no tiene resultados. Con 99 textos públicos el 14 de noviembre de 2026, un [comprobador externo de unidades](#fact-changes-on-a-public-set), ejecutado por el autor de Laconic, halló que las reescrituras de Laconic perdían un número, fecha, nombre o cita aproximadamente con la misma frecuencia que `humanizer`, o más, según el modelo; ninguna diferencia se aleja claramente de 0.
+Para humanizar un texto escrito por IA, pide al agente que lo humanice. La skill de prosa elimina los patrones de escritura de IA, está escrita para conservar cada hecho, número y salvedad, y deja el texto más corto, sin rellenarlo con una personalidad impostada. El [benchmark de supervivencia de hechos](evals/README.md#fact-survival-benchmark) que pone a prueba esta promesa aún no tiene resultados.
 
 <table>
 <tr>
@@ -59,16 +59,6 @@ npx skills add yungSNAT/laconic --global --agent "*" --yes
 ## Uso
 
 Reinicia el agente y escribe `/laconic`. Sigue activo durante la sesión hasta que digas 'stop laconic'.
-
-<a id="when-to-choose-something-else"></a>
-## Cuándo elegir otra cosa
-
-- **El coste en tokens es lo primero:** [caveman](https://github.com/JuliusBrussee/caveman) está hecho para eso y además comprime lo que lee el agente, y [Chisle](https://github.com/JayPokale/Chisle) escribe aún menos tokens de salida. En los 47 casos de Laconic ([coste en tokens](#token-cost-against-caveman-and-chisle), 17 de noviembre de 2026), las reglas compactas de Laconic escribieron un 14% más de tokens de salida que caveman y un 44% más que Chisle. Con las reglas leídas de la caché de prompts, como en una sesión, una respuesta costó un 17% más que con caveman y un 45% más que con Chisle; en llamadas en frío sueltas, cada una de las cuales escribió las reglas en la caché, costó un 11% menos que con caveman (cuyas reglas son más largas) y un 5% más que con Chisle. El modo sesión costó alrededor de un 27% más por tarea que las reglas compactas.
-- **Necesitas otra variedad de inglés:** Laconic escribe solo inglés australiano. [LanguageTool](https://github.com/languagetool-org/languagetool) revisa gramática y estilo en inglés australiano, británico, canadiense, neozelandés, sudafricano y estadounidense, una vez escrito el texto.
-- **Aceptas una reescritura que añada detalle:** [humanizer](https://github.com/blader/humanizer) 4.0.0 (10 de noviembre de 2026) indica al modelo, donde un texto es genérico, que 'add a specific detail you know to be true'. Laconic no añade hechos, y `laconic-check preserve --strict` rechaza una edición que añada una cifra, URL, cita u otro elemento que protege.
-- **Solo quieres la guía de escritura:** [No AI Slop](https://github.com/petergyang/no-ai-slop), en la que se basa la guía de escritura de Laconic, la ofrece sin las reglas de respuesta ni el inglés australiano.
-- **Editas en Microsoft Word:** [PerfectIt](https://www.perfectit.com/) comprueba la coherencia en Word contra una hoja de estilo, incluida una para el Australian Government Style. Laconic funciona en agentes, asistentes de chat y CI, no en Word.
-- **Quieres comprobar en CI tu propio estilo de la casa:** [Vale](https://github.com/vale-cli/vale) revisa la prosa contra reglas que configuras, con expresiones regulares, tipos de regla y paquetes; `laconic-check` añade a las reglas de Laconic las sustituciones de palabras y frases prohibidas de un proyecto, y nada más.
 
 <a id="what-changes"></a>
 ## Qué cambia
@@ -173,59 +163,7 @@ Laconic supera a la instrucción simple por 0.56 ponderado. Los cambios son neut
 
 </details>
 
-Límites: de 18 a 90 respuestas por configuración de un único modelo generador; los casos están en `evals/cases.jsonl` y la rúbrica en `evals/rubric.md`. Estos casos también orientaron la redacción de las reglas, así que las puntuaciones no son una prueba con datos reservados; la comparación con el estilo Concise de Claude Code más abajo usa los 10 casos congelados de `evals/holdout-cases.jsonl`, escritos el 1 de noviembre de 2026 y no usados para ajustar las reglas. Las comas seriales siguen siendo el desliz más común.
-
-<a id="against-claude-codes-concise-style"></a>
-### Frente al estilo Concise de Claude Code
-
-El 17 de noviembre de 2026, 3 configuraciones respondieron los 10 casos reservados, 3 ensayos cada una, generados y juzgados por Claude Opus 5.5 (`claude-opus-5-5`, esfuerzo alto) en Claude Code 2.1.325 sin herramientas: las reglas compactas de Laconic, el estilo de salida Concise integrado en Claude Code (`"outputStyle": "Concise"`) y la instrucción simple 'Answer concisely.'. El juez vio juntas las 3 respuestas de cada caso bajo letras barajadas, sin conocer los nombres de las configuraciones aunque sí su estilo. Las juzgó dos veces: solo por corrección, según `evals/rubric-correctness.md`, que le indica no puntuar el estilo; y según la rúbrica propia de Laconic, `evals/rubric.md`, tras coincidir con las 10 respuestas de calibración etiquetadas a mano.
-
-| Medida | Laconic | Estilo Concise | 'Answer concisely.' |
-| --- | --- | --- | --- |
-| Corrección, sin estilo (1 a 5) | 4.80 | 4.27 | 4.47 |
-| Diferencia con el estilo Concise (intervalo del 95%) | +0.53 (0.00 a +1.17) | | +0.20 (−0.13 a +0.53) |
-| Hallazgos bloqueantes, sin estilo | 0 | 4 | 1 |
-| Puntuación ponderada, rúbrica propia de Laconic (1 a 5) | 4.69 | 4.06 | 4.11 |
-| Diferencia con el estilo Concise (intervalo del 95%) | +0.63 (+0.29 a +1.00) | | +0.05 (−0.10 a +0.22) |
-| Hallazgos bloqueantes, rúbrica propia de Laconic | 1 | 13 | 10 |
-| Respuestas sin hallazgos de `laconic-check` 0.5.0 | 24 de 30 | 16 de 30 | 13 de 30 |
-| Comprobaciones regex superadas | 9 de 12 | 9 de 12 | 9 de 12 |
-| Longitud media de respuesta (caracteres) | 782 | 614 | 627 |
-| Media de tokens de salida, razonamiento incluido | 475 | 327 | 298 |
-| Coste medio por respuesta, una llamada en frío, según Claude Code | US$0.022 | US$0.019 | US$0.016 |
-| Coste de Laconic frente a él (intervalo del 95%) | | 1.18 veces (1.07 a 1.29) | 1.39 veces (1.30 a 1.50) |
-
-La rúbrica propia de Laconic puntúa el inglés australiano y la mecánica de la casa, que solo Laconic pide, y el juez las aplicó a la corrección y a los hallazgos bloqueantes además de a la puntuación ponderada, así que de las filas juzgadas solo las 3 primeras son neutrales respecto al estilo. Juzgado solo por corrección, Laconic obtuvo 0.53 más que el estilo Concise, pero con 10 casos el intervalo llega a la ausencia de diferencia, así que no es una ventaja clara; Laconic no tuvo ningún hallazgo bloqueante frente a sus 4. Las notas del primer juicio registran que el estilo Concise dio el día de la semana equivocado para el 26 o el 28 de noviembre de 2026 en 2 de 3 correos de nóminas y enterró el plazo en el tercero, afirmó una cobertura de pruebas que la tarea no establecía en 2 de 3 notas de revisión y citó mal una vez el texto auditado; 'Answer concisely.' cometió deslices similares. Laconic escribió un 46% más de tokens de salida que el estilo Concise y costó un 18% más por respuesta. Las 3 configuraciones mantuvieron la raya corta del Style Manual en '2026–27', donde las reglas de Laconic piden el guion de la casa, así que todas fallaron la comprobación regex de ese caso.
-
-Límites: 30 respuestas por configuración de un único modelo, que también las juzgó, sobre casos escritos por el autor de Laconic; el juicio sin estilo no tuvo conjunto de calibración. Cada intervalo remuestrea los 10 casos (10,000 remuestreos, semilla 2282). Cada llamada escribió su prompt en la caché de prompts, así que las filas de coste son de llamadas en frío sueltas; con las reglas en caché, como en una sesión, la salida extra de Laconic probablemente pesaría más, aunque esta ejecución no lo midió. Claude Code y su estilo Concise están hechos para sesiones de ingeniería de software, y la mayoría de estos casos son tareas de escritura y asesoramiento. El script de la ejecución, las puntuaciones por respuesta, los recuentos de tokens y costes, y el script que recalcula esta tabla están en [`evals/runs/concise-style-2026-11-17`](evals/runs/concise-style-2026-11-17/); las respuestas no se guardan.
-
-<a id="token-cost-against-caveman-and-chisle"></a>
-### Coste en tokens frente a caveman y Chisle
-
-El 17 de noviembre de 2026, 3 conjuntos de reglas respondieron los 47 casos de `evals/cases.jsonl`, generados y juzgados por Claude Opus 5.5 (`claude-opus-5-5`, esfuerzo alto) en Claude Code 2.1.325 sin herramientas: las reglas compactas de Laconic, el `skills/caveman/SKILL.md` de [caveman](https://github.com/JuliusBrussee/caveman) 4.1.0 y el `skills/chisle/SKILL.md` de [Chisle](https://github.com/JayPokale/Chisle) 3.12.1, cada uno añadido al prompt de sistema sin su front matter. Las llamadas en frío (2 ensayos) se ejecutaron cada una desde un directorio de trabajo nuevo y por tanto escribieron las reglas en la caché de prompts; las llamadas en caché (1 ensayo, sin juzgar) se ejecutaron desde un mismo directorio tras una llamada de cebado y por tanto las leyeron de ella, como hacen las llamadas de una misma sesión. El juez vio juntas las 3 respuestas en frío de cada caso bajo letras barajadas, y su prompt no nombraba ningún conjunto de reglas, aunque podía ver su estilo y 3 de las 94 respuestas de Laconic mencionaban Laconic, 2 al citar un directorio de trabajo y 1 al nombrar su skill. Las juzgó dos veces: solo por corrección, según `evals/rubric-correctness.md`, que le indica no puntuar el estilo; y según la rúbrica propia de Laconic, `evals/rubric.md`.
-
-| Medida | Laconic | caveman | Chisle |
-| --- | --- | --- | --- |
-| Media de tokens de salida, razonamiento incluido, llamadas en frío | 745 | 655 | 516 |
-| Tokens de salida de Laconic frente a él (intervalo del 95%) | | 1.14 veces (1.04 a 1.27) | 1.44 veces (1.27 a 1.68) |
-| Media de tokens de entrada, llamadas en frío | 3,218 | 4,285 | 3,861 |
-| Media de tokens de salida, razonamiento incluido, llamadas en caché | 780 | 637 | 492 |
-| Coste medio por respuesta, reglas leídas de la caché | US$0.018 | US$0.016 | US$0.013 |
-| Coste de Laconic frente a él, reglas leídas de la caché (intervalo del 95%) | | 1.17 veces (1.05 a 1.29) | 1.45 veces (1.25 a 1.61) |
-| Coste medio por respuesta, una llamada en frío, escritura en caché incluida | US$0.028 | US$0.031 | US$0.026 |
-| Coste de Laconic frente a él, llamadas en frío (intervalo del 95%) | | 0.89 veces (0.83 a 0.94) | 1.05 veces (0.96 a 1.15) |
-| Longitud media de respuesta (caracteres), llamadas en frío | 1,297 | 1,198 | 977 |
-| Corrección, sin estilo (1 a 5) | 4.68 | 4.44 | 4.38 |
-| Diferencia de Laconic (intervalo del 95%) | | +0.24 (+0.06 a +0.45) | +0.30 (+0.10 a +0.53) |
-| Hallazgos bloqueantes, sin estilo | 2 | 5 | 7 |
-| Puntuación ponderada, rúbrica propia de Laconic (1 a 5) | 4.63 | 4.11 | 4.11 |
-| Hallazgos bloqueantes, rúbrica propia de Laconic | 8 | 43 | 44 |
-| Comprobaciones regex superadas, llamadas en frío | 18 de 18 | 16 de 18 | 16 de 18 |
-| Respuestas sin hallazgos de `laconic-check` 0.5.0, llamadas en frío | 70 de 94 | 36 de 94 | 39 de 94 |
-
-Laconic fue el que más escribió: un 14% más de tokens de salida que caveman y un 44% más que Chisle. En llamadas en frío, las reglas más largas de caveman costaron más de escribir en la caché que la salida extra de Laconic, así que una respuesta costó un 11% menos con Laconic; con las reglas leídas de la caché, como en una sesión, la salida extra de Laconic encareció una respuesta un 17% frente a caveman y un 45% frente a Chisle. Juzgado solo por corrección, Laconic superó a caveman por 0.24 y a Chisle por 0.30; sus 2 hallazgos bloqueantes sin estilo fueron un error aritmético y un valor de prueba de RFC 7636 mal citado. La rúbrica propia de Laconic puntuó además el inglés australiano y la mecánica de la casa, que ningún rival pide, dentro de la corrección y como hallazgos bloqueantes, y la mayoría de los hallazgos bloqueantes de los rivales con ella se deben a eso: comas seriales, comillas dobles, números escritos con letras y ortografía estadounidense. En ese juicio ambos rivales dieron plazos típicos en las dos respuestas al caso que los prohíbe, donde Laconic no dio ninguno; entre los hallazgos bloqueantes de Laconic hay una respuesta que, al decírsele que no tenía herramientas, no editó un archivo que la tarea decía que podía alcanzar (igual que una de Chisle), una con un error aritmético importante y 2 que añadieron una advertencia de límites que la tarea prohibía.
-
-Límites: un único modelo, que también juzgó las respuestas, sobre casos que también orientaron la redacción de las reglas de Laconic; el juicio sin estilo no tuvo conjunto de calibración. Las cifras de tokens y coste son las que Claude Code informa para cada llamada. La evaluación propia de caveman sustituye el prompt de sistema por su skill, donde esta ejecución la añadió. No se ejercitó la compresión de lo que lee el agente de ningún rival, y ambos publican cifras con sus propios prompts y modelos, que esta ejecución no reproduce. Los intervalos remuestrean los 47 casos (10,000 remuestreos, semilla 2282). El script de la ejecución, las puntuaciones por respuesta, los recuentos de tokens y costes, y el script que recalcula esta tabla están en [`evals/runs/token-cost-2026-11-17`](evals/runs/token-cost-2026-11-17/); las respuestas no se guardan.
+Límites: de 18 a 90 respuestas por configuración de un único modelo generador; los casos están en `evals/cases.jsonl` y la rúbrica en `evals/rubric.md`. Estos casos también orientaron la redacción de las reglas, así que las puntuaciones no son una prueba con datos reservados. Las comas seriales siguen siendo el desliz más común.
 
 <a id="against-other-humanisers"></a>
 ### Frente a otros humanizadores
@@ -256,22 +194,6 @@ Cuatro comprobaciones regex se ampliaron tras inspeccionar respuestas que las fa
 </details>
 
 Límites: 40 textos por configuración de un único modelo generador, juzgados por la misma familia de modelos, con estos 20 prompts y estas configuraciones instaladas. Cada comprobador refleja el criterio de la casa de su autor, y el detector de `avoid-ai-writing` es el motor propio de esa skill. Superar las comprobaciones regex es una prueba parcial de que los hechos sobrevivieron, no prueba de que lo hiciera cada matiz. [evals/README.md](evals/README.md) da los comandos para repetirlo.
-
-<a id="fact-changes-on-a-public-set"></a>
-### Cambios de hechos en un conjunto público
-
-El 14 de noviembre de 2026, la skill de prosa de Laconic y [humanizer](https://github.com/blader/humanizer) 4.0.0 reescribieron cada una los 99 textos públicos de los ciclos de septiembre a noviembre de 2026 del [AI Humanizer Benchmark](https://huggingface.co/datasets/ai-humanizer-benchmark/ai-humanizer-benchmark), 2 ensayos cada uno, en 2 rondas con modelos distintos. Un comprobador externo, [humanizer-fact-audit](https://github.com/zwang-devv/humanizer-fact-audit), contó las reescrituras que perdían al menos un número, fecha, nombre de persona u organización, o cita de 3 o más palabras del original. El método quedó registrado en un commit antes de hacer ninguna reescritura.
-
-| Ronda | Laconic | `humanizer` | Diferencia (intervalo del 95%) |
-|---|---|---|---|
-| Claude Opus 5.5 | 18 de 134 (13.43%) | 10 de 134 (7.46%) | +5.97 puntos (0.00 a +12.32) |
-| `gpt-6.1-sol` (Codex) | 20 de 134 (14.93%) | 20 de 134 (14.93%) | 0.00 puntos (−2.21 a +2.14) |
-
-Con Opus 5.5, Laconic perdió unidades en más reescrituras que `humanizer` (18 frente a 10) y perdió más unidades en cada grupo: números y fechas 9 de 440 frente a 5, nombres 12 de 164 frente a 9 y citas 5 de 70 frente a 0. Con `gpt-6.1-sol` las 2 skills empataron. Ningún intervalo excluye 0, así que ninguna ronda muestra una diferencia clara. Las reescrituras de Laconic fueron más cortas en ambas rondas: 0.94 y 0.90 de las palabras del original, frente a 1.01 y 0.93.
-
-Límites: el comprobador compara unidades y puede marcar una paráfrasis inocua de una cita; no ve condiciones cambiadas, negaciones ni afirmaciones inventadas, así que no es una prueba completa de fidelidad a los hechos. De los 99 textos, 32 no tienen ninguna unidad que pueda comprobar, así que las tasas cubren 134 reescrituras por skill. Cada ronda usó un modelo para reescribir, 3 textos por contexto nuevo; las instrucciones se dieron como texto, no como plugins instalados. La ronda de Opus se añadió después de la de Codex, con el método sin cambios. El autor de Laconic eligió al rival, escribió el método y ejecutó ambas rondas. [evals/README.md](evals/README.md#public-set-fact-check) da las revisiones fijadas.
-
-En los 33 textos del ciclo 2026-10, reescritos una vez cada uno, un texto por llamada, por Claude Opus 5.5 el 17 de noviembre de 2026, la skill de Laconic alteró una unidad en 5 de los 20 documentos que tienen alguna, igual que `humanizer`, frente a 1 de avoid-ai-writing y de `work-humanizer`, 0 de patina con `--verify` y 8 de la petición sola; los 11 humanizadores comerciales alteraron de 7 a 13. Una reescritura por texto es demasiado poco para mostrar una diferencia entre las skills ([por humanizador](evals/README.md#by-humaniser)).
 
 <a id="checker"></a>
 ## Comprobador
@@ -309,18 +231,19 @@ Para usar `lint` como filtro en CI o en un hook de pre-commit, estas opciones fi
 
 | Opción | Efecto |
 | --- | --- |
-| `--json` | Imprime un objeto JSON: `findings`, cada uno con `file`, `line`, `column`, `rule`, `advisory`, `message` y `url`, luego el recuento `failing` y el número de hallazgos `suppressed` por comentarios. |
-| `--sarif` | Imprime un registro [SARIF 2.1.0](https://docs.oasis-open.org/sarif/sarif/v2.1.0/sarif-v2.1.0.html) para el code scanning de GitHub y otros visores SARIF: cada regla, con su descripción y enlace, y cada hallazgo como resultado de nivel `warning` (`note` si es consejo), ubicado por la URI `file` absoluta del archivo, que code scanning asigna a su ruta en el repositorio, y por columnas en unidades de código UTF-16, como las cuenta SARIF. No con `--json`; desde 0.6.0. |
-| `--metrics` | Tras los hallazgos, imprime métricas de la prosa de cada archivo, y de todos juntos cuando hay 2 o más; con `--json`, añade un objeto `metrics` con `files` y `overall`. No con `--sarif`; después de 0.6.0. |
-| `--profile <name>` | Aplica un perfil de registro: `email`, `report`, `docs`, `chat` o `essay`. Una línea `profile = <name>` en `.laconic-check` hace lo mismo, y `--profile` la sustituye. Después de 0.6.0. |
+| `--format <format>` | Elige el formato de salida: `text` (predeterminado), `json` (igual que `--json`) o `sarif` (igual que `--sarif`). |
+| `--json` | Imprime un objeto JSON con `scope` ('Checks house style, prose patterns and substance heuristics; never infers authorship.'), `findings` (cada uno con `file`, `line`, `column`, `rule`, `advisory`, `severity`, `confidence`, `message` y `url`), `failing` y `suppressed`. |
+| `--sarif` | Imprime un registro [SARIF 2.1.0](https://docs.oasis-open.org/sarif/sarif/v2.1.0/sarif-v2.1.0.html) para el code scanning de GitHub y otros visores SARIF: cada regla, con su descripción y enlace, y cada hallazgo como resultado de nivel `warning` (`note` si es consejo), llevando las propiedades `severity` y `confidence` con `scope` en la ejecución, ubicado por la URI `file` absoluta del archivo, que code scanning asigna a su ruta en el repositorio, y por columnas en unidades de código UTF-16, como las cuenta SARIF. No con `--json`; desde 0.6.0. |
+| `--metrics` | Tras los hallazgos, imprime métricas de la prosa de cada archivo, y de todos juntos cuando hay 2 o más; con `--json`, añade un objeto `metrics` con `files` y `overall`. No con `--sarif`; desde 0.6.0. |
+| `--profile <name>` | Aplica un perfil de registro: `email`, `report`, `docs`, `chat` o `essay`. Una línea `profile = <name>` en `laconic.toml` o `.laconic-check` hace lo mismo, y `--profile` la sustituye. Desde 0.6.0. |
 | `--disable <rules>` | Descarta los hallazgos de estas reglas; separadas por comas y repetible. |
 | `--only <rules>` | Conserva solo los hallazgos de estas reglas; `--disable` prevalece sobre ella. |
 | `--max-findings <n>` | Falla solo con más de n hallazgos que hacen fallar (por defecto 0). |
 | `--warn` | Nunca falla por hallazgos. |
 | `--commit-msg` | Lee cada archivo como un mensaje de commit de Git, sin las líneas de comentario ni nada bajo la línea de tijeras. |
-| `--config <file>` | Lee la configuración de este archivo en lugar de `.laconic-check`. |
+| `--config <file>` | Lee la configuración de este archivo en lugar de `laconic.toml` o `.laconic-check`. |
 
-Un perfil cambia qué reglas se ejecutan y cuáles fallan; sin perfil, `lint` no cambia. `email`, `report` y `essay` activan [`unglossed-term`](docs/rules.md#unglossed-term), una regla de aviso para una sigla de 3 a 8 mayúsculas sin una explicación previa como 'Full Name (ACR)' o 'ACR stands for'; pasan las formas muy conocidas como 'BHP' y las palabras en mayúsculas para dar énfasis. Cada perfil activa además otras reglas opcionales; [docs/rules.md](docs/rules.md) indica cuáles en cada regla. `--only unglossed-term` la activa sin perfil. Esos 3 perfiles hacen fallar `stacked-hedge`; `email` y `essay`, también `bold-label`; `essay`, también `clause-dashes`; y `report`, también `hyphen-consistency` y `acronym-before-definition`. `chat` hace fallar `stacked-hedge`, `bold-label` y `clause-dashes` y descarta `acronym-before-definition` y `hyphen-consistency`; `docs` descarta `bold-label` y `acronym-before-definition` y deja `number-word` como aviso. Un hallazgo que un perfil hace fallar pierde '(advisory)' en su mensaje:
+Un perfil cambia qué reglas se ejecutan y cuáles fallan; sin perfil, `lint` no cambia. `email`, `report` y `essay` activan [`unglossed-term`](docs/rules.md#unglossed-term), una regla de aviso para una sigla de 3 a 8 mayúsculas sin una explicación previa como 'Full Name (ACR)' o 'ACR stands for'; pasan las formas muy conocidas como 'BHP' y las palabras en mayúsculas para dar énfasis. Cada perfil activa además otras reglas opcionales; [docs/rules.md](docs/rules.md) indica cuáles en cada regla. `--only unglossed-term` la activa sin perfil. Esos 3 perfiles hacen fallar `stacked-hedge`; `email` y `essay`, también `bold-label`; `essay`, también `clause-dashes`; y `report`, también `hyphen-consistency` y `acronym-before-definition`. `chat` hace fallar `stacked-hedge`, `bold-label` y `clause-dashes` y descarta `acronym-before-definition` y `hyphen-consistency`; `docs` descarta `bold-label` y `acronym-before-definition` y deja `number-word` como aviso. Los perfiles activan también 5 reglas opcionales de sustancia y relleno de chat (desde 0.6.0, todas de aviso por defecto): `email` activa `ai-placeholder`; `report` y `essay` activan `unanchored-magnitude`, `unattributed-superlative`, `unnamed-evidence` y `ai-placeholder`; `docs` activa `unattributed-superlative` y `ai-placeholder`; y `chat` activa `ai-placeholder` y hace fallar `chat-filler`. Un hallazgo que un perfil hace fallar pierde '(advisory)' en su mensaje:
 
 ```text
 $ printf 'Each member gets a QBR plan. This could potentially slip a week.\n' > memo.md
@@ -345,13 +268,23 @@ $ laconic-check lint --metrics notes.md
 metrics: notes.md: words=14 sentences=2 mean_word_len=5.43 long_words=35.7% nominalisations=14.3% triads=1 sentence_len=mean 7.0 / median 7.0
 ```
 
-Un archivo `.laconic-check` en el directorio desde el que se ejecuta `lint` contiene líneas `key = value` para `disable`, `only` y `max-findings`, y líneas de comentario `#`. Una línea `accept` enumera palabras solo de letras que `us-spelling` no marca, cada una comparada como palabra completa y con las mismas mayúsculas, así que `accept = color` sigue marcando 'Color' al inicio de una frase (desde 0.6.0). Las reglas de la línea de comandos se suman a sus listas, y `--max-findings` sustituye su recuento:
+Un archivo `laconic.toml` o `.laconic-check` (`laconic.toml` tiene prioridad) en el directorio desde el que se ejecuta `lint` contiene líneas `key = value` para `disable`, `only`, `profile`, `accept` y `max_findings` (`max-findings` en `.laconic-check`), y líneas de comentario `#`. Una línea `accept` enumera palabras solo de letras que `us-spelling` no marca, cada una comparada como palabra completa y con las mismas mayúsculas, así que `accept = color` sigue marcando 'Color' al inicio de una frase (desde 0.6.0). Una sección `[protect]` enumera frases de autor (`phrases = [...]` o una frase por línea) exentas de hallazgos en los fragmentos coincidentes (desde 0.6.0). Las reglas de la línea de comandos se suman a sus listas, y `--max-findings` sustituye su recuento:
 
 ```text
 # The CSS property names color and center are expected here.
 accept = color, center
 # This project uses serial commas.
 disable = serial-comma
+```
+
+```toml
+# laconic.toml uses TOML arrays, max_findings and [protect] phrase exemptions.
+accept = ["color", "center"]
+disable = ["serial-comma"]
+max_findings = 0
+
+[protect]
+phrases = ["deep dive"]
 ```
 
 Tras la configuración, una sección `[rules]` contiene las reglas propias del proyecto, una frase por línea: `id: phrase = replacement` sugiere el reemplazo e `id: phrase =` prohíbe la frase (desde 0.6.0). Cada hallazgo nombra su regla `project/<id>`, que aceptan `disable`, `only`, `--disable`, `--only` y los comentarios de supresión; varias líneas pueden compartir un id. Una frase es una o más palabras de letras y cifras, con guiones o apóstrofos dentro de una palabra. Coincide con palabras completas en la prosa, nunca en código, URL ni citas, y a través de un salto de línea. Escrita en minúsculas coincide con cualquier combinación de mayúsculas; con una mayúscula coincide solo tal como está escrita. El texto escrito exactamente como su reemplazo no se marca, así que `github = GitHub` deja en paz 'GitHub'. Los hallazgos del proyecto hacen fallar `lint` como los de Laconic. No tienen enlace a la referencia de reglas: `url` es `null` en `--json`, y el registro SARIF enumera sus reglas tras las de Laconic, sin enlace. Una línea mal formada o una sección desconocida detiene `lint` con el número de la línea:
@@ -394,12 +327,12 @@ En GitHub Actions, la Action compuesta descarga una versión de laconic-check pa
 - uses: actions/checkout@v7
 - uses: yungSNAT/Laconic@<commit>
   with:
-    version: 0.6.0     # the laconic-check release; 0.6.0 by default
+    version: 0.6.1     # the laconic-check release; 0.6.1 by default
     files: README.md   # one path a line; default: every .md and .markdown file Git tracks
     args: --warn       # further lint options
 ```
 
-Para listar los hallazgos en el code scanning de GitHub, pon `laconic-check` en el PATH (hasta que una versión tenga `--sarif`, `cargo install --locked --git https://github.com/yungSNAT/Laconic --rev <commit> laconic-check`), da al job `security-events: write` y sube el registro. Con `--warn`, los hallazgos no hacen fallar el paso, así que solo falla por un error de uso o de lectura, y entonces no se sube nada incompleto; para que el job también falle por hallazgos, añade la Action de arriba u otro paso `lint` sin `--warn`:
+Para listar los hallazgos en el code scanning de GitHub, pon `laconic-check` 0.6.0 o posterior en el PATH, da al job `security-events: write` y sube el registro. Con `--warn`, los hallazgos no hacen fallar el paso, así que solo falla por un error de uso o de lectura, y entonces no se sube nada incompleto; para que el job también falle por hallazgos, añade la Action de arriba u otro paso `lint` sin `--warn`:
 
 ```yaml
 - run: laconic-check lint --sarif --warn README.md docs/*.md > laconic-check.sarif
@@ -422,7 +355,7 @@ El 13 de noviembre de 2026, `preserve` se ejecutó sobre las 363 reescrituras de
 
 En los mismos documentos, el `validate.js` de avoid-ai-writing falla 23 de los 105 alterados y la comprobación de fidelidad de Zero Slop los 105; pasan 233 y 15 de los 258 conservados, frente a 23 de `preserve` y 64 con `--loose` ([evals/README.md](evals/README.md#against-other-fact-checkers), 16 de noviembre de 2026). Según la tabla 1 del artículo, cada humanizador alteró al menos una unidad en 7 a 13 de los 20 textos reescritos que tienen alguna (del 35% al 65%; Undetectable AI 11 de 20); [evals/README.md](evals/README.md#by-humaniser) da la tabla con los resultados de `preserve` para cada uno.
 
-`laconic-check mcp` ofrece `lint` y `preserve` como herramientas MCP por la entrada y salida estándar, sin nada más que instalar. La herramienta `preserve` acepta `loose: true` para lo que hace `--loose`, y la herramienta `lint` aplica el archivo `.laconic-check` del directorio en el que se ejecuta el servidor, como hace `lint`, releído en cada llamada; uno mal formado convierte la llamada en un error que nombra su línea (ambos desde 0.6.0):
+`laconic-check mcp` ofrece `lint` y `preserve` como herramientas MCP por la entrada y salida estándar, sin nada más que instalar. La herramienta `preserve` acepta `loose: true` para lo que hace `--loose`, y la herramienta `lint` aplica el archivo `laconic.toml` o `.laconic-check` del directorio en el que se ejecuta el servidor, como hace `lint`, releído en cada llamada; uno mal formado convierte la llamada en un error que nombra su línea (ambos desde 0.6.0):
 
 ```bash
 claude mcp add --scope user laconic-check -- laconic-check mcp
@@ -430,13 +363,13 @@ claude mcp add --scope user laconic-check -- laconic-check mcp
 
 Está en laconic-check 0.3.0 y posteriores.
 
-`laconic-check lsp` es un servidor de lenguaje por la entrada y salida estándar, para que un editor muestre los hallazgos de `lint` mientras escribes (desde 0.6.0). Revisa cada documento Markdown abierto cada vez que cambia y marca cada hallazgo como advertencia, o como sugerencia si es consejo, enlazado a su regla. Aplica el archivo `.laconic-check` de la carpeta del espacio de trabajo que contiene el documento, la más interior cuando las carpetas se anidan, y muestra un archivo que no puede leer o analizar como error en la primera línea. Después de 0.6.0 también ofrece una corrección rápida donde la regla conoce el único reemplazo, como una grafía estadounidense, un número escrito en palabras, una abreviatura latina, una forma de hora o fecha, comillas dobles o un carácter invisible. Una corrección cambia solo el texto señalado, y solo cuando la eliges (`gra` en Neovim, `space a` en Helix). Las reglas que exigen reescribir, como las rayas, las frases hechas y las posibles comas seriales, no ofrecen ninguna. Una corrección indica la versión del documento, así que el editor rechaza la que llega después de que el texto cambió en lugar de aplicarla en el lugar equivocado. Un editor que no declara aceptar esas ediciones no recibe correcciones, salvo Neovim, que las acepta sin declararlo. Neovim no comprueba ninguna corrección hecha antes del primer cambio de un documento, así que solo recibe correcciones una vez que el documento cambió desde que se abrió. En Neovim 0.11 o posterior, que toma como carpeta del espacio de trabajo la que contiene `.laconic-check` o `.git`:
+`laconic-check lsp` es un servidor de lenguaje por la entrada y salida estándar, para que un editor muestre los hallazgos de `lint` mientras escribes (desde 0.6.0). Revisa cada documento Markdown abierto cada vez que cambia y marca cada hallazgo como advertencia, o como sugerencia si es consejo, enlazado a su regla. Aplica el archivo `laconic.toml` o `.laconic-check` de la carpeta del espacio de trabajo que contiene el documento, la más interior cuando las carpetas se anidan, y muestra un archivo que no puede leer o analizar como error en la primera línea. Desde 0.6.0 también ofrece una corrección rápida donde la regla conoce el único reemplazo, como una grafía estadounidense, un número escrito en palabras, una abreviatura latina, una forma de hora o fecha, comillas dobles o un carácter invisible. Una corrección cambia solo el texto señalado, y solo cuando la eliges (`gra` en Neovim, `space a` en Helix). Las reglas que exigen reescribir, como las rayas, las frases hechas y las posibles comas seriales, no ofrecen ninguna. Una corrección indica la versión del documento, así que el editor rechaza la que llega después de que el texto cambió en lugar de aplicarla en el lugar equivocado. Un editor que no declara aceptar esas ediciones no recibe correcciones, salvo Neovim, que las acepta sin declararlo. Neovim no comprueba ninguna corrección hecha antes del primer cambio de un documento, así que solo recibe correcciones una vez que el documento cambió desde que se abrió. En Neovim 0.11 o posterior, que toma como carpeta del espacio de trabajo la que contiene `laconic.toml`, `.laconic-check` o `.git`:
 
 ```lua
 vim.lsp.config('laconic_check', {
   cmd = { 'laconic-check', 'lsp' },
   filetypes = { 'markdown' },
-  root_markers = { '.laconic-check', '.git' },
+  root_markers = { 'laconic.toml', '.laconic-check', '.git' },
 })
 vim.lsp.enable('laconic_check')
 ```
@@ -453,7 +386,7 @@ name = "markdown"
 language-servers = ["laconic-check"]
 ```
 
-`laconic-check hook` es un hook Stop para Claude Code y Codex, desactivado hasta que lo añades (desde 0.6.0). Cuando el agente está a punto de terminar su turno, revisa el Markdown sin confirmar (preparado, no preparado y sin seguimiento) del repositorio que contiene el directorio de la sesión, con el archivo `.laconic-check` del nivel superior del repositorio. Si `lint` fallaría, pide al agente que mire primero los hallazgos que hacen fallar y enumera hasta 50. Lo pide una vez por turno, así que el agente aún puede terminar cuando un hallazgo es un falso positivo. También revisa tus propias ediciones sin confirmar, no solo las del agente. En Claude Code, añade esto a `.claude/settings.json` o `~/.claude/settings.json`; Codex lee el mismo bloque de `~/.codex/hooks.json` y muestra un hook nuevo como no fiable hasta que lo revisas en `/hooks`:
+`laconic-check hook` es un hook Stop para Claude Code y Codex, desactivado hasta que lo añades (desde 0.6.0). Cuando el agente está a punto de terminar su turno, revisa el Markdown sin confirmar (preparado, no preparado y sin seguimiento) del repositorio que contiene el directorio de la sesión, con el archivo `laconic.toml` o `.laconic-check` del nivel superior del repositorio. Si `lint` fallaría, pide al agente que mire primero los hallazgos que hacen fallar y enumera hasta 50. Lo pide una vez por turno, así que el agente aún puede terminar cuando un hallazgo es un falso positivo. También revisa tus propias ediciones sin confirmar, no solo las del agente. En Claude Code, añade esto a `.claude/settings.json` o `~/.claude/settings.json`; Codex lee el mismo bloque de `~/.codex/hooks.json` y muestra un hook nuevo como no fiable hasta que lo revisas en `/hooks`:
 
 ```json
 {

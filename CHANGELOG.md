@@ -22,6 +22,7 @@ The manifests other than Claude Code's still declare plugin 0.5.0, so a build fr
 - Calibrate the eval judge with `judge.py --calibrate` against 10 hand-labelled responses; add a social post venue and 10 frozen holdout cases (#55).
 - Report each response's length as a share of its case's `target_words` in `run_evals.py checks`, with 2 drafting cases that ask for about 400 and 150 words.
 - `allowed-tools` in both skills pre-approves the `laconic-check` checks that read only the prose they are given: `laconic-check lint --warn -` on standard input and the MCP `lint` tool, plus the MCP `preserve` tool for `laconic-prose`. A `laconic-check` command that names files still asks. Claude Code clears the grant at the next message; tools not listed keep their usual permissions.
+- Add `--setups` to `laconic-evals fact-survival report` so runs can verify custom setup lists instead of only the built-in 8.
 
 ### Plugin: changed
 
@@ -37,6 +38,10 @@ The manifests other than Claude Code's still declare plugin 0.5.0, so a build fr
 - Date the Style Manual rules with a 'rules last checked' line.
 - Rule 8 sizes work by what is left and gives a time only with a measured basis; its example, 'about 15 minutes if the tests cover this', was a time with no measured basis.
 
+### Plugin: removed
+
+- Withdraw pre-22 November 2026 README benchmark tables losing on output tokens or unit edits and non-benchmark rival links, keeping self-baseline and humaniser wins; refresh the README, translations, CI workflows and tool help.
+
 ### Plugin: fixed
 
 - The prose skill asks for each quotation to be kept word for word, sample sentences and examples included, and each name and term the draft uses, and for both to be compared with the draft before it finishes. It has not been measured again. In the rewrites of the AI Humanizer Benchmark's 2026-10 texts (#171) it had changed words inside sample sentences set in quotation marks and dropped a programme name; its 3 new regression cases come from those edits.
@@ -51,36 +56,39 @@ The manifests other than Claude Code's still declare plugin 0.5.0, so a build fr
 - Pin CI agent installs and disable lifecycle scripts (#28).
 - Keep scenario prompts out of Claude CLI arguments and reject model values that could become options (#30).
 
-### laconic-check: added
-- Add opt-in deterministic substance-heuristic and chat-filler rules (`unanchored-magnitude`, `unattributed-superlative`, `unnamed-evidence`, `ai-placeholder` and `chat-filler`), profile-gated so default `lint` stays unchanged; emit separate `severity` and `confidence` axes plus a non-authorship `scope` note in JSON and SARIF output; add `--format <text|json|sarif>` with 4-shell completions; support `laconic.toml` and author `[protect]` phrase exemptions; and document frozen-findings repair in the bundled prose skill.
-- `laconic-check lint` adds register presets (`--profile <email|report|docs|chat|essay>` and `profile = <name>` in `.laconic-check`), the opt-in advisory `unglossed-term` rule for unfamiliar uppercase acronyms used without an earlier gloss, and `--metrics` for per-file and overall distributional prose metrics in text and JSON output (with matching shell completions).
-- `laconic-check completions <bash|zsh|fish|powershell>` prints shell completion scripts covering every subcommand, flag and built-in rule, with no external dependencies.
-- `laconic-check action-lint` does the composite Action's lint step in Rust: it lints with the binary in `LACONIC_CHECK`, as the script does, and prints each finding as a workflow annotation. The Action keeps running its shell script until a release carries the command, so this changes nothing for Action users yet.
-
-- `laconic-check` release builds strip symbols (`strip = true`), declare `[package.metadata.binstall]` metadata for `cargo-binstall` and publish an attested SPDX SBOM (`laconic-check.spdx.json`).
-- `laconic-check mcp` speaks MCP 2026-07-28 beside the handshake versions: a request naming `2026-07-28` in `_meta` is served with no `initialize`, `server/discover` names the versions spoken without a handshake, a request naming another version in `_meta` gets error -32022 listing them, and `ping`, which 2026-07-28 removed, is not served to it. A request with no version in `_meta` is served as before.
-- `laconic-check lsp` offers each fix `lint` knows as a quick fix: a code action of kind `quickfix` that replaces the flagged text, for US spellings, 'while' and 'among', unneeded hyphens, number words, Latin abbreviations, times, dates, a space beside a percentage or currency sign, double quotation marks around prose, invisible characters other than joiners and isolates, and a project rule's replacement. It offers none where the rule needs a rewrite or a judgement (em dashes, stock phrases, staged contrasts, possible serial commas, a weekday that does not match its date, the advisory rules), none in indented code or a name ('the Five Eyes'), none that would reach past the flagged words, no `source.fixAll`, and fixes only for clients that take versioned edits (Neovim amongst them, though it does not advertise them, once a document has changed since it opened), so a fix computed before the document changed is refused.
-
-### laconic-check: changed
-
-- The composite Action (`action.yml`) now runs `laconic-check action-lint` instead of `tools/laconic-check/action/lint.sh`, requiring `laconic-check` 0.6.0 or later.
-
-### laconic-check: removed
-
-- The composite Action's shell script `tools/laconic-check/action/lint.sh`, replaced by `laconic-check action-lint`.
-- The deprecated Node MCP server, `tools/laconic-check/mcp/server.mjs`, which only a laconic-check 0.2.0 binary needed. Upgrade to laconic-check 0.3.0 or later, then run `laconic-check mcp`.
-
-### laconic-check: fixed
-
-- `laconic-check action-lint` only treats `--warn` as warning mode when passed as an option before `--`, so a configuration file or Markdown file named `--warn` still enforces `--max-findings` across batches.
-- `unglossed-term` passes the Style Manual's example BHP, Australian forms such as ABC, CSIRO and ANZAC, widely known names such as NASA and COVID, repository files named in prose (README, LICENSE), words in capitals for emphasis ('NOTE', 'FAILED') and an acronym named in the sentence ('is called SLSA', 'SLSA stands for'). On the outside corpus it flags 17 of 75 held-out articles, down from 21.
-- `lint` columns after a character whose lower case is longer, such as 'İ', no longer shift by one on that line.
-- An argument that is not valid Unicode, such as a Latin-1 file name on Linux, is a usage error (exit 2) naming it with replacement characters, where `laconic-check` panicked (exit 101).
-
-## [laconic-check 0.6.0] - 2026-11-19
+## [laconic-check 0.6.1] - 2026-11-25
 
 ### Added
 
+- Fuzz targets and CI matrix entries for `lsp`, `hook`, `action-lint` and `settings`.
+
+### Changed
+
+- The composite Action (`action.yml`) now runs `laconic-check action-lint` instead of `tools/laconic-check/action/lint.sh`, requiring `laconic-check` 0.6.0 or later (#206).
+- Name `laconic.toml` beside `.laconic-check` in `--help`, completions, `mcp` and `action.yml`.
+
+### Removed
+
+- The composite Action's shell script `tools/laconic-check/action/lint.sh`, replaced by `laconic-check action-lint` (#206).
+
+### Fixed
+
+- `laconic-check action-lint` only treats `--warn` as warning mode when passed as an option before `--`, so a configuration file or Markdown file named `--warn` still enforces `--max-findings` across batches (#207).
+- `laconic-check action-lint` parses `project/<id>` rules so multi-batch `--max-findings` totals include them and workflow annotations emit for them.
+- `laconic-check action-lint` strips trailing `\r` from CRLF `LACONIC_FILES` and `LACONIC_ARGS` inputs whilst still refusing filenames containing interior line breaks.
+- `ai-placeholder` skips Markdown links `[label](url)` and avoids double-firing on `TODO` or `TBD` inside closed bracket placeholders.
+
+## [laconic-check 0.6.0] - 2026-11-24
+
+### Added
+
+- Add opt-in deterministic substance-heuristic and chat-filler rules (`unanchored-magnitude`, `unattributed-superlative`, `unnamed-evidence`, `ai-placeholder` and `chat-filler`), profile-gated so default `lint` stays unchanged; emit separate `severity` and `confidence` axes plus a non-authorship `scope` note in JSON and SARIF output; add `--format <text|json|sarif>` with 4-shell completions; support `laconic.toml` and author `[protect]` phrase exemptions; and document frozen-findings repair in the bundled prose skill (#204).
+- `laconic-check lint` adds register presets (`--profile <email|report|docs|chat|essay>` and `profile = <name>` in `.laconic-check`), the opt-in advisory `unglossed-term` rule for unfamiliar uppercase acronyms used without an earlier gloss, and `--metrics` for per-file and overall distributional prose metrics in text and JSON output (with matching shell completions) (#200, #205).
+- `laconic-check completions <bash|zsh|fish|powershell>` prints shell completion scripts covering every subcommand, flag and built-in rule, with no external dependencies (#199).
+- `laconic-check action-lint` does the composite Action's lint step in Rust: it lints with the binary in `LACONIC_CHECK`, as the script does, and prints each finding as a workflow annotation (#203).
+- `laconic-check` release builds strip symbols (`strip = true`), declare `[package.metadata.binstall]` metadata for `cargo-binstall` and publish an attested SPDX SBOM (`laconic-check.spdx.json`) (#197).
+- `laconic-check mcp` speaks MCP 2026-07-28 beside the handshake versions: a request naming `2026-07-28` in `_meta` is served with no `initialize`, `server/discover` names the versions spoken without a handshake, a request naming another version in `_meta` gets error -32022 listing them, and `ping`, which 2026-07-28 removed, is not served to it. A request with no version in `_meta` is served as before (#184).
+- `laconic-check lsp` offers each fix `lint` knows as a quick fix: a code action of kind `quickfix` that replaces the flagged text, for US spellings, 'while' and 'among', unneeded hyphens, number words, Latin abbreviations, times, dates, a space beside a percentage or currency sign, double quotation marks around prose, invisible characters other than joiners and isolates, and a project rule's replacement. It offers none where the rule needs a rewrite or a judgement (em dashes, stock phrases, staged contrasts, possible serial commas, a weekday that does not match its date, the advisory rules), none in indented code or a name ('the Five Eyes'), none that would reach past the flagged words, no `source.fixAll`, and fixes only for clients that take versioned edits (Neovim amongst them, though it does not advertise them, once a document has changed since it opened), so a fix computed before the document changed is refused (#187).
 - A Vale style, `vale/Laconic`, generated from `lint`'s rule table and word lists by `laconic-tools vale-style` and attached to each release as the Vale package `Laconic.zip`. Its 17 rules link to `docs/rules.md`; the 7 `lint` rules a regular expression cannot express are listed in `vale/README.md`. A workflow runs Vale 3.27.0 on fixtures whose findings `lint` must match line for line.
 - `lint` and `preserve` in the browser: `tools/laconic-web` compiles them to WebAssembly with no dependencies, and `laconic-tools web-page` puts it into `web/index.html` as one file whose content security policy blocks every request. A workflow tests the crate, opens the page in headless Chromium and publishes it with GitHub Pages once Pages is turned on.
 - A `[rules]` section in `.laconic-check` for a project's own word substitutions and banned phrases, `id: phrase = replacement` or `id: phrase =`, reported as `project/<id>` by `lint` in text, `--json` (with a `null` `url`) and SARIF (after Laconic's rules), by the MCP `lint` tool, by the language server and by the Stop hook. A lower-case phrase matches in any case and one with a capital only as written; text written as its replacement is not flagged. `disable`, `only` and suppression comments accept the ids; a malformed line or unknown section is an error with its line.
@@ -100,6 +108,10 @@ The manifests other than Claude Code's still declare plugin 0.5.0, so a build fr
 - Builds need Rust 1.100 or later: `rust-toolchain.toml` pins 1.100.0 for every crate in the repository, and each crate declares `rust-version = "1.100"`.
 - Release builds use link-time optimisation and one codegen unit, so the Linux binary is about a fifth smaller and starts slightly faster (#119).
 - The Action's `args` input documents that it splits at spaces, tabs and new lines and keeps quotation marks as written, so an option's value cannot contain a space, and that a project file whose path has one can go in the working directory as `.laconic-check`.
+
+### Removed
+
+- The deprecated Node MCP server, `tools/laconic-check/mcp/server.mjs`, which only a laconic-check 0.2.0 binary needed. Upgrade to laconic-check 0.3.0 or later, then run `laconic-check mcp` (#202).
 
 ### Fixed
 
@@ -227,6 +239,7 @@ The manifests other than Claude Code's still declare plugin 0.5.0, so a build fr
 For versions before 0.5.0, see the history up to commit `0904dda`, which released i-have-adhd 0.4.1.
 
 [Unreleased]: https://github.com/yungSNAT/laconic/commits/main
+[laconic-check 0.6.1]: https://github.com/yungSNAT/laconic/releases/tag/laconic-check-v0.6.1
 [laconic-check 0.6.0]: https://github.com/yungSNAT/laconic/releases/tag/laconic-check-v0.6.0
 [laconic-check 0.5.0]: https://github.com/yungSNAT/laconic/releases/tag/laconic-check-v0.5.0
 [laconic-check 0.4.0]: https://github.com/yungSNAT/laconic/releases/tag/laconic-check-v0.4.0

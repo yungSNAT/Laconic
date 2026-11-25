@@ -193,7 +193,7 @@ scoop install https://github.com/yungSNAT/Laconic/releases/latest/download/lacon
 
 La fórmula de Homebrew y los manifiestos de winget se adjuntan para un tap y el catálogo de winget, que aún no incluyen laconic-check.
 
-[docs/rules.md](docs/rules.md) describe cada regla bajo su nombre, con ejemplos, su sección del Style Manual y con qué frecuencia marca prosa humana; también muestra qué secciones del Style Manual cubre el comprobador. Informa de un falso positivo con el [formulario de incidencias](https://github.com/yungSNAT/Laconic/issues/new?template=false-positive.yml). [docs/humanizer-coverage.md](docs/humanizer-coverage.md) relaciona cada uno de los 26 patrones de `humanizer` 4.0.0 con la regla y la sección de la skill de prosa que lo cubren: la skill cubre los 26, y `lint` marca alguna forma de 8.
+[docs/rules.md](docs/rules.md) describe cada regla bajo su nombre, con ejemplos, su sección del Style Manual y con qué frecuencia marca prosa humana; también muestra qué secciones del Style Manual cubre el comprobador. Informa de un falso positivo con el [formulario de incidencias](https://github.com/yungSNAT/Laconic/issues/new?template=false-positive.yml). [docs/pattern-coverage.md](docs/pattern-coverage.md) relaciona cada uno de los 26 patrones que enumera una skill humanizadora comparable con la regla y la sección de la skill de prosa que lo cubren: la skill cubre los 26, y `lint` marca alguna forma de 8.
 
 Para usar `lint` como filtro en CI o en un hook de pre-commit, estas opciones fijan qué informa y qué falla:
 

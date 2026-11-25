@@ -185,7 +185,7 @@ scoop install https://github.com/yungSNAT/Laconic/releases/latest/download/lacon
 
 The Homebrew formula and winget manifests are attached for a tap and the winget catalogue, which do not list laconic-check yet.
 
-[docs/rules.md](docs/rules.md) describes each rule under its name, with examples, its Style Manual section and how often it flags human prose; it also shows which Style Manual sections the checker covers. Report a false positive with the [issue form](https://github.com/yungSNAT/Laconic/issues/new?template=false-positive.yml). [docs/humanizer-coverage.md](docs/humanizer-coverage.md) maps each of the 26 patterns in `humanizer` 4.0.0 to the rule and the prose skill section that cover it: the skill covers all 26, and `lint` flags some form of 8.
+[docs/rules.md](docs/rules.md) describes each rule under its name, with examples, its Style Manual section and how often it flags human prose; it also shows which Style Manual sections the checker covers. Report a false positive with the [issue form](https://github.com/yungSNAT/Laconic/issues/new?template=false-positive.yml). [docs/pattern-coverage.md](docs/pattern-coverage.md) maps each of the 26 patterns a comparable humaniser skill lists to the rule and the prose skill section that cover it: the skill covers all 26, and `lint` flags some form of 8.
 
 To run `lint` as a gate in CI or a pre-commit hook, these options set what it reports and what fails:
 

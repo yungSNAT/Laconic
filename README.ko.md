@@ -193,7 +193,7 @@ scoop install https://github.com/yungSNAT/Laconic/releases/latest/download/lacon
 
 Homebrew 포뮬러와 winget 매니페스트는 탭과 winget 카탈로그용으로 첨부되지만, 둘 다 아직 laconic-check를 등록하지 않았습니다.
 
-[docs/rules.md](docs/rules.md)는 각 규칙을 이름별로 예시, Style Manual 해당 절, 사람이 쓴 산문을 얼마나 자주 지적하는지와 함께 설명하고, 검사기가 다루는 Style Manual 절도 보여 줍니다. 오탐은 [이슈 양식](https://github.com/yungSNAT/Laconic/issues/new?template=false-positive.yml)으로 알려 주세요. [docs/humanizer-coverage.md](docs/humanizer-coverage.md)는 `humanizer` 4.0.0의 패턴 26개 각각을 그것을 다루는 규칙과 산문 스킬 절에 대응시킵니다. 스킬은 26개 모두를 다루고, `lint`는 그중 8개를 어떤 형태로든 지적합니다.
+[docs/rules.md](docs/rules.md)는 각 규칙을 이름별로 예시, Style Manual 해당 절, 사람이 쓴 산문을 얼마나 자주 지적하는지와 함께 설명하고, 검사기가 다루는 Style Manual 절도 보여 줍니다. 오탐은 [이슈 양식](https://github.com/yungSNAT/Laconic/issues/new?template=false-positive.yml)으로 알려 주세요. [docs/pattern-coverage.md](docs/pattern-coverage.md)는 비슷한 휴머나이저 스킬이 나열하는 패턴 26개 각각을 그것을 다루는 규칙과 산문 스킬 절에 대응시킵니다. 스킬은 26개 모두를 다루고, `lint`는 그중 8개를 어떤 형태로든 지적합니다.
 
 `lint`를 CI나 pre-commit 훅의 관문으로 쓸 때, 다음 옵션이 무엇을 보고하고 무엇을 실패시킬지 정합니다.
 

@@ -1,8 +1,8 @@
-# `humanizer`'s patterns in Laconic
+# A humaniser skill's patterns in Laconic
 
-[humanizer](https://github.com/blader/humanizer) 4.0.0 (commit `b48c832`, 10 November 2026) lists 26 patterns in its `SKILL.md`. This table shows where Laconic covers each one: a `laconic-check lint` rule that flags some of its forms ([rules](rules.md)), and the section of the prose skill's [pattern catalogue](../skills/laconic-prose/references/patterns.md) that repairs it. A rule never flags every form a pattern lists; 'part' marks one that flags a few of its phrases. Checked by hand on 17 November 2026.
+A comparable humaniser skill, as published on 10 November 2026, lists 26 patterns. This table shows where Laconic covers each one: a `laconic-check lint` rule that flags some of its forms ([rules](rules.md)), and the section of the prose skill's [pattern catalogue](../skills/laconic-prose/references/patterns.md) that repairs it. A rule never flags every form a pattern lists; 'part' marks one that flags a few of its phrases. Checked by hand on 17 November 2026.
 
-| # | `humanizer` pattern | `lint` rule | Prose skill section |
+| # | Pattern | `lint` rule | Prose skill section |
 | --- | --- | --- | --- |
 | 1 | Not X but Y | `staged-contrast` ('it's not X, it's Y'; 'not just X but Y') | Binary contrasts and negative listing |
 | 2 | One-line closers and dramatic fragments | `stock-phrase`, part ('let that sink in') | Dramatic fragmentation and robotic rhythm; Fake-profound kickers; Pressure phrases |
@@ -31,4 +31,4 @@
 | 25 | Writing about the document instead of its subject | None | Narrating how the document was written; Meta-joiners |
 | 26 | Re-explaining what the reader knows | None | Repeating known context in a reply |
 
-The skill has a section for each of the 26. `lint` flags some form of 8 of them; the other 18 need a reading of meaning or context, so `lint` leaves them to the skill. Laconic also covers what `humanizer` does not list, such as Australian spelling, dates, times and numbers, and `preserve` checks that a rewrite kept the source's facts.
+The skill has a section for each of the 26. `lint` flags some form of 8 of them; the other 18 need a reading of meaning or context, so `lint` leaves them to the skill. Laconic also covers what that list leaves out, such as Australian spelling, dates, times and numbers, and `preserve` checks that a rewrite kept the source's facts.

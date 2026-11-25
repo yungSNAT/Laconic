@@ -24,14 +24,6 @@ struct ParagraphView<'a> {
     raw_lower: String,
 }
 
-struct AnchoredSpec {
-    phrases: &'static [&'static str],
-    rule: RuleId,
-    anchored: fn(&str, &str) -> bool,
-    label: &'static str,
-    advice: &'static str,
-}
-
 /// Runs all opt-in substance and chat-filler rules on a single masked paragraph.
 pub(super) fn check(masked: &[char], raw: &[char], findings: &mut Vec<Finding>) {
     let masked_str: String = masked.iter().collect();
@@ -47,30 +39,43 @@ pub(super) fn check(masked: &[char], raw: &[char], findings: &mut Vec<Finding>) 
     };
 
     check_magnitudes(&view, findings);
-    check_anchored_list(
+    check_phrases(
         &view,
-        &AnchoredSpec {
-            phrases: SUPERLATIVES,
-            rule: RuleId::UnattributedSuperlative,
-            anchored: has_attribution_anchor,
-            label: "unattributed superlative or comparative claim",
-            advice: "name the baseline and source, or remove the claim",
-        },
+        SUPERLATIVES,
+        RuleId::UnattributedSuperlative,
+        Some(has_attribution_anchor),
         findings,
+        |phrase| {
+            format!(
+                "unattributed superlative or comparative claim '{phrase}' (advisory); name the baseline and source, or remove the claim"
+            )
+        },
     );
-    check_anchored_list(
+    check_phrases(
         &view,
-        &AnchoredSpec {
-            phrases: UNNAMED_EVIDENCE,
-            rule: RuleId::UnnamedEvidence,
-            anchored: has_evidence_anchor,
-            label: "appeal to unnamed evidence",
-            advice: "name the study, author or source, or cut the appeal",
-        },
+        UNNAMED_EVIDENCE,
+        RuleId::UnnamedEvidence,
+        Some(has_evidence_anchor),
         findings,
+        |phrase| {
+            format!(
+                "appeal to unnamed evidence '{phrase}' (advisory); name the study, author or source, or cut the appeal"
+            )
+        },
     );
     check_ai_placeholders(&view, findings);
-    check_chat_filler(&view, findings);
+    check_phrases(
+        &view,
+        CHAT_FILLER,
+        RuleId::ChatFiller,
+        None,
+        findings,
+        |phrase| {
+            format!(
+                "architectural filler '{phrase}' (advisory); name the concrete check, module or interface"
+            )
+        },
+    );
 }
 
 fn is_word_char(c: char) -> bool {
@@ -244,28 +249,18 @@ fn has_evidence_anchor(orig: &str, low: &str) -> bool {
 }
 
 fn check_magnitudes(view: &ParagraphView<'_>, findings: &mut Vec<Finding>) {
-    for phrase in VAGUE_MAGNITUDES {
-        let plen = phrase.chars().count();
-        let mut from = 0;
-        while let Some(pos) = view.lower[from..].find(phrase) {
-            let col_idx = view.lower[..from + pos].chars().count();
-            if whole_word_at(&view.lower_chars, col_idx, plen) {
-                let (orig, low) = sentence_slice(view, col_idx);
-                if !has_magnitude_anchor(&orig, &low) {
-                    findings.push(Finding {
-                        line: 0,
-                        column: col_idx + 1,
-                        rule: RuleId::UnanchoredMagnitude.into(),
-                        message: format!(
-                            "unanchored magnitude '{phrase}' (advisory); add a denominator, timeframe or source"
-                        ),
-                        fix: None,
-                    });
-                }
-            }
-            from += pos + phrase.len();
-        }
-    }
+    check_phrases(
+        view,
+        VAGUE_MAGNITUDES,
+        RuleId::UnanchoredMagnitude,
+        Some(has_magnitude_anchor),
+        findings,
+        |phrase| {
+            format!(
+                "unanchored magnitude '{phrase}' (advisory); add a denominator, timeframe or source"
+            )
+        },
+    );
     check_numeric_multipliers(view, findings);
 }
 
@@ -312,55 +307,117 @@ fn check_numeric_multipliers(view: &ParagraphView<'_>, findings: &mut Vec<Findin
     }
 }
 
-fn check_anchored_list(view: &ParagraphView<'_>, spec: &AnchoredSpec, findings: &mut Vec<Finding>) {
-    for phrase in spec.phrases {
+fn check_phrases(
+    view: &ParagraphView<'_>,
+    phrases: &[&str],
+    rule: RuleId,
+    anchor: Option<fn(&str, &str) -> bool>,
+    findings: &mut Vec<Finding>,
+    mut message: impl FnMut(&str) -> String,
+) {
+    for &phrase in phrases {
         let plen = phrase.chars().count();
         let mut from = 0;
         while let Some(pos) = view.lower[from..].find(phrase) {
             let col_idx = view.lower[..from + pos].chars().count();
-            if whole_word_at(&view.lower_chars, col_idx, plen) {
-                let (orig, low) = sentence_slice(view, col_idx);
-                if !(spec.anchored)(&orig, &low) {
-                    findings.push(Finding {
-                        line: 0,
-                        column: col_idx + 1,
-                        rule: spec.rule.into(),
-                        message: format!("{} '{phrase}' (advisory); {}", spec.label, spec.advice),
-                        fix: None,
-                    });
-                }
-            }
-            from += pos + phrase.len();
-        }
-    }
-}
-
-fn check_ai_placeholders(view: &ParagraphView<'_>, findings: &mut Vec<Finding>) {
-    for phrase in AI_RESIDUE {
-        let plen = phrase.chars().count();
-        let mut from = 0;
-        while let Some(pos) = view.lower[from..].find(phrase) {
-            let col_idx = view.lower[..from + pos].chars().count();
-            if whole_word_at(&view.lower_chars, col_idx, plen) {
+            if whole_word_at(&view.lower_chars, col_idx, plen)
+                && anchor.is_none_or(|f| {
+                    let (orig, low) = sentence_slice(view, col_idx);
+                    !f(&orig, &low)
+                })
+            {
                 findings.push(Finding {
                     line: 0,
                     column: col_idx + 1,
-                    rule: RuleId::AiPlaceholder.into(),
-                    message: format!(
-                        "AI residue phrase '{phrase}' (advisory); remove self-reference from finished prose"
-                    ),
+                    rule: rule.into(),
+                    message: message(phrase),
                     fix: None,
                 });
             }
             from += pos + phrase.len();
         }
     }
+}
+
+/// Whether `raw[at]` follows an odd run of backslashes, which makes it literal text.
+fn is_escaped(raw: &[char], at: usize) -> bool {
+    raw[..at].iter().rev().take_while(|&&c| c == '\\').count() % 2 == 1
+}
+
+/// The index of the `)` ending an inline link destination that opens at `raw[close + 1]`, when
+/// `raw[close]` is an unescaped `]`. The destination has no space unless a quoted title
+/// follows it, so `[TODO](see below)` is no link.
+fn link_tail_end(raw: &[char], close: usize) -> Option<usize> {
+    if raw.get(close) != Some(&']') || is_escaped(raw, close) || raw.get(close + 1) != Some(&'(') {
+        return None;
+    }
+    let end = close + 2 + raw[close + 2..].iter().position(|&c| c == ')')?;
+    let inner: String = raw[close + 2..end].iter().collect();
+    let inner = inner.trim();
+    let valid = match inner.split_once(char::is_whitespace) {
+        None => true,
+        Some((_, title)) => {
+            let title = title.trim_start();
+            title.len() >= 2
+                && ((title.starts_with('"') && title.ends_with('"'))
+                    || (title.starts_with('\'') && title.ends_with('\'')))
+        }
+    };
+    valid.then_some(end)
+}
+
+fn is_markdown_link_tail(raw: &[char], close: usize) -> bool {
+    link_tail_end(raw, close).is_some()
+}
+
+fn markdown_link_label_ranges(raw: &[char]) -> Vec<(usize, usize)> {
+    let mut ranges = Vec::new();
+    let mut i = 0;
+    while i < raw.len() {
+        if let Some(end) = link_tail_end(raw, i) {
+            // The nearest unescaped bracket or line break before `]`; a `[` opens the label.
+            if let Some(open) = (0..i)
+                .rev()
+                .find(|&pos| {
+                    raw[pos] == '\n'
+                        || ((raw[pos] == '[' || raw[pos] == ']') && !is_escaped(raw, pos))
+                })
+                .filter(|&pos| raw[pos] == '[')
+            {
+                ranges.push((open, i));
+            }
+            i = end + 1;
+            continue;
+        }
+        i += 1;
+    }
+    ranges
+}
+
+fn check_ai_placeholders(view: &ParagraphView<'_>, findings: &mut Vec<Finding>) {
+    check_phrases(
+        view,
+        AI_RESIDUE,
+        RuleId::AiPlaceholder,
+        None,
+        findings,
+        |p| {
+            format!("AI residue phrase '{p}' (advisory); remove self-reference from finished prose")
+        },
+    );
+    let mut skip_ranges = markdown_link_label_ranges(view.raw);
     for opener in PLACEHOLDER_OPENERS {
         let mut from = 0;
         while let Some(pos) = view.lower[from..].find(opener) {
             let col_idx = view.lower[..from + pos].chars().count();
             if let Some(close) = view.lower_chars[col_idx..].iter().position(|&c| c == ']') {
-                let span: String = view.masked[col_idx..=col_idx + close].iter().collect();
+                let end = col_idx + close;
+                if is_markdown_link_tail(view.raw, end) {
+                    from += pos + opener.len();
+                    continue;
+                }
+                skip_ranges.push((col_idx, end));
+                let span: String = view.masked[col_idx..=end].iter().collect();
                 findings.push(Finding {
                     line: 0,
                     column: col_idx + 1,
@@ -376,6 +433,13 @@ fn check_ai_placeholders(view: &ParagraphView<'_>, findings: &mut Vec<Finding>) 
     }
     let mut i = 0;
     while i < view.masked.len() {
+        if skip_ranges
+            .iter()
+            .any(|&(start, end)| i >= start && i <= end)
+        {
+            i += 1;
+            continue;
+        }
         if view.masked[i] == 'T' && (i == 0 || !is_word_char(view.masked[i - 1])) {
             let token = if view.masked.get(i..i + 4) == Some(&['T', 'O', 'D', 'O'])
                 && (i + 4 == view.masked.len() || !is_word_char(view.masked[i + 4]))
@@ -403,28 +467,6 @@ fn check_ai_placeholders(view: &ParagraphView<'_>, findings: &mut Vec<Finding>) 
             }
         }
         i += 1;
-    }
-}
-
-fn check_chat_filler(view: &ParagraphView<'_>, findings: &mut Vec<Finding>) {
-    for phrase in CHAT_FILLER {
-        let plen = phrase.chars().count();
-        let mut from = 0;
-        while let Some(pos) = view.lower[from..].find(phrase) {
-            let col_idx = view.lower[..from + pos].chars().count();
-            if whole_word_at(&view.lower_chars, col_idx, plen) {
-                findings.push(Finding {
-                    line: 0,
-                    column: col_idx + 1,
-                    rule: RuleId::ChatFiller.into(),
-                    message: format!(
-                        "architectural filler '{phrase}' (advisory); name the concrete check, module or interface"
-                    ),
-                    fix: None,
-                });
-            }
-            from += pos + phrase.len();
-        }
     }
 }
 

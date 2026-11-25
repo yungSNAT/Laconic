@@ -54,7 +54,7 @@ pub fn run(files: &str, args: &str, exe: &Path, out: &mut impl Write) -> u8 {
     };
     // The Action splits args at spaces, tabs and new lines.
     let args: Vec<&str> = args
-        .split([' ', '\t', '\n'])
+        .split([' ', '\t', '\n', '\r'])
         .filter(|arg| !arg.is_empty())
         .collect();
     let mut warn = false;
@@ -190,6 +190,7 @@ fn listed(list: &str) -> Result<Vec<String>, String> {
     let mut seen = HashSet::new();
     Ok(list
         .split('\n')
+        .map(|file| file.strip_suffix('\r').unwrap_or(file))
         .filter(|file| !file.is_empty() && seen.insert(*file))
         .map(str::to_owned)
         .collect())
@@ -241,20 +242,25 @@ fn exit_code(code: Option<i32>, signal: Option<i32>) -> u8 {
 
 /// Prints each line of lint's output, and an annotation for each finding in it. Returns the
 /// number of failing findings.
-fn annotate(text: &str, out: &mut impl Write) -> usize {
+pub fn annotate(text: &str, out: &mut impl Write) -> usize {
     let mut failing = 0;
-    for line in text.split('\n').filter(|line| !line.is_empty()) {
+    for line in text
+        .split('\n')
+        .map(|line| line.strip_suffix('\r').unwrap_or(line))
+        .filter(|line| !line.is_empty())
+    {
         // Filename and message text must not be interpreted as workflow commands.
         let _ = writeln!(out, "laconic-check: {line}");
         let Some(finding) = Finding::parse(line) else {
             continue;
         };
-        let level = if finding.message.contains("(advisory)") {
-            "warning"
-        } else {
-            failing += 1;
-            "error"
-        };
+        let level =
+            if !finding.rule.starts_with("project/") && finding.message.contains("(advisory)") {
+                "warning"
+            } else {
+                failing += 1;
+                "error"
+            };
         let _ = writeln!(
             out,
             "::{level} file={},line={},col={},title={}::{}",
@@ -279,8 +285,7 @@ struct Finding<'a> {
 
 impl<'a> Finding<'a> {
     /// The file name is as long as it can be, so a message holding `:1:2: rule:` stays in the
-    /// message; a rule is lower-case letters and hyphens, so a project rule, `project/<id>`,
-    /// is no finding here.
+    /// message; `rule` is a built-in slug or `project/<id>`.
     fn parse(line: &'a str) -> Option<Finding<'a>> {
         line.match_indices(':').rev().find_map(|(at, _)| {
             if at == 0 {
@@ -289,17 +294,28 @@ impl<'a> Finding<'a> {
             let (number, rest) = digits(&line[at + 1..])?;
             let (column, rest) = digits(rest.strip_prefix(':')?)?;
             let rest = rest.strip_prefix(": ")?;
-            let end = rest.find(|c: char| !(c.is_ascii_lowercase() || c == '-'))?;
-            let message = rest[end..].strip_prefix(": ")?;
-            (end > 0).then_some(Finding {
+            let (rule, message) = rest.split_once(": ")?;
+            is_rule_name(rule).then_some(Finding {
                 file: &line[..at],
                 line: number,
                 column,
-                rule: &rest[..end],
+                rule,
                 message,
             })
         })
     }
+}
+
+fn is_rule_name(rule: &str) -> bool {
+    if let Some(id) = rule.strip_prefix("project/") {
+        return !id.is_empty()
+            && !id.starts_with('-')
+            && !id.ends_with('-')
+            && id
+                .bytes()
+                .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-');
+    }
+    !rule.is_empty() && rule.bytes().all(|b| b.is_ascii_lowercase() || b == b'-')
 }
 
 /// A leading run of ASCII digits, and the rest.
@@ -382,7 +398,11 @@ mod tests {
         for line in [
             "",
             ":1:2: rule: text",
-            "a.md:1:2: project/plain: text",
+            "a.md:1:2: project/: text",
+            "a.md:1:2: project/-bad: text",
+            "a.md:1:2: project/bad-: text",
+            "a.md:1:2: project/a/b: text",
+            "a.md:1:2: project/Bad: text",
             "a.md:1:2: Rule: text",
             "a.md:x:2: rule: text",
             "a.md:1:2:rule: text",
@@ -391,6 +411,48 @@ mod tests {
         ] {
             assert!(Finding::parse(line).is_none(), "{line:?}");
         }
+    }
+
+    #[test]
+    fn project_rule_lines_parse_and_count_as_failing() {
+        let parsed = Finding::parse("a.md:1:2: project/no-pass-2: text (advisory)").unwrap();
+        assert_eq!(parsed.file, "a.md");
+        assert_eq!(parsed.line, "1");
+        assert_eq!(parsed.column, "2");
+        assert_eq!(parsed.rule, "project/no-pass-2");
+        assert_eq!(parsed.message, "text (advisory)");
+
+        let mut out = Vec::new();
+        let failing = annotate(
+            "a.md:1:2: project/plain: 'utilise' (advisory)\r\nb.md:2:3: passive-voice: msg (advisory)\r\n",
+            &mut out,
+        );
+        assert_eq!(failing, 1);
+        let text = String::from_utf8(out).unwrap();
+        assert!(text.contains(
+            "::error file=a.md,line=1,col=2,title=laconic-check project/plain::'utilise' (advisory)"
+        ));
+        assert!(text.contains(
+            "::warning file=b.md,line=2,col=3,title=laconic-check passive-voice::msg (advisory)"
+        ));
+    }
+
+    #[test]
+    fn crlf_lists_strip_trailing_cr_whilst_interior_cr_is_kept() {
+        assert_eq!(
+            listed("a.md\r\n\r\nb.md\r\na.md\r\n").unwrap(),
+            vec!["a.md", "b.md"]
+        );
+        assert_eq!(listed("two\rclean.md\r\n").unwrap(), vec!["two\rclean.md"]);
+        assert_eq!(
+            run(
+                "two\rclean.md\r\n",
+                "--only\r\nplain\r\n",
+                Path::new("missing"),
+                &mut Vec::new()
+            ),
+            2
+        );
     }
 
     #[test]

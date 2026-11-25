@@ -1731,7 +1731,19 @@ fn mask(chars: &[char], mask_quotes: bool) -> (Vec<char>, Vec<(usize, usize)>) {
             && chars.get(i + 1) == Some(&'(')
             && let Some(end) = find(chars, i + 2, |x| x == ')')
         {
-            blank(&mut out, i + 1, end + 1);
+            if let Some(open) = out[..i]
+                .iter()
+                .rposition(|&x| x == '[' || x == ']' || x == '\n')
+                .filter(|&pos| out[pos] == '[')
+            {
+                if open > 0 && out[open - 1] == '!' {
+                    out[open - 1] = ' ';
+                }
+                out[open] = ' ';
+                blank(&mut out, i, end + 1);
+            } else {
+                blank(&mut out, i + 1, end + 1);
+            }
             i = end + 1;
             continue;
         }
@@ -2034,10 +2046,10 @@ fn check_line(masked: &[char], line: usize, findings: &mut Vec<Finding>) {
     }
     check_style_manual_forms(&lower, &text, line, findings);
     // Serial comma candidates: ", and" or ", or" with another comma earlier in the same clause.
-    for (k, window) in lower_chars.windows(6).enumerate() {
-        let text: String = window.iter().collect();
-        let is_and = text.starts_with(", and ");
-        let is_or = text.starts_with(", or ");
+    for k in 0..lower_chars.len() {
+        let tail = &lower_chars[k..];
+        let is_and = tail.starts_with(&[',', ' ', 'a', 'n', 'd', ' ']);
+        let is_or = tail.starts_with(&[',', ' ', 'o', 'r', ' ']);
         if !(is_and || is_or) {
             continue;
         }
@@ -2537,11 +2549,7 @@ fn check_style_manual_forms(lower: &str, text: &str, line: usize, findings: &mut
                     .is_some_and(|j| ordinal(&core(tokens[j].1)));
             // 'Friday the 13th may be rooted in fear': the month takes a capital, the verb
             // doesn't, so 'the 1st May meeting' is still a date. `lower` has lost the case.
-            let modal = month == "may"
-                && text
-                    .split_whitespace()
-                    .nth(i)
-                    .is_some_and(|w| w.contains("may"));
+            let modal = month == "may" && originals.get(i).is_some_and(|w| w.contains("may"));
             if (prev_day.is_some_and(ordinal) && !modal) || ordinal_of {
                 // '19th' or '19th of' becomes '19'; with 'of', only when nothing (such as an
                 // emphasis mark) stands between the 2 words.

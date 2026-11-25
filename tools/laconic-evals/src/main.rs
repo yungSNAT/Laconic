@@ -209,8 +209,12 @@ fn survival(command: Survival, out: &mut dyn Write, tools: &Tools) -> Result<u8,
             cases,
             reference,
             trials,
+            setups,
         } => {
-            let setups: BTreeSet<String> = fact_survival::SETUPS.map(str::to_owned).into();
+            let setups: BTreeSet<String> = setups
+                .unwrap_or_else(|| fact_survival::SETUPS.map(str::to_owned).into())
+                .into_iter()
+                .collect();
             let added = |source: &str, rewrite: &str| {
                 fact_survival::added_count(tools.checker, source, rewrite)
             };

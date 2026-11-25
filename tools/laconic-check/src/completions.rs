@@ -146,7 +146,7 @@ _laconic-check() {{
                         '--max-findings=[Fail only on more than n failing findings]:count:' \
                         '--warn[Never fail on findings]' \
                         '--commit-msg[Read each file as a Git commit message]' \
-                        '--config=[Read settings from this file instead of .laconic-check]:file:_files' \
+                        '--config=[Read settings from this file instead of laconic.toml or .laconic-check]:file:_files' \
                         '*:file:_files'
                     ;;
                 preserve)

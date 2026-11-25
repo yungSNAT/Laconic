@@ -120,8 +120,26 @@ fn ai_placeholder_catches_residue_brackets_and_todo_tbd() {
         rules_of("Finish the checklist TODO before sending."),
         ["ai-placeholder"]
     );
+    assert_eq!(rules_of("See [TODO]."), ["ai-placeholder"]);
+    assert_eq!(rules_of("See [TODO: add details]."), ["ai-placeholder"]);
+    assert_eq!(rules_of("See [TBD]."), ["ai-placeholder"]);
+    assert_eq!(rules_of("See [TBD - owner]."), ["ai-placeholder"]);
+    assert_eq!(rules_of("See [insert TODO here]."), ["ai-placeholder"]);
+    assert_eq!(rules_of("See [TODO and finish."), ["ai-placeholder"]);
+    assert_eq!(rules_of("See [see TODO]."), ["ai-placeholder"]);
     assert!(!rules_of("Run `TODO` and `[insert x]` in code.").contains(&"ai-placeholder"));
     assert!(!rules_of("Check the todo list tomorrow.").contains(&"ai-placeholder"));
+    for clean in [
+        "Click [Add details](https://example.com) to continue.",
+        "Open [Your profile](https://example.com/profile) to edit settings.",
+        "Read [the house color guide](https://example.com/guide).",
+    ] {
+        assert!(
+            !rules_of(clean).contains(&"ai-placeholder"),
+            "unexpected flag in {clean:?}: {:?}",
+            rules_of(clean)
+        );
+    }
 }
 
 #[test]
@@ -191,4 +209,43 @@ fn substrings_ending_in_per_or_of_do_not_anchor_magnitudes() {
             rules_of(unanchored)
         );
     }
+}
+
+#[test]
+fn markdown_links_labelled_todo_or_tbd_do_not_trigger_ai_placeholder() {
+    assert!(
+        !rules_of("See [TODO](https://example.com) for the board.").contains(&"ai-placeholder")
+    );
+    assert!(
+        !rules_of("Open [TBD](https://example.com) and [Add details](https://example.com).")
+            .contains(&"ai-placeholder")
+    );
+    let mixed = rules_of("See [TODO](https://example.com) and TODO later.");
+    assert_eq!(
+        mixed.iter().filter(|&&r| r == "ai-placeholder").count(),
+        1,
+        "only standalone prose TODO should flag: {mixed:?}"
+    );
+    let mixed_tbd = rules_of("See [TBD](https://example.com) and TBD next week.");
+    assert_eq!(
+        mixed_tbd.iter().filter(|&&r| r == "ai-placeholder").count(),
+        1,
+        "only standalone prose TBD should flag: {mixed_tbd:?}"
+    );
+    let count = |text: &str| {
+        rules_of(text)
+            .iter()
+            .filter(|&&r| r == "ai-placeholder")
+            .count()
+    };
+    assert_eq!(count("See ![TBD](img.png) above."), 0);
+    assert_eq!(count("See [TODO](url \"Title\") later."), 0);
+    // Escaped brackets render as literal text, so no link hides the placeholder.
+    assert_eq!(count(r"See \[TODO\](https://example.com) later."), 1);
+    assert_eq!(count(r"See \[TODO](https://example.com) later."), 1);
+    assert_eq!(count(r"See [TODO\](https://example.com) later."), 1);
+    // An even run of backslashes escapes itself, so the bracket still opens a link.
+    assert_eq!(count(r"See \\[TODO](https://example.com) later."), 0);
+    // A destination with a space and no title is not a link.
+    assert_eq!(count("See [TODO](see below) later."), 1);
 }

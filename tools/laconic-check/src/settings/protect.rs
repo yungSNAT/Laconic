@@ -37,37 +37,14 @@ impl CompiledPhrase {
     }
 
     fn match_at(&self, text: &[char], start: usize) -> Option<usize> {
-        if self.starts_word && start > 0 && is_word_char(text, start - 1) {
-            return None;
-        }
-        let mut at = start;
-        for &p in &self.chars {
-            let &c = text.get(at)?;
-            if p == ' ' {
-                if !c.is_whitespace() {
-                    return None;
-                }
-                while text.get(at).is_some_and(|ch| ch.is_whitespace()) {
-                    at += 1;
-                }
-                continue;
-            }
-            let same = if apostrophe(p) {
-                apostrophe(c)
-            } else if self.exact {
-                c == p
-            } else {
-                c.to_lowercase().eq(p.to_lowercase())
-            };
-            if !same {
-                return None;
-            }
-            at += 1;
-        }
-        if self.ends_word && is_word_char(text, at) {
-            return None;
-        }
-        Some(at)
+        match_phrase(
+            text,
+            start,
+            self.chars.iter().copied(),
+            self.exact,
+            self.starts_word,
+            self.ends_word,
+        )
     }
 }
 
@@ -125,13 +102,54 @@ fn apostrophe(c: char) -> bool {
     c == '\'' || c == '\u{2019}'
 }
 
-fn is_word_char(text: &[char], at: usize) -> bool {
+pub(crate) fn is_word_char(text: &[char], at: usize) -> bool {
     let alphanumeric = |i: usize| text.get(i).is_some_and(|c| c.is_alphanumeric());
     text.get(at).is_some_and(|&c| {
         c.is_alphanumeric()
             || c == '-'
             || (apostrophe(c) && at > 0 && alphanumeric(at - 1) && alphanumeric(at + 1))
     })
+}
+
+pub(crate) fn match_phrase(
+    text: &[char],
+    start: usize,
+    phrase: impl Iterator<Item = char>,
+    exact: bool,
+    starts_word: bool,
+    ends_word: bool,
+) -> Option<usize> {
+    if starts_word && start > 0 && is_word_char(text, start - 1) {
+        return None;
+    }
+    let mut at = start;
+    for p in phrase {
+        let &c = text.get(at)?;
+        if p == ' ' {
+            if !c.is_whitespace() {
+                return None;
+            }
+            while text.get(at).is_some_and(|ch| ch.is_whitespace()) {
+                at += 1;
+            }
+            continue;
+        }
+        let same = if apostrophe(p) {
+            apostrophe(c)
+        } else if exact {
+            c == p
+        } else {
+            c.to_lowercase().eq(p.to_lowercase())
+        };
+        if !same {
+            return None;
+        }
+        at += 1;
+    }
+    if ends_word && is_word_char(text, at) {
+        return None;
+    }
+    Some(at)
 }
 
 /// Strips an unquoted `# ...` comment to the end of a single line, respecting quoted strings
@@ -306,8 +324,16 @@ pub(crate) fn normalise_phrase_text(decoded: &str) -> Result<String, String> {
 pub(crate) fn protected_spans(phrases: &[CompiledPhrase], line: &str) -> Vec<(usize, usize)> {
     let text: Vec<char> = line.chars().collect();
     let mut spans = Vec::new();
-    for phrase in phrases {
-        for start in 0..text.len() {
+    for start in 0..text.len() {
+        if text[start].is_whitespace() {
+            continue;
+        }
+        let word_start =
+            text[start].is_alphanumeric() && (start == 0 || !is_word_char(&text, start - 1));
+        for phrase in phrases {
+            if phrase.starts_word && !word_start {
+                continue;
+            }
             if let Some(end) = phrase.match_at(&text, start) {
                 spans.push((start, end));
             }

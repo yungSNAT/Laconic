@@ -1,7 +1,7 @@
 // Copyright 2026 Ryan Duguid
 // SPDX-License-Identifier: Apache-2.0
 
-//! The steps of the dated benchmark runs in `evals/runs/`, which each run's `run.sh` calls:
+//! The steps of the dated benchmark runs once in `evals/runs/` (withdrawn; Git history at `8c7fcd12`), which each run's `run.sh` called:
 //! the runner configurations, the answer files, one row per answer or rewrite, and the
 //! published figures recomputed from those rows. Each writes the bytes the run's Python wrote.
 

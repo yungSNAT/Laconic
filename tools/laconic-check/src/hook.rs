@@ -20,7 +20,7 @@ const LISTED: usize = 50;
 /// What the hook prints for a Stop event, if anything: a block decision with `lint`'s failing
 /// findings in the uncommitted Markdown of the repository that holds the event's `cwd`.
 /// Nothing when the turn already continued for a Stop hook, outside a Git repository, or when
-/// `lint` would pass, which applies the `.laconic-check` file at the repository's top level.
+/// `lint` would pass, which applies the `laconic.toml` or `.laconic-check` file at the repository's top level.
 pub fn stop(input: &str) -> Result<Option<String>, String> {
     let event = mcp::parse(input)
         .filter(|event| matches!(event, Json::Object(_)))
@@ -81,7 +81,7 @@ fn failing(root: &Path, file: &Path, settings: &Settings) -> Result<Vec<String>,
 }
 
 /// The block decision for these findings, listing the first LISTED.
-fn decision(failing: &[String]) -> String {
+pub fn decision(failing: &[String]) -> String {
     let mut reason = format!(
         "laconic-check lint found {} in uncommitted Markdown. Each is a reason to look, not \
          proof of a defect; each rule is described under its name in {}. Fix the ones that are \
@@ -163,7 +163,7 @@ fn settings(root: &Path) -> Result<Settings, String> {
 /// added, changed or untracked; a deleted file has nothing to lint.
 // shortcut: this is all uncommitted Markdown, not only what the agent changed this turn, which
 // would need the transcript; a user's own unfinished edits are linted too.
-fn markdown(status: &[u8]) -> Result<Vec<PathBuf>, String> {
+pub fn markdown(status: &[u8]) -> Result<Vec<PathBuf>, String> {
     status
         .split(|&b| b == 0)
         .filter_map(|entry| {

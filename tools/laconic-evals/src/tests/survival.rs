@@ -241,4 +241,40 @@ fn report_summarises_every_planned_setup() {
         &tools,
     );
     assert!(status.is_err());
+
+    let custom_scores = dir.path().join("custom_scores.jsonl");
+    let custom_responses = dir.path().join("custom_responses.jsonl");
+    let custom = ["alpha", "beta"];
+    write_rows(
+        &custom_scores,
+        &custom.map(
+            |s| json!({"setup": s, "case_id": "c", "trial": 1, "verdicts": marks, "invented": []}),
+        ),
+    );
+    write_rows(
+        &custom_responses,
+        &custom.map(|s| json!({"runner": s, "case_id": "c", "trial": 1, "response": "one"})),
+    );
+    let (status, printed) = call(
+        &[
+            "fact-survival",
+            "report",
+            &arg(&custom_scores),
+            &arg(&custom_responses),
+            "--cases",
+            &arg(&cases),
+            "--reference",
+            "alpha",
+            "--trials",
+            "1",
+            "--setups",
+            "alpha",
+            "beta",
+        ],
+        &tools,
+    );
+    assert_eq!(status, Ok(0));
+    let custom_summary = crate::cases::parse(&printed).unwrap();
+    assert_eq!(custom_summary.as_object().unwrap().len(), 2);
+    assert!(custom_summary.get("beta").is_some());
 }

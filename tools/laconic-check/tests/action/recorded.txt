@@ -107,8 +107,9 @@ laconic-check: many/0-fault.md:3:5: us-spelling: 'color': Australian form is 'co
 ::error file=many/0-fault.md,line=3,col=5,title=laconic-check us-spelling::'color': Australian form is 'colour'
 laconic-check: many/z-fault.md:3:5: us-spelling: 'color': Australian form is 'colour'
 ::error file=many/z-fault.md,line=3,col=5,title=laconic-check us-spelling::'color': Australian form is 'colour'
-== a_project_rule_is_printed_not_annotated 1
+== a_project_rule_is_annotated 1
 laconic-check: rule.md:1:4: project/plain: 'utilise': the project file prefers 'use'
+::error file=rule.md,line=1,col=4,title=laconic-check project/plain::'utilise': the project file prefers 'use'
 == config_option_names_the_project_file 1
 laconic-check: two.md:1:5: us-spelling: 'color': Australian form is 'colour'
 ::error file=two.md,line=1,col=5,title=laconic-check us-spelling::'color': Australian form is 'colour'

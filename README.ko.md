@@ -21,17 +21,15 @@
 
 Laconic은 코딩 에이전트와 채팅 어시스턴트를 위한 AI 'humanizer'(휴머나이저)이자 'no AI slop'(AI 군더더기 없음) 스킬입니다. 모델이 답을 먼저 말하고, 확인하지 않은 것을 표시하며, 답이 완성되면 멈추게 합니다. 또한 독자에게 필요한 모든 사실, 단계, 단서를 지키라고 지시합니다. 모든 원문 문장을 Australian Government Style Manual에 따라 쓰되, 스킬에 적힌 자체 규칙을 우선하도록 지시합니다.
 
-AI가 쓴 글을 사람이 쓴 글처럼 바꾸려면 에이전트에게 휴머나이즈해 달라고 요청하세요. 산문 스킬은 AI 글쓰기 패턴을 없애고, 모든 사실, 숫자, 단서를 지키도록 작성되어 있으며, 꾸며 낸 개성으로 부풀리지 않고 글을 더 짧게 만듭니다. 이 약속을 검증하는 [사실 보존 벤치마크](evals/README.md#fact-survival-benchmark)는 아직 결과가 나오지 않았습니다. 2026년 11월 14일 공개 텍스트 99개에서, Laconic 작성자가 실행한 [외부 단위 대조 검사기](#fact-changes-on-a-public-set)는 모델에 따라 Laconic의 재작성이 `humanizer`와 비슷하거나 더 자주 숫자, 날짜, 이름, 인용을 잃는다는 것을 발견했습니다. 어느 차이도 0과 뚜렷이 구분되지 않습니다.
+AI가 쓴 글을 사람이 쓴 글처럼 바꾸려면 에이전트에게 휴머나이즈해 달라고 요청하세요. 산문 스킬은 AI 글쓰기 패턴을 없애고, 모든 사실, 숫자, 단서를 지키도록 작성되어 있으며, 꾸며 낸 개성으로 부풀리지 않고 글을 더 짧게 만듭니다. 이 약속을 검증하는 [사실 보존 벤치마크](evals/README.md#fact-survival-benchmark)는 아직 결과가 나오지 않았습니다.
 
 <table>
 <tr>
-<td align="center" width="33%"><h3>5점 만점에 4.92</h3>휴머나이즈 품질, 상대는 4.54와 4.50<br><sub><a href="#against-other-humanisers">중립 루브릭, 텍스트 20개, 블라인드 심사</a></sub></td>
-<td align="center" width="33%"><h3>원문 길이의 65%</h3>두 경쟁 도구는 모두 81%<br><sub><a href="#against-other-humanisers">길이만 비교, 사실 검사는 같은 표에 함께 제시</a></sub></td>
 <td align="center" width="33%"><h3>4.63 대 4.07</h3>단순한 'Answer concisely.'와 비교<br><sub><a href="#evaluation">자체 루브릭, 사례 45개, 차단 결함 6개 대 29개</a></sub></td>
 </tr>
 </table>
 
-3개 수치 모두 2026년 10월 20일 Laconic 자체 평가 도구에서 생성 모델 하나로 얻었습니다. 한계와 재실행 명령은 [평가](#evaluation)에 있습니다.
+이 수치는 2026년 10월 20일 Laconic 자체 평가 도구에서 생성 모델 하나로 얻었습니다. 한계와 재실행 명령은 [평가](#evaluation)에 있습니다.
 
 <a id="install"></a>
 ## 설치
@@ -59,16 +57,6 @@ npx skills add yungSNAT/laconic --global --agent "*" --yes
 ## 사용
 
 에이전트를 다시 시작한 뒤 `/laconic`을 입력하세요. 'stop laconic'이라고 말할 때까지 세션 동안 켜져 있습니다.
-
-<a id="when-to-choose-something-else"></a>
-## 다른 도구를 고를 때
-
-- **토큰 비용이 가장 중요하다면:** [caveman](https://github.com/JuliusBrussee/caveman)은 그 목적으로 만들어졌고 에이전트가 읽는 내용도 압축합니다. [Chisle](https://github.com/JayPokale/Chisle)은 출력 토큰을 그보다도 더 적게 씁니다. Laconic의 사례 47개에서([토큰 비용](#token-cost-against-caveman-and-chisle), 2026년 11월 17일) Laconic의 간결 규칙은 caveman보다 출력 토큰을 14%, Chisle보다 44% 더 썼습니다. 세션에서처럼 규칙을 프롬프트 캐시에서 읽으면 답변 하나의 비용이 caveman보다 17%, Chisle보다 45% 더 들었습니다. 매번 규칙을 캐시에 쓰는 단일 콜드 호출에서는 caveman보다 11% 적게(caveman의 규칙이 더 깁니다), Chisle보다 5% 더 들었습니다. 세션 모드는 작업당 간결 규칙보다 약 27% 더 들었습니다.
-- **다른 영어 변형이 필요하다면:** Laconic은 호주 영어로만 씁니다. [LanguageTool](https://github.com/languagetool-org/languagetool)은 글을 쓴 뒤 호주, 영국, 캐나다, 뉴질랜드, 남아프리카, 미국 영어의 문법과 문체를 검사합니다.
-- **세부 내용을 덧붙이는 재작성을 받아들인다면:** [humanizer](https://github.com/blader/humanizer) 4.0.0(2026년 11월 10일)은 글이 일반적인 곳에서 모델에게 'add a specific detail you know to be true'라고 지시합니다. Laconic은 사실을 덧붙이지 않으며, `laconic-check preserve --strict`는 보호 대상인 수치, URL, 인용 등을 추가한 편집을 실패 처리합니다.
-- **글쓰기 안내만 원한다면:** Laconic의 글쓰기 안내가 바탕으로 삼은 [No AI Slop](https://github.com/petergyang/no-ai-slop)은 응답 규칙과 호주 영어 없이 그 안내를 제공합니다.
-- **Microsoft Word에서 편집한다면:** [PerfectIt](https://www.perfectit.com/)은 Australian Government Style용을 포함한 스타일 시트에 맞춰 Word에서 일관성을 검사합니다. Laconic은 Word가 아니라 에이전트, 채팅 어시스턴트, CI에서 동작합니다.
-- **자체 하우스 스타일을 CI에서 검사하고 싶다면:** [Vale](https://github.com/vale-cli/vale)은 정규 표현식, 규칙 유형, 패키지로 직접 구성한 규칙에 따라 산문을 검사합니다. `laconic-check`는 Laconic의 규칙에 프로젝트 자체의 단어 치환과 금지 문구를 더할 뿐입니다.
 
 <a id="what-changes"></a>
 ## 달라지는 점
@@ -173,105 +161,7 @@ Laconic은 단순 지시보다 가중 점수가 0.56 높습니다. 변경은 심
 
 </details>
 
-한계: 생성 모델 하나에서 나온 구성당 답변 18~90개입니다. 사례는 `evals/cases.jsonl`, 루브릭은 `evals/rubric.md`에 있습니다. 이 사례들은 규칙 문구를 다듬는 데도 쓰였으므로 점수는 보류 데이터 시험이 아닙니다. 아래의 Claude Code Concise 스타일 비교는 2026년 11월 1일에 작성되어 규칙 조정에 쓰이지 않은 `evals/holdout-cases.jsonl`의 고정 사례 10개를 씁니다. 연속 쉼표가 여전히 가장 흔한 실수입니다.
-
-<a id="against-claude-codes-concise-style"></a>
-### Claude Code의 Concise 스타일과 비교
-
-2026년 11월 17일, 3개 구성이 보류 사례 10개에 각 3회씩 답했고, Claude Code 2.1.325에서 도구 없이 Claude Opus 5.5(`claude-opus-5-5`, high effort)가 생성하고 심사했습니다. 3개 구성은 Laconic의 간결 규칙, Claude Code 내장 Concise 출력 스타일(`"outputStyle": "Concise"`), 단순 지시 'Answer concisely.'입니다. 심사자는 사례마다 답변 3개를 섞은 글자 아래 함께 보았으며, 구성 이름은 몰랐지만 문체는 볼 수 있었습니다. 두 번 심사했습니다. 한 번은 문체를 채점하지 말라는 `evals/rubric-correctness.md`에 따라 정확성만, 한 번은 손으로 표시한 보정 답변 10개 모두와 일치한 뒤 Laconic 자체 루브릭 `evals/rubric.md`에 따라 심사했습니다.
-
-| 지표 | Laconic | Concise 스타일 | 'Answer concisely.' |
-| --- | --- | --- | --- |
-| 정확성, 문체 제외(1~5) | 4.80 | 4.27 | 4.47 |
-| Concise 스타일과의 차이(95% 구간) | +0.53 (0.00 ~ +1.17) | | +0.20 (−0.13 ~ +0.53) |
-| 차단 결함, 문체 제외 | 0 | 4 | 1 |
-| 가중 점수, Laconic 자체 루브릭(1~5) | 4.69 | 4.06 | 4.11 |
-| Concise 스타일과의 차이(95% 구간) | +0.63 (+0.29 ~ +1.00) | | +0.05 (−0.10 ~ +0.22) |
-| 차단 결함, Laconic 자체 루브릭 | 1 | 13 | 10 |
-| `laconic-check` 0.5.0 지적 없는 답변 | 30개 중 24 | 30개 중 16 | 30개 중 13 |
-| 통과한 정규식 검사 | 12개 중 9 | 12개 중 9 | 12개 중 9 |
-| 평균 답변 길이(문자) | 782 | 614 | 627 |
-| 평균 출력 토큰, 사고 포함 | 475 | 327 | 298 |
-| 답변당 평균 비용, 콜드 호출 1회, Claude Code 보고 기준 | US$0.022 | US$0.019 | US$0.016 |
-| 이에 대한 Laconic의 비용(95% 구간) | | 1.18배 (1.07 ~ 1.29) | 1.39배 (1.30 ~ 1.50) |
-
-Laconic 자체 루브릭은 Laconic만 요구하는 호주 영어와 자체 세부 규칙을 채점하며, 심사자는 이를 가중 점수뿐 아니라 정확성과 차단 결함에도 적용했습니다. 따라서 심사 행 가운데 문체에 중립적인 것은 처음 3개뿐입니다. 정확성만 보면 Laconic이 Concise 스타일보다 0.53 높았지만, 사례 10개에서는 구간이 차이 없음에 닿으므로 뚜렷한 우위가 아닙니다. 차단 결함은 Laconic이 0개, Concise 스타일이 4개였습니다. 첫 심사 메모에 따르면 Concise 스타일은 급여 이메일 3건 중 2건에서 2026년 11월 26일 또는 28일의 요일을 틀리고 세 번째에서는 마감일을 묻어 버렸으며, 검토 메모 3건 중 2건에서 작업이 확인하지 않은 테스트 커버리지를 주장하고, 감사 대상 텍스트를 한 번 잘못 인용했습니다. 'Answer concisely.'도 비슷한 실수를 했습니다. Laconic은 Concise 스타일보다 출력 토큰을 46% 더 썼고 답변당 비용이 18% 더 들었습니다. 3개 구성 모두 Laconic 규칙이 자체 하이픈을 요구하는 '2026–27'에서 Style Manual의 엔 대시를 유지해 그 사례의 정규식 검사에 실패했습니다.
-
-한계: 모델 하나가 생성하고 같은 모델이 심사한 구성당 답변 30개이며, 사례는 Laconic 작성자가 썼습니다. 문체 제외 심사에는 보정 세트가 없었습니다. 각 구간은 사례 10개를 다시 표집합니다(10,000회, 시드 2282). 각 호출이 프롬프트를 프롬프트 캐시에 썼으므로 비용 행은 단일 콜드 호출 기준입니다. 세션에서처럼 규칙이 캐시되어 있으면 Laconic의 추가 출력이 더 크게 작용할 가능성이 있지만, 이 실행은 이를 측정하지 않았습니다. Claude Code와 Concise 스타일은 소프트웨어 엔지니어링 세션용이며, 이 사례들은 대부분 글쓰기와 조언 작업입니다. 실행 스크립트, 답변별 점수, 토큰 수와 비용, 이 표를 다시 계산하는 스크립트는 [`evals/runs/concise-style-2026-11-17`](evals/runs/concise-style-2026-11-17/)에 있으며, 답변 자체는 저장하지 않습니다.
-
-<a id="token-cost-against-caveman-and-chisle"></a>
-### caveman, Chisle과의 토큰 비용 비교
-
-2026년 11월 17일, 3개 규칙 세트가 `evals/cases.jsonl`의 사례 47개 모두에 답했고, Claude Code 2.1.325에서 도구 없이 Claude Opus 5.5(`claude-opus-5-5`, high effort)가 생성하고 심사했습니다. 3개 규칙 세트는 Laconic의 간결 규칙, [caveman](https://github.com/JuliusBrussee/caveman) 4.1.0의 `skills/caveman/SKILL.md`, [Chisle](https://github.com/JayPokale/Chisle) 3.12.1의 `skills/chisle/SKILL.md`이며, 각각 front matter를 뺀 채 시스템 프롬프트 뒤에 붙였습니다. 콜드 호출(2회 시행)은 각각 새 작업 디렉터리에서 실행되어 규칙을 프롬프트 캐시에 썼습니다. 캐시 호출(1회 시행, 심사 안 함)은 준비 호출 뒤 한 디렉터리에서 실행되어 한 세션의 호출처럼 규칙을 캐시에서 읽었습니다. 심사자는 사례마다 콜드 답변 3개를 섞은 글자 아래 함께 보았고, 프롬프트에는 규칙 세트 이름이 없었습니다. 다만 문체는 볼 수 있었고, Laconic 답변 94개 중 3개가 Laconic을 언급했습니다(2개는 작업 디렉터리를 인용해서, 1개는 스킬 이름을 대서). 두 번 심사했습니다. 한 번은 문체를 채점하지 말라는 `evals/rubric-correctness.md`에 따라 정확성만, 한 번은 Laconic 자체 루브릭 `evals/rubric.md`에 따라 심사했습니다.
-
-| 지표 | Laconic | caveman | Chisle |
-| --- | --- | --- | --- |
-| 평균 출력 토큰, 사고 포함, 콜드 호출 | 745 | 655 | 516 |
-| 이에 대한 Laconic의 출력 토큰(95% 구간) | | 1.14배 (1.04 ~ 1.27) | 1.44배 (1.27 ~ 1.68) |
-| 평균 입력 토큰, 콜드 호출 | 3,218 | 4,285 | 3,861 |
-| 평균 출력 토큰, 사고 포함, 캐시 호출 | 780 | 637 | 492 |
-| 답변당 평균 비용, 캐시에서 규칙 읽음 | US$0.018 | US$0.016 | US$0.013 |
-| 이에 대한 Laconic의 비용, 캐시에서 규칙 읽음(95% 구간) | | 1.17배 (1.05 ~ 1.29) | 1.45배 (1.25 ~ 1.61) |
-| 답변당 평균 비용, 콜드 호출 1회, 캐시 쓰기 포함 | US$0.028 | US$0.031 | US$0.026 |
-| 이에 대한 Laconic의 비용, 콜드 호출(95% 구간) | | 0.89배 (0.83 ~ 0.94) | 1.05배 (0.96 ~ 1.15) |
-| 평균 답변 길이(문자), 콜드 호출 | 1,297 | 1,198 | 977 |
-| 정확성, 문체 제외(1~5) | 4.68 | 4.44 | 4.38 |
-| Laconic의 차이(95% 구간) | | +0.24 (+0.06 ~ +0.45) | +0.30 (+0.10 ~ +0.53) |
-| 차단 결함, 문체 제외 | 2 | 5 | 7 |
-| 가중 점수, Laconic 자체 루브릭(1~5) | 4.63 | 4.11 | 4.11 |
-| 차단 결함, Laconic 자체 루브릭 | 8 | 43 | 44 |
-| 통과한 정규식 검사, 콜드 호출 | 18개 중 18 | 18개 중 16 | 18개 중 16 |
-| `laconic-check` 0.5.0 지적 없는 답변, 콜드 호출 | 94개 중 70 | 94개 중 36 | 94개 중 39 |
-
-Laconic이 가장 많이 썼습니다. caveman보다 출력 토큰이 14%, Chisle보다 44% 많았습니다. 콜드 호출에서는 caveman의 더 긴 규칙을 캐시에 쓰는 비용이 Laconic의 추가 출력보다 커서 Laconic의 답변이 11% 쌌습니다. 세션에서처럼 규칙을 캐시에서 읽으면 Laconic의 추가 출력 때문에 답변이 caveman보다 17%, Chisle보다 45% 비쌌습니다. 정확성만 보면 Laconic이 caveman보다 0.24, Chisle보다 0.30 앞섰습니다. Laconic의 문체 제외 차단 결함 2개는 산술 오류 하나와 RFC 7636 테스트 값 오인용 하나였습니다. Laconic 자체 루브릭은 두 경쟁 도구 모두 요구하지 않는 호주 영어와 자체 세부 규칙도 정확성과 차단 결함으로 채점했고, 그 기준에서 경쟁 도구들의 차단 결함 대부분은 연속 쉼표, 큰따옴표, 글자로 쓴 숫자, 미국식 철자에 관한 것입니다. 그 심사에서 두 경쟁 도구 모두 일반적인 소요 기간을 금지한 사례의 두 답변 모두에서 그것을 제시했지만 Laconic은 제시하지 않았습니다. Laconic의 차단 결함에는 도구가 없다는 말을 듣고 작업이 접근 가능하다고 한 파일을 편집하지 않은 답변 하나(Chisle 답변 하나도 마찬가지), 중대한 산술 오류가 있는 답변 하나, 작업이 금지한 한계 고지를 덧붙인 답변 2개가 포함됩니다.
-
-한계: 모델 하나가 생성하고 같은 모델이 심사했으며, 사례는 Laconic의 규칙 문구를 다듬는 데도 쓰였습니다. 문체 제외 심사에는 보정 세트가 없었습니다. 토큰과 비용 수치는 Claude Code가 호출마다 보고한 값입니다. caveman 자체 평가는 시스템 프롬프트를 스킬로 대체하지만, 이 실행은 뒤에 붙였습니다. 두 경쟁 도구의 입력 압축은 시험하지 않았고, 둘 다 자체 프롬프트와 모델로 얻은 수치를 공개하며 이 실행은 그것을 재현하지 않습니다. 구간은 사례 47개를 다시 표집합니다(10,000회, 시드 2282). 실행 스크립트, 답변별 점수, 토큰 수와 비용, 이 표를 다시 계산하는 스크립트는 [`evals/runs/token-cost-2026-11-17`](evals/runs/token-cost-2026-11-17/)에 있으며, 답변 자체는 저장하지 않습니다.
-
-<a id="against-other-humanisers"></a>
-### 다른 휴머나이저와 비교
-
-2026년 10월 20일, 설치된 3개 구성이 호주 독자를 위해 AI가 쓴 텍스트 20개(`evals/humanise-cases.jsonl`: 고객 이메일, PR 설명, 릴리스 노트, 이사회 보고서, 채용 공고 등)를 휴머나이즈했고, 각 2회 시행으로 Claude Opus 5.5가 생성하고 블라인드 심사했습니다. 각 구성은 Skill과 Read 도구와 함께 자기 스킬만 가졌고 그것을 쓰라고 지시받았습니다. Laconic의 산문 스킬(커밋 `c7e3048`), [humanizer](https://github.com/blader/humanizer)(커밋 `8c307f3`), [avoid-ai-writing](https://github.com/conorbronsdon/avoid-ai-writing)(커밋 `cb16d10`)입니다.
-
-| 지표 | Laconic | `humanizer` | `avoid-ai-writing` |
-|---|---|---|---|
-| 가중 점수, 중립 루브릭(1~5) | 4.92 | 4.54 | 4.50 |
-| 가중 점수, 자체 루브릭 | 4.87 | 4.50 | 4.42 |
-| 정확성, 중립 루브릭 | 4.80 | 4.13 | 4.18 |
-| 간결성, 중립 루브릭 | 4.95 | 4.20 | 3.95 |
-| 차단 결함 | 0 | 0 | 0 |
-| 통과한 정규식 사실 및 패턴 검사(아래 참고) | 40개 중 40 | 40개 중 40 | 40개 중 35 |
-| 원문 대비 평균 길이, 단어 기준 | 65% | 81% | 81% |
-| 텍스트당 avoid-ai-writing 탐지기 지적(원문: 2.6) | 0.03 | 0 | 0.05 |
-| 텍스트당 dslop 지적, 리듬 지표 포함(원문: 1.80) | 0.50 | 0.83 | 0.63 |
-| 텍스트당 `laconic-check` 0.1.0 지적(원문: 1.85) | 0.15 | 0.45 | 0.28 |
-| 텍스트 40개 생성 비용 | $4.54 | $5.84 | $15.78 |
-
-Laconic의 자체 세부 규칙(숫자, 연속 쉼표, 엠 대시)은 빼되 호주식 철자는 여전히 요구하는 중립 루브릭에서 Laconic은 가중 점수로 `humanizer`보다 0.38, `avoid-ai-writing`보다 0.43 앞섭니다. 두 시행과 함께 텍스트 20개를 다시 표집하는 대응 부트스트랩의 95% 구간은 +0.26 ~ +0.51과 +0.26 ~ +0.59입니다. 그 세부 규칙을 루브릭에서 빼도 우위는 유지됩니다. 다른 구성에 대한 심사 메모에는 자기소개서에 덧붙인 경력, 보조금 신청서에서 추론해 낸 달러 금액처럼 원문에 없던 내용이 있습니다. 이 표본에서 3개 구성 모두 이 탐지기들의 지적을 원문 수준보다 훨씬 낮췄습니다.
-
-<details>
-<summary>정규식 검사를 수정한 방법</summary>
-
-충실한 바꿔 쓰기('in stages', 'a second person will check', 'five to seven', 'Don't install any personal')로 실패한 답변을 살펴본 뒤 정규식 검사 4개를 넓혔습니다. 수정한 같은 검사를 모든 구성에 적용했으며, 표는 수정 후 결과입니다. 변경 전에는 40개 중 Laconic이 37개, `humanizer`가 34개를 통과했습니다. `laconic-check` 행은 버전 0.1.0 결과이며, 이후 버전은 규칙을 더해 더 많은 지적을 셉니다.
-
-</details>
-
-한계: 생성 모델 하나에서 나온 구성당 텍스트 40개이고, 같은 모델 계열이 이 프롬프트 20개와 이 설치 구성으로 심사했습니다. 각 검사기는 작성자의 기준을 반영하며, `avoid-ai-writing` 탐지기는 그 스킬 자체의 엔진입니다. 정규식 검사 통과는 사실이 살아남았다는 부분적 증거일 뿐, 모든 단서가 살아남았다는 증명이 아닙니다. 재실행 명령은 [evals/README.md](evals/README.md)에 있습니다.
-
-<a id="fact-changes-on-a-public-set"></a>
-### 공개 세트에서의 사실 변화
-
-2026년 11월 14일, Laconic의 산문 스킬과 [humanizer](https://github.com/blader/humanizer) 4.0.0이 각각 [AI Humanizer Benchmark](https://huggingface.co/datasets/ai-humanizer-benchmark/ai-humanizer-benchmark)의 2026년 9월~11월 주기 공개 텍스트 99개를 각 2회씩, 서로 다른 모델로 2라운드에 걸쳐 재작성했습니다. 외부 검사기 [humanizer-fact-audit](https://github.com/zwang-devv/humanizer-fact-audit)는 원문의 숫자, 날짜, 인명이나 조직명, 3단어 이상 인용 가운데 하나 이상을 잃은 재작성을 셌습니다. 방법은 재작성 전에 커밋했습니다.
-
-| 라운드 | Laconic | `humanizer` | 차이(95% 구간) |
-|---|---|---|---|
-| Claude Opus 5.5 | 134개 중 18 (13.43%) | 134개 중 10 (7.46%) | +5.97포인트 (0.00 ~ +12.32) |
-| `gpt-6.1-sol` (Codex) | 134개 중 20 (14.93%) | 134개 중 20 (14.93%) | 0.00포인트 (−2.21 ~ +2.14) |
-
-Opus 5.5에서 Laconic은 `humanizer`보다 더 많은 재작성에서 단위를 잃었고(18 대 10), 모든 그룹에서 더 많이 잃었습니다. 숫자와 날짜 440개 중 9 대 5, 이름 164개 중 12 대 9, 인용 70개 중 5 대 0입니다. `gpt-6.1-sol`에서는 2개 스킬이 같았습니다. 어느 구간도 0을 배제하지 않으므로 어느 라운드도 뚜렷한 차이를 보이지 않습니다. Laconic의 재작성은 두 라운드 모두 더 짧았습니다. 원문 단어의 0.94와 0.90으로, 상대는 1.01과 0.93이었습니다.
-
-한계: 검사기는 단위를 대조하므로 인용을 무해하게 바꿔 쓴 것도 지적할 수 있고, 바뀐 조건, 부정, 지어낸 주장은 보지 못하므로 사실 충실도의 완전한 시험이 아닙니다. 텍스트 99개 중 32개에는 검사할 수 있는 단위가 없어, 비율은 스킬당 재작성 134개를 대상으로 합니다. 각 라운드는 모델 하나로 재작성했고 새 컨텍스트마다 텍스트 3개를 넣었습니다. 지시는 설치된 플러그인이 아니라 텍스트로 주었습니다. Opus 라운드는 Codex 라운드 뒤에 방법을 바꾸지 않고 추가했습니다. Laconic 작성자가 경쟁 도구를 고르고, 방법을 쓰고, 두 라운드를 실행했습니다. 고정한 리비전은 [evals/README.md](evals/README.md#public-set-fact-check)에 있습니다.
-
-2026년 11월 17일 Claude Opus 5.5가 2026-10 주기의 텍스트 33개를 각각 한 번씩, 호출당 텍스트 하나로 재작성했을 때, Laconic의 스킬은 단위가 있는 문서 20개 중 5개에서 단위를 바꿨고 `humanizer`도 같았습니다. avoid-ai-writing과 `work-humanizer`는 1개, `--verify`를 쓴 patina는 0개, 요청만 준 경우는 8개였고, 상용 휴머나이저 11개는 7~13개를 바꿨습니다. 텍스트당 재작성 1회는 스킬 간 차이를 보이기에 너무 적습니다([휴머나이저별](evals/README.md#by-humaniser)).
+한계: 생성 모델 하나에서 나온 구성당 답변 18~90개입니다. 사례는 `evals/cases.jsonl`, 루브릭은 `evals/rubric.md`에 있습니다. 이 사례들은 규칙 문구를 다듬는 데도 쓰였으므로 점수는 보류 데이터 시험이 아닙니다. 연속 쉼표가 여전히 가장 흔한 실수입니다.
 
 <a id="checker"></a>
 ## 검사기
@@ -309,18 +199,19 @@ Homebrew 포뮬러와 winget 매니페스트는 탭과 winget 카탈로그용으
 
 | 옵션 | 효과 |
 | --- | --- |
-| `--json` | JSON 객체 하나를 출력합니다. 각각 `file`, `line`, `column`, `rule`, `advisory`, `message`, `url`이 있는 `findings`, 그다음 `failing` 개수와 주석으로 `suppressed`된 지적 수입니다. |
-| `--sarif` | GitHub code scanning과 다른 SARIF 뷰어용 [SARIF 2.1.0](https://docs.oasis-open.org/sarif/sarif/v2.1.0/sarif-v2.1.0.html) 로그를 출력합니다. 모든 규칙을 설명과 링크와 함께 담고, 각 지적을 `warning` 수준(조언이면 `note`) 결과로 담습니다. 위치는 code scanning이 저장소 경로로 대응시키는 파일의 절대 `file` URI와, SARIF가 세는 방식대로 UTF-16 코드 단위의 열로 나타냅니다. `--json`과 함께 쓸 수 없으며, 0.6.0부터입니다. |
-| `--metrics` | 지적 사항 뒤에 각 파일의 문장 지표를 출력하고, 파일이 2개 이상이면 전체 지표도 출력합니다. `--json`에서는 `files`와 `overall`을 담은 `metrics` 객체를 더합니다. `--sarif`와 함께 쓸 수 없으며, 0.6.0 이후입니다. |
-| `--profile <name>` | 글의 용도별 프리셋을 적용합니다: `email`, `report`, `docs`, `chat`, `essay`. `.laconic-check`의 `profile = <name>` 줄도 같은 일을 하며, `--profile`이 그보다 우선합니다. 0.6.0 이후입니다. |
+| `--format <format>` | 출력 형식을 고릅니다: `text`(기본값), `json`(`--json`과 같음) 또는 `sarif`(`--sarif`와 같음). |
+| `--json` | `scope`('Checks house style, prose patterns and substance heuristics; never infers authorship.'), `findings`(각각 `file`, `line`, `column`, `rule`, `advisory`, `severity`, `confidence`, `message`, `url` 포함), `failing`, `suppressed`를 담은 JSON 객체 하나를 출력합니다. |
+| `--sarif` | GitHub code scanning과 다른 SARIF 뷰어용 [SARIF 2.1.0](https://docs.oasis-open.org/sarif/sarif/v2.1.0/sarif-v2.1.0.html) 로그를 출력합니다. 모든 규칙을 설명과 링크와 함께 담고, 각 지적을 `warning` 수준(조언이면 `note`) 결과로 담으며, 각 결과에는 `severity`와 `confidence` 속성이, 실행에는 `scope`가 붙습니다. 위치는 code scanning이 저장소 경로로 대응시키는 파일의 절대 `file` URI와, SARIF가 세는 방식대로 UTF-16 코드 단위의 열로 나타냅니다. `--json`과 함께 쓸 수 없으며, 0.6.0부터입니다. |
+| `--metrics` | 지적 사항 뒤에 각 파일의 문장 지표를 출력하고, 파일이 2개 이상이면 전체 지표도 출력합니다. `--json`에서는 `files`와 `overall`을 담은 `metrics` 객체를 더합니다. `--sarif`와 함께 쓸 수 없으며, 0.6.0부터입니다. |
+| `--profile <name>` | 글의 용도별 프리셋을 적용합니다: `email`, `report`, `docs`, `chat`, `essay`. `laconic.toml` 또는 `.laconic-check`의 `profile = <name>` 줄도 같은 일을 하며, `--profile`이 그보다 우선합니다. 0.6.0부터입니다. |
 | `--disable <rules>` | 이 규칙들의 지적을 버립니다. 쉼표로 구분하며 반복할 수 있습니다. |
 | `--only <rules>` | 이 규칙들의 지적만 남깁니다. `--disable`이 우선합니다. |
 | `--max-findings <n>` | 실패 지적이 n개를 넘을 때만 실패합니다(기본값 0). |
 | `--warn` | 지적 때문에 실패하지 않습니다. |
 | `--commit-msg` | 각 파일을 Git 커밋 메시지로 읽으며, 주석 줄과 가위 줄 아래는 제외합니다. |
-| `--config <file>` | `.laconic-check` 대신 이 파일에서 설정을 읽습니다. |
+| `--config <file>` | `laconic.toml` 또는 `.laconic-check` 대신 이 파일에서 설정을 읽습니다. |
 
-프로필은 어떤 규칙을 실행하고 어떤 규칙으로 실패할지를 바꿉니다. 프로필이 없으면 `lint`는 그대로입니다. `email`, `report`, `essay`는 [`unglossed-term`](docs/rules.md#unglossed-term)을 켭니다. 이 규칙은 'Full Name (ACR)'이나 'ACR stands for' 같은 설명이 앞에 없는 대문자 3~8자의 약어를 알리는 권고 규칙이며, 'BHP' 같은 널리 알려진 형태와 강조용 대문자 단어는 통과합니다. 모든 프로필은 다른 옵트인 규칙도 일부 켭니다. 어떤 규칙인지는 [docs/rules.md](docs/rules.md)의 각 규칙에 나옵니다. `--only unglossed-term`은 프로필 없이 이 규칙을 켭니다. 이 3개 프로필은 `stacked-hedge`로 실패하고, `email`과 `essay`는 `bold-label`, `essay`는 `clause-dashes`, `report`는 `hyphen-consistency`와 `acronym-before-definition`으로도 실패합니다. `chat`은 `stacked-hedge`, `bold-label`, `clause-dashes`로 실패하게 하고 `acronym-before-definition`과 `hyphen-consistency`를 뺍니다. `docs`는 `bold-label`과 `acronym-before-definition`을 빼고 `number-word`를 권고로 바꿉니다. 프로필 때문에 실패하게 된 지적은 메시지에서 '(advisory)'가 빠집니다.
+프로필은 어떤 규칙을 실행하고 어떤 규칙으로 실패할지를 바꿉니다. 프로필이 없으면 `lint`는 그대로입니다. `email`, `report`, `essay`는 [`unglossed-term`](docs/rules.md#unglossed-term)을 켭니다. 이 규칙은 'Full Name (ACR)'이나 'ACR stands for' 같은 설명이 앞에 없는 대문자 3~8자의 약어를 알리는 권고 규칙이며, 'BHP' 같은 널리 알려진 형태와 강조용 대문자 단어는 통과합니다. 모든 프로필은 다른 옵트인 규칙도 일부 켭니다. 어떤 규칙인지는 [docs/rules.md](docs/rules.md)의 각 규칙에 나옵니다. `--only unglossed-term`은 프로필 없이 이 규칙을 켭니다. 이 3개 프로필은 `stacked-hedge`로 실패하고, `email`과 `essay`는 `bold-label`, `essay`는 `clause-dashes`, `report`는 `hyphen-consistency`와 `acronym-before-definition`으로도 실패합니다. `chat`은 `stacked-hedge`, `bold-label`, `clause-dashes`로 실패하게 하고 `acronym-before-definition`과 `hyphen-consistency`를 뺍니다. `docs`는 `bold-label`과 `acronym-before-definition`을 빼고 `number-word`를 권고로 바꿉니다. 프로필은 5개의 옵트인 근거·채팅 상투어 규칙도 켭니다(0.6.0부터, 기본은 모두 권고): `email`은 `ai-placeholder`, `report`와 `essay`는 `unanchored-magnitude`, `unattributed-superlative`, `unnamed-evidence`, `ai-placeholder`, `docs`는 `unattributed-superlative`와 `ai-placeholder`, `chat`은 `ai-placeholder`를 켜고 `chat-filler`로 실패하게 합니다. 프로필 때문에 실패하게 된 지적은 메시지에서 '(advisory)'가 빠집니다.
 
 ```text
 $ printf 'Each member gets a QBR plan. This could potentially slip a week.\n' > memo.md
@@ -345,13 +236,23 @@ $ laconic-check lint --metrics notes.md
 metrics: notes.md: words=14 sentences=2 mean_word_len=5.43 long_words=35.7% nominalisations=14.3% triads=1 sentence_len=mean 7.0 / median 7.0
 ```
 
-`lint`를 실행하는 디렉터리의 `.laconic-check` 파일에는 `disable`, `only`, `max-findings`에 대한 `key = value` 줄과 `#` 주석 줄이 들어갑니다. `accept` 줄은 `us-spelling`이 지적하지 않을 글자만으로 된 단어를 나열하며, 각 단어는 같은 대소문자로 온전한 단어 단위로 대조됩니다. 그래서 `accept = color`여도 문장 첫머리의 'Color'는 계속 지적됩니다(0.6.0부터). 명령줄의 규칙은 목록에 더해지고, `--max-findings`는 개수를 대체합니다.
+`lint`를 실행하는 디렉터리의 `laconic.toml` 또는 `.laconic-check` 파일(`laconic.toml` 우선)에는 `disable`, `only`, `profile`, `accept`, `max_findings`(`.laconic-check`에서는 `max-findings`)에 대한 `key = value` 줄과 `#` 주석 줄이 들어갑니다. `accept` 줄은 `us-spelling`이 지적하지 않을 글자만으로 된 단어를 나열하며, 각 단어는 같은 대소문자로 온전한 단어 단위로 대조됩니다. 그래서 `accept = color`여도 문장 첫머리의 'Color'는 계속 지적됩니다(0.6.0부터). `[protect]` 절은 일치하는 범위에서 지적을 면제하는 작성자 문구(`phrases = [...]` 또는 한 줄에 한 문구)를 나열합니다(0.6.0부터). 명령줄의 규칙은 목록에 더해지고, `--max-findings`는 개수를 대체합니다.
 
 ```text
 # The CSS property names color and center are expected here.
 accept = color, center
 # This project uses serial commas.
 disable = serial-comma
+```
+
+```toml
+# laconic.toml uses TOML arrays, max_findings and [protect] phrase exemptions.
+accept = ["color", "center"]
+disable = ["serial-comma"]
+max_findings = 0
+
+[protect]
+phrases = ["deep dive"]
 ```
 
 설정 다음에 오는 `[rules]` 절에는 프로젝트 자체 규칙을 한 줄에 한 문구씩 씁니다. `id: phrase = replacement`는 대체어를 제안하고 `id: phrase =`는 문구를 금지합니다(0.6.0부터). 각 지적은 규칙을 `project/<id>`로 표시하며, `disable`, `only`, `--disable`, `--only`, 억제 주석이 이를 받습니다. 여러 줄이 같은 id를 쓸 수 있습니다. 문구는 글자와 숫자로 된 단어 하나 이상이며, 단어 안에는 하이픈이나 아포스트로피를 쓸 수 있습니다. 산문에서 온전한 단어 단위로, 줄바꿈을 넘어서도 대조하며, 코드, URL, 인용 안에서는 대조하지 않습니다. 소문자로 쓰면 대소문자에 상관없이 대조하고, 대문자가 있으면 쓴 그대로만 대조합니다. 대체어와 똑같이 쓴 텍스트는 지적하지 않으므로 `github = GitHub`는 'GitHub'를 그대로 둡니다. 프로젝트 지적도 Laconic 자체 지적처럼 `lint`를 실패시킵니다. 규칙 참조 링크는 없으며, `--json`에서 `url`은 `null`이고 SARIF 로그는 Laconic 규칙 뒤에 링크 없이 이 규칙들을 나열합니다. 형식이 잘못된 줄이나 알 수 없는 절이 있으면 `lint`는 그 줄 번호와 함께 멈춥니다.
@@ -394,12 +295,12 @@ GitHub Actions에서는 복합 Action이 러너(Linux x86_64, Windows x86_64, Ap
 - uses: actions/checkout@v7
 - uses: yungSNAT/Laconic@<commit>
   with:
-    version: 0.6.0     # the laconic-check release; 0.6.0 by default
+    version: 0.6.1     # the laconic-check release; 0.6.1 by default
     files: README.md   # one path a line; default: every .md and .markdown file Git tracks
     args: --warn       # further lint options
 ```
 
-대신 GitHub code scanning에 지적을 나열하려면 `laconic-check`를 PATH에 두고(릴리스에 `--sarif`가 들어가기 전까지는 `cargo install --locked --git https://github.com/yungSNAT/Laconic --rev <commit> laconic-check`), 작업에 `security-events: write`를 주고 로그를 올리세요. `--warn`이면 지적 때문에 단계가 실패하지 않으므로 사용법 오류나 읽기 오류에서만 실패하고, 그때는 불완전한 것이 올라가지 않습니다. 지적 때문에도 작업을 실패시키려면 위의 Action이나 `--warn` 없는 다른 `lint` 단계를 추가하세요.
+대신 GitHub code scanning에 지적을 나열하려면 `laconic-check` 0.6.0 이상을 PATH에 두고, 작업에 `security-events: write`를 주고 로그를 올리세요. `--warn`이면 지적 때문에 단계가 실패하지 않으므로 사용법 오류나 읽기 오류에서만 실패하고, 그때는 불완전한 것이 올라가지 않습니다. 지적 때문에도 작업을 실패시키려면 위의 Action이나 `--warn` 없는 다른 `lint` 단계를 추가하세요.
 
 ```yaml
 - run: laconic-check lint --sarif --warn README.md docs/*.md > laconic-check.sarif
@@ -420,9 +321,7 @@ GitHub Actions에서는 복합 Action이 러너(Linux x86_64, Windows x86_64, Ap
 | 이름이 바뀜 | 28 | 20 확인할 이름 나열 | 20 | 20 |
 | 모든 단위 유지 | 258 | 17 통과, 224 의미 단어만으로 실패, 0 월·인라인 코드·URL로 실패, 17 숫자·양·인용으로 실패 | 23 통과; 222; 0; 13 | 64 통과; 182; 0; 12 |
 
-같은 문서에서 avoid-ai-writing의 `validate.js`는 바뀐 105개 중 23개를, Zero Slop의 충실도 검사는 105개 모두를 실패시킵니다. 유지된 258개 중 각각 233개와 15개를 통과시키며, `preserve`는 23개, `--loose`는 64개입니다([evals/README.md](evals/README.md#against-other-fact-checkers), 2026년 11월 16일). 논문의 표 1에 따르면 각 휴머나이저는 단위가 있는 재작성 텍스트 20개 중 7~13개(35%~65%, Undetectable AI는 20개 중 11개)에서 단위를 하나 이상 바꿨습니다. 각각에 대한 `preserve` 결과가 담긴 표는 [evals/README.md](evals/README.md#by-humaniser)에 있습니다.
-
-`laconic-check mcp`는 `lint`와 `preserve`를 표준 입출력으로 MCP 도구로 제공하며, 따로 설치할 것이 없습니다. `preserve` 도구는 `--loose`와 같은 동작을 위해 `loose: true`를 받고, `lint` 도구는 `lint`처럼 서버가 실행되는 디렉터리의 `.laconic-check` 파일을 호출마다 다시 읽어 적용합니다. 형식이 잘못된 파일이면 호출이 그 줄을 알려 주는 오류가 됩니다(둘 다 0.6.0부터).
+`laconic-check mcp`는 `lint`와 `preserve`를 표준 입출력으로 MCP 도구로 제공하며, 따로 설치할 것이 없습니다. `preserve` 도구는 `--loose`와 같은 동작을 위해 `loose: true`를 받고, `lint` 도구는 `lint`처럼 서버가 실행되는 디렉터리의 `laconic.toml` 또는 `.laconic-check` 파일을 호출마다 다시 읽어 적용합니다. 형식이 잘못된 파일이면 호출이 그 줄을 알려 주는 오류가 됩니다(둘 다 0.6.0부터).
 
 ```bash
 claude mcp add --scope user laconic-check -- laconic-check mcp
@@ -430,13 +329,13 @@ claude mcp add --scope user laconic-check -- laconic-check mcp
 
 laconic-check 0.3.0 이상에 들어 있습니다.
 
-`laconic-check lsp`는 표준 입출력으로 동작하는 언어 서버로, 입력하는 동안 편집기가 `lint`의 지적을 보여 줍니다(0.6.0부터). 열린 Markdown 문서가 바뀔 때마다 검사하고, 각 지적을 경고로(조언이면 힌트로) 규칙에 링크해 표시합니다. 문서를 담은 작업 공간 폴더(폴더가 중첩되면 가장 안쪽)의 `.laconic-check` 파일을 적용하며, 읽거나 해석할 수 없는 파일은 첫 줄에 오류로 표시합니다. 0.6.0 이후에는 규칙이 단 하나의 대체어를 아는 곳마다 빠른 수정도 제공합니다. 미국식 철자, 단어로 쓴 숫자, 라틴어 약어, 시각이나 날짜 형식, 큰따옴표, 보이지 않는 문자 등이 그렇습니다. 수정은 지적된 텍스트만 바꾸며, 직접 고를 때만 적용됩니다(Neovim에서는 `gra`, Helix에서는 `space a`). 엠 대시, 상투적 표현, 연속 쉼표 후보처럼 고쳐 써야 하는 규칙은 수정을 제공하지 않습니다. 수정은 문서의 버전을 함께 알리므로, 텍스트가 바뀐 뒤에 도착한 수정은 편집기가 엉뚱한 곳에 적용하지 않고 거부합니다. 이런 편집을 받는다고 알리지 않는 편집기는 수정을 받지 못하며, 알리지 않고도 받는 Neovim만 예외입니다. Neovim은 문서가 처음 바뀌기 전에 만든 수정은 확인하지 않으므로, 문서가 열린 뒤 한 번이라도 바뀐 다음부터만 수정을 받습니다. `.laconic-check`나 `.git`이 있는 폴더를 작업 공간 폴더로 삼는 Neovim 0.11 이상에서는:
+`laconic-check lsp`는 표준 입출력으로 동작하는 언어 서버로, 입력하는 동안 편집기가 `lint`의 지적을 보여 줍니다(0.6.0부터). 열린 Markdown 문서가 바뀔 때마다 검사하고, 각 지적을 경고로(조언이면 힌트로) 규칙에 링크해 표시합니다. 문서를 담은 작업 공간 폴더(폴더가 중첩되면 가장 안쪽)의 `laconic.toml` 또는 `.laconic-check` 파일을 적용하며, 읽거나 해석할 수 없는 파일은 첫 줄에 오류로 표시합니다. 0.6.0부터는 규칙이 단 하나의 대체어를 아는 곳마다 빠른 수정도 제공합니다. 미국식 철자, 단어로 쓴 숫자, 라틴어 약어, 시각이나 날짜 형식, 큰따옴표, 보이지 않는 문자 등이 그렇습니다. 수정은 지적된 텍스트만 바꾸며, 직접 고를 때만 적용됩니다(Neovim에서는 `gra`, Helix에서는 `space a`). 엠 대시, 상투적 표현, 연속 쉼표 후보처럼 고쳐 써야 하는 규칙은 수정을 제공하지 않습니다. 수정은 문서의 버전을 함께 알리므로, 텍스트가 바뀐 뒤에 도착한 수정은 편집기가 엉뚱한 곳에 적용하지 않고 거부합니다. 이런 편집을 받는다고 알리지 않는 편집기는 수정을 받지 못하며, 알리지 않고도 받는 Neovim만 예외입니다. Neovim은 문서가 처음 바뀌기 전에 만든 수정은 확인하지 않으므로, 문서가 열린 뒤 한 번이라도 바뀐 다음부터만 수정을 받습니다. `laconic.toml`, `.laconic-check`나 `.git`이 있는 폴더를 작업 공간 폴더로 삼는 Neovim 0.11 이상에서는:
 
 ```lua
 vim.lsp.config('laconic_check', {
   cmd = { 'laconic-check', 'lsp' },
   filetypes = { 'markdown' },
-  root_markers = { '.laconic-check', '.git' },
+  root_markers = { 'laconic.toml', '.laconic-check', '.git' },
 })
 vim.lsp.enable('laconic_check')
 ```
@@ -453,7 +352,7 @@ name = "markdown"
 language-servers = ["laconic-check"]
 ```
 
-`laconic-check hook`은 Claude Code와 Codex용 Stop 훅이며, 추가하기 전까지는 꺼져 있습니다(0.6.0부터). 에이전트가 차례를 끝내려 할 때, 세션 디렉터리를 담은 저장소의 커밋하지 않은 Markdown(스테이징됨, 스테이징 안 됨, 추적 안 됨)을 저장소 최상위의 `.laconic-check` 파일로 검사합니다. `lint`가 실패할 상황이면 에이전트에게 실패 지적을 먼저 살펴보라고 요청하고 최대 50개를 나열합니다. 차례마다 한 번만 요청하므로 지적이 오탐일 때도 에이전트는 끝낼 수 있습니다. 에이전트의 편집만이 아니라 사용자 자신의 커밋하지 않은 편집도 검사합니다. Claude Code에서는 `.claude/settings.json`이나 `~/.claude/settings.json`에 다음을 추가하세요. Codex는 같은 블록을 `~/.codex/hooks.json`에서 읽으며, 새 훅은 `/hooks`에서 검토할 때까지 신뢰하지 않음으로 표시합니다.
+`laconic-check hook`은 Claude Code와 Codex용 Stop 훅이며, 추가하기 전까지는 꺼져 있습니다(0.6.0부터). 에이전트가 차례를 끝내려 할 때, 세션 디렉터리를 담은 저장소의 커밋하지 않은 Markdown(스테이징됨, 스테이징 안 됨, 추적 안 됨)을 저장소 최상위의 `laconic.toml` 또는 `.laconic-check` 파일로 검사합니다. `lint`가 실패할 상황이면 에이전트에게 실패 지적을 먼저 살펴보라고 요청하고 최대 50개를 나열합니다. 차례마다 한 번만 요청하므로 지적이 오탐일 때도 에이전트는 끝낼 수 있습니다. 에이전트의 편집만이 아니라 사용자 자신의 커밋하지 않은 편집도 검사합니다. Claude Code에서는 `.claude/settings.json`이나 `~/.claude/settings.json`에 다음을 추가하세요. Codex는 같은 블록을 `~/.codex/hooks.json`에서 읽으며, 새 훅은 `/hooks`에서 검토할 때까지 신뢰하지 않음으로 표시합니다.
 
 ```json
 {

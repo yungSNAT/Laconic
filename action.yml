@@ -4,13 +4,13 @@ inputs:
   version:
     description: The laconic-check release to download, 0.6.0 or later.
     required: false
-    default: 0.6.0
+    default: 0.6.1
   files:
     description: Markdown files to lint, one path a line. Defaults to every .md and .markdown file Git tracks.
     required: false
     default: ""
   args:
-    description: Further lint options, such as --warn, separated by spaces or new lines; not --json or --sarif, since the Action reads text output. The Action splits args at spaces, tabs and new lines and keeps quotation marks as written, so an option's value cannot contain a space; for a project file whose path has one, put it in the working directory as .laconic-check, which lint reads without --config.
+    description: Further lint options, such as --warn, separated by spaces or new lines; not --json or --sarif, since the Action reads text output. The Action splits args at spaces, tabs and new lines and keeps quotation marks as written, so an option's value cannot contain a space; for a project file whose path has one, put it in the working directory as laconic.toml or .laconic-check, which lint reads without --config.
     required: false
     default: ""
 runs:

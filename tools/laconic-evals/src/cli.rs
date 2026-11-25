@@ -172,7 +172,7 @@ pub(super) enum Command {
         #[arg(num_args = 0.., allow_hyphen_values = true, trailing_var_arg = true)]
         args: Vec<String>,
     },
-    /// The steps of the dated runs in evals/runs/, which their run.sh files call.
+    /// The steps of the dated runs once in evals/runs/ (withdrawn; their run.sh files are in Git history at 8c7fcd12).
     Record {
         #[command(subcommand)]
         command: Record,
@@ -261,6 +261,9 @@ pub(super) enum Survival {
         reference: String,
         #[arg(long, allow_negative_numbers = true, default_value_t = 2)]
         trials: i64,
+        /// Planned setup names to require [default: the 8 built-in setups].
+        #[arg(long, num_args = 1..)]
+        setups: Option<Vec<String>>,
     },
 }
 

@@ -40,52 +40,7 @@ impl ProjectRule {
     }
 }
 
-fn apostrophe(c: char) -> bool {
-    c == '\'' || c == '\u{2019}'
-}
-
-/// Whether `text[at]` is part of a word, which a phrase may not touch at either end: a
-/// letter, digit or hyphen, or an apostrophe between letters or digits, as in 'it's'.
-fn in_word(text: &[char], at: usize) -> bool {
-    let alphanumeric = |i: usize| text.get(i).is_some_and(|c| c.is_alphanumeric());
-    text.get(at).is_some_and(|&c| {
-        c.is_alphanumeric()
-            || c == '-'
-            || (apostrophe(c) && at > 0 && alphanumeric(at - 1) && alphanumeric(at + 1))
-    })
-}
-
-/// The end of `phrase` matched at `start` of `text`, if it matches there as whole words. A
-/// space in the phrase matches any run of whitespace, an apostrophe either kind, and a phrase
-/// with no capital letter matches in any case; one with a capital matches only as written.
-fn match_at(text: &[char], start: usize, phrase: &str) -> Option<usize> {
-    let exact = phrase.chars().any(char::is_uppercase);
-    let mut at = start;
-    for p in phrase.chars() {
-        let c = *text.get(at)?;
-        if p == ' ' {
-            if !c.is_whitespace() {
-                return None;
-            }
-            while text.get(at).is_some_and(|c| c.is_whitespace()) {
-                at += 1;
-            }
-            continue;
-        }
-        let same = if apostrophe(p) {
-            apostrophe(c)
-        } else if exact {
-            c == p
-        } else {
-            c.to_lowercase().eq(p.to_lowercase())
-        };
-        if !same {
-            return None;
-        }
-        at += 1;
-    }
-    (!in_word(text, at)).then_some(at)
-}
+use crate::settings::protect::{is_word_char, match_phrase};
 
 /// Adds a finding for each phrase of `rules` in the masked paragraph `text`, at its 1-based
 /// column there. A match written exactly as its replacement is not a finding, so
@@ -94,12 +49,14 @@ fn match_at(text: &[char], start: usize, phrase: &str) -> Option<usize> {
 // times the number of phrases; index the phrases by first letter if projects list thousands.
 pub(super) fn check(text: &[char], rules: &[Rc<ProjectRule>], findings: &mut Vec<Finding>) {
     for start in 0..text.len() {
-        if !text[start].is_alphanumeric() || (start > 0 && in_word(text, start - 1)) {
+        if !text[start].is_alphanumeric() || (start > 0 && is_word_char(text, start - 1)) {
             continue;
         }
         for rule in rules {
             for phrase in &rule.phrases {
-                let Some(end) = match_at(text, start, &phrase.text) else {
+                let exact = phrase.text.chars().any(char::is_uppercase);
+                let Some(end) = match_phrase(text, start, phrase.text.chars(), exact, false, true)
+                else {
                     continue;
                 };
                 let found: String = text[start..end].iter().collect();

@@ -412,7 +412,9 @@ fn main() -> ExitCode {
             }
         },
         Some("instructions") if args.len() <= 2 => {
-            match instructions::render(args.get(1).map(String::as_str)) {
+            let topic = args.get(1).map(String::as_str);
+            let topic = topic.filter(|t| !matches!(*t, "-h" | "--help"));
+            match instructions::render(topic) {
                 Some(text) => {
                     print!("{text}");
                     ExitCode::SUCCESS

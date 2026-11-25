@@ -31,9 +31,10 @@ Check prose:
                                        fail when an edit dropped a number, date, name, quotation,
                                        URL, inline code or a word such as 'not' or 'must'
 
-Read a finding: it is a reason to look, not proof of a defect. A message ending '(advisory)'
-never fails lint; every other finding does. Each rule is described under its name in
-RULES_URL.
+Read a finding: it is a reason to look, not proof of a defect. A finding whose message
+contains '(advisory)', or whose `advisory` field is true with --json, never fails lint;
+every other finding does. `laconic-check instructions rules` lists which rules are
+advisory, and each rule is described under its name in RULES_URL.
 
 Act on a finding: fix the text where the rule is right. Where the text is right as written,
 leave it and, if the finding would block CI, silence that one finding with a comment on its
@@ -55,7 +56,8 @@ register profile or protect terms; `laconic-check instructions config` shows its
 `laconic-check mcp` serves lint and preserve as MCP tools, and `laconic-check hook` is a Stop
 hook that asks the agent to look at failing findings before it finishes a turn.
 
-Exit codes: 0 clean, 1 findings (or dropped items for preserve), 2 a usage or read error.
+Exit codes: 1 when failing findings exceed max_findings (0 unless set) without --warn, or
+when preserve finds dropped items; 2 a usage or read error; otherwise 0.
 ";
 
 const CONFIG: &str = "\

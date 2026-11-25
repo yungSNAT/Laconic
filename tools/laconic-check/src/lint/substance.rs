@@ -343,6 +343,29 @@ fn is_markdown_link_tail(raw: &[char], close: usize) -> bool {
     raw.get(close + 1) == Some(&'(') && raw[close + 2..].contains(&')')
 }
 
+fn markdown_link_label_ranges(raw: &[char]) -> Vec<(usize, usize)> {
+    let mut ranges = Vec::new();
+    let mut i = 0;
+    while i < raw.len() {
+        if raw[i] == ']'
+            && raw.get(i + 1) == Some(&'(')
+            && let Some(rel_end) = raw[i + 2..].iter().position(|&c| c == ')')
+        {
+            if let Some(open) = raw[..i]
+                .iter()
+                .rposition(|&c| c == '[' || c == ']' || c == '\n')
+                .filter(|&pos| raw[pos] == '[')
+            {
+                ranges.push((open, i));
+            }
+            i = i + 2 + rel_end + 1;
+            continue;
+        }
+        i += 1;
+    }
+    ranges
+}
+
 fn check_ai_placeholders(view: &ParagraphView<'_>, findings: &mut Vec<Finding>) {
     check_phrases(
         view,
@@ -354,7 +377,7 @@ fn check_ai_placeholders(view: &ParagraphView<'_>, findings: &mut Vec<Finding>) 
             format!("AI residue phrase '{p}' (advisory); remove self-reference from finished prose")
         },
     );
-    let mut bracket_ranges: Vec<(usize, usize)> = Vec::new();
+    let mut skip_ranges = markdown_link_label_ranges(view.raw);
     for opener in PLACEHOLDER_OPENERS {
         let mut from = 0;
         while let Some(pos) = view.lower[from..].find(opener) {
@@ -365,7 +388,7 @@ fn check_ai_placeholders(view: &ParagraphView<'_>, findings: &mut Vec<Finding>) 
                     from += pos + opener.len();
                     continue;
                 }
-                bracket_ranges.push((col_idx, end));
+                skip_ranges.push((col_idx, end));
                 let span: String = view.masked[col_idx..=end].iter().collect();
                 findings.push(Finding {
                     line: 0,
@@ -382,7 +405,7 @@ fn check_ai_placeholders(view: &ParagraphView<'_>, findings: &mut Vec<Finding>) 
     }
     let mut i = 0;
     while i < view.masked.len() {
-        if bracket_ranges
+        if skip_ranges
             .iter()
             .any(|&(start, end)| i >= start && i <= end)
         {

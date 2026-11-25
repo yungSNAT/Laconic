@@ -210,3 +210,26 @@ fn substrings_ending_in_per_or_of_do_not_anchor_magnitudes() {
         );
     }
 }
+
+#[test]
+fn markdown_links_labelled_todo_or_tbd_do_not_trigger_ai_placeholder() {
+    assert!(
+        !rules_of("See [TODO](https://example.com) for the board.").contains(&"ai-placeholder")
+    );
+    assert!(
+        !rules_of("Open [TBD](https://example.com) and [Add details](https://example.com).")
+            .contains(&"ai-placeholder")
+    );
+    let mixed = rules_of("See [TODO](https://example.com) and TODO later.");
+    assert_eq!(
+        mixed.iter().filter(|&&r| r == "ai-placeholder").count(),
+        1,
+        "only standalone prose TODO should flag: {mixed:?}"
+    );
+    let mixed_tbd = rules_of("See [TBD](https://example.com) and TBD next week.");
+    assert_eq!(
+        mixed_tbd.iter().filter(|&&r| r == "ai-placeholder").count(),
+        1,
+        "only standalone prose TBD should flag: {mixed_tbd:?}"
+    );
+}

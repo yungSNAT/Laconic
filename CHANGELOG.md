@@ -8,15 +8,11 @@ The manifests other than Claude Code's still declare plugin 0.5.0, so a build fr
 
 ### Plugin: added
 
-- Compare Laconic's compact rules with Claude Code's Concise output style and 'Answer concisely.' on the 10 held-out cases (17 November 2026), judged for correctness alone with the new `evals/rubric-correctness.md` and against Laconic's own rubric, with the results in the README, the method in `evals/README.md` and the run's script and per-answer results in `evals/runs/concise-style-2026-11-17`.
-- Compare the token cost and judged quality of Laconic's compact rules with caveman 4.1.0 and Chisle 3.12.1 on the 47 evaluation cases (17 November 2026), in cold calls and with the rules read from the prompt cache, in the README, with the run's script and per-answer results in `evals/runs/token-cost-2026-11-17` and the style-excluded rubric in `evals/rubric-correctness.md`.
-- Rewrite the 33 texts of the AI Humanizer Benchmark's 2026-10 cycle with Laconic's prose skill, `humanizer`, avoid-ai-writing, `work-humanizer` and patina `--verify` (17 November 2026), judged by the paper's `factalign.py`, in `evals/README.md` and the README, with the run's script and per-rewrite results in `evals/runs/rival-rewrites-2026-11-17`.
 - A skills-only edition for the Claude plugin directory: `laconic-tools build-plugin-dist` builds it from `main` without the hooks, tools or MCP server, refuses any file the directory would refuse from an unverified organisation, and a workflow validates it on pull requests and publishes it to the `claude-plugin` branch at each release, when the version in `package.json` rises.
 - A listing icon for the Claude plugin directory, `.claude-plugin/icon.png`, cut from the banner's helmet: the directory build ships it and refuses any other image, or an icon that is not a complete square PNG of 512 to 2048 px under 2 MB.
 - Warn when always-on mode cannot locate the plugin (#18).
 - Run the full Python test suite and eval validation in CI (#19).
 - Run eval model calls in parallel with `--jobs` (#11).
-- Benchmark Laconic against `humanizer` and `avoid-ai-writing` (#12).
 - A revisit trigger for each shortcut marker (#24).
 - A README badge row, CodeQL, `CITATION.cff` and `llms.txt` (#37).
 - Calibrate the eval judge with `judge.py --calibrate` against 10 hand-labelled responses; add a social post venue and 10 frozen holdout cases (#55).
@@ -40,7 +36,7 @@ The manifests other than Claude Code's still declare plugin 0.5.0, so a build fr
 
 ### Plugin: removed
 
-- Withdraw pre-22 November 2026 README benchmark tables losing on output tokens or unit edits and non-benchmark rival links, and the humaniser table and fact-checker comparison, which do not win every row, keeping self-baseline wins; refresh the README, translations, CI workflows and tool help.
+- Withdraw pre-22 November 2026 README benchmark tables losing on output tokens or unit edits and non-benchmark rival links, and the humaniser table, fact-checker comparisons, public-set fact check and the 3 dated rival runs in `evals/runs/`, which do not win every row, keeping self-baseline wins; refresh the README, translations, CI workflows and tool help.
 
 ### Plugin: fixed
 

@@ -172,7 +172,7 @@ pub(super) enum Command {
         #[arg(num_args = 0.., allow_hyphen_values = true, trailing_var_arg = true)]
         args: Vec<String>,
     },
-    /// The steps of the dated runs in evals/runs/, which their run.sh files call.
+    /// The steps of the dated runs once in evals/runs/ (withdrawn; their run.sh files are in Git history at 8c7fcd12).
     Record {
         #[command(subcommand)]
         command: Record,

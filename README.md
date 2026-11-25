@@ -313,8 +313,6 @@ On 13 November 2026, `preserve` ran on the 363 rewrites by 11 commercial humanis
 | Names altered | 28 | 20 list a name to check | 20 | 20 |
 | Every unit kept | 258 | 17 pass; 224 fail only on meaning words; 0 fail on a month, inline code or URL; 17 fail on a number, quantity or quotation | 23 pass; 222; 0; 13 | 64 pass; 182; 0; 12 |
 
-By the paper's Table 1, each humaniser altered at least one unit in 7 to 13 of the 20 texts it rewrote that hold one (35% to 65%; Undetectable AI 11 of 20); [evals/README.md](evals/README.md#by-humaniser) gives the table with `preserve`'s results for each.
-
 `laconic-check mcp` serves `lint` and `preserve` as MCP tools over standard input and output, with nothing else to install. The `preserve` tool takes `loose: true` for what `--loose` does, and the `lint` tool applies the `laconic.toml` or `.laconic-check` file in the directory the server runs in, as `lint` does, reread on each call; a malformed one makes the call an error naming its line (both from 0.6.0):
 
 ```bash

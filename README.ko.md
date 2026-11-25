@@ -321,8 +321,6 @@ GitHub Actions에서는 복합 Action이 러너(Linux x86_64, Windows x86_64, Ap
 | 이름이 바뀜 | 28 | 20 확인할 이름 나열 | 20 | 20 |
 | 모든 단위 유지 | 258 | 17 통과, 224 의미 단어만으로 실패, 0 월·인라인 코드·URL로 실패, 17 숫자·양·인용으로 실패 | 23 통과; 222; 0; 13 | 64 통과; 182; 0; 12 |
 
-논문의 표 1에 따르면 각 휴머나이저는 단위가 있는 재작성 텍스트 20개 중 7~13개(35%~65%, Undetectable AI는 20개 중 11개)에서 단위를 하나 이상 바꿨습니다. 각각에 대한 `preserve` 결과가 담긴 표는 [evals/README.md](evals/README.md#by-humaniser)에 있습니다.
-
 `laconic-check mcp`는 `lint`와 `preserve`를 표준 입출력으로 MCP 도구로 제공하며, 따로 설치할 것이 없습니다. `preserve` 도구는 `--loose`와 같은 동작을 위해 `loose: true`를 받고, `lint` 도구는 `lint`처럼 서버가 실행되는 디렉터리의 `laconic.toml` 또는 `.laconic-check` 파일을 호출마다 다시 읽어 적용합니다. 형식이 잘못된 파일이면 호출이 그 줄을 알려 주는 오류가 됩니다(둘 다 0.6.0부터).
 
 ```bash

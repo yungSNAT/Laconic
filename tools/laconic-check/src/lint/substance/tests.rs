@@ -232,4 +232,20 @@ fn markdown_links_labelled_todo_or_tbd_do_not_trigger_ai_placeholder() {
         1,
         "only standalone prose TBD should flag: {mixed_tbd:?}"
     );
+    let count = |text: &str| {
+        rules_of(text)
+            .iter()
+            .filter(|&&r| r == "ai-placeholder")
+            .count()
+    };
+    assert_eq!(count("See ![TBD](img.png) above."), 0);
+    assert_eq!(count("See [TODO](url \"Title\") later."), 0);
+    // Escaped brackets render as literal text, so no link hides the placeholder.
+    assert_eq!(count(r"See \[TODO\](https://example.com) later."), 1);
+    assert_eq!(count(r"See \[TODO](https://example.com) later."), 1);
+    assert_eq!(count(r"See [TODO\](https://example.com) later."), 1);
+    // An even run of backslashes escapes itself, so the bracket still opens a link.
+    assert_eq!(count(r"See \\[TODO](https://example.com) later."), 0);
+    // A destination with a space and no title is not a link.
+    assert_eq!(count("See [TODO](see below) later."), 1);
 }

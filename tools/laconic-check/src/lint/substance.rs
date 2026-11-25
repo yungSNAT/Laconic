@@ -339,26 +339,54 @@ fn check_phrases(
     }
 }
 
+/// Whether `raw[at]` follows an odd run of backslashes, which makes it literal text.
+fn is_escaped(raw: &[char], at: usize) -> bool {
+    raw[..at].iter().rev().take_while(|&&c| c == '\\').count() % 2 == 1
+}
+
+/// The index of the `)` ending an inline link destination that opens at `raw[close + 1]`, when
+/// `raw[close]` is an unescaped `]`. The destination has no space unless a quoted title
+/// follows it, so `[TODO](see below)` is no link.
+fn link_tail_end(raw: &[char], close: usize) -> Option<usize> {
+    if raw.get(close) != Some(&']') || is_escaped(raw, close) || raw.get(close + 1) != Some(&'(') {
+        return None;
+    }
+    let end = close + 2 + raw[close + 2..].iter().position(|&c| c == ')')?;
+    let inner: String = raw[close + 2..end].iter().collect();
+    let inner = inner.trim();
+    let valid = match inner.split_once(char::is_whitespace) {
+        None => true,
+        Some((_, title)) => {
+            let title = title.trim_start();
+            title.len() >= 2
+                && ((title.starts_with('"') && title.ends_with('"'))
+                    || (title.starts_with('\'') && title.ends_with('\'')))
+        }
+    };
+    valid.then_some(end)
+}
+
 fn is_markdown_link_tail(raw: &[char], close: usize) -> bool {
-    raw.get(close + 1) == Some(&'(') && raw[close + 2..].contains(&')')
+    link_tail_end(raw, close).is_some()
 }
 
 fn markdown_link_label_ranges(raw: &[char]) -> Vec<(usize, usize)> {
     let mut ranges = Vec::new();
     let mut i = 0;
     while i < raw.len() {
-        if raw[i] == ']'
-            && raw.get(i + 1) == Some(&'(')
-            && let Some(rel_end) = raw[i + 2..].iter().position(|&c| c == ')')
-        {
-            if let Some(open) = raw[..i]
-                .iter()
-                .rposition(|&c| c == '[' || c == ']' || c == '\n')
+        if let Some(end) = link_tail_end(raw, i) {
+            // The nearest unescaped bracket or line break before `]`; a `[` opens the label.
+            if let Some(open) = (0..i)
+                .rev()
+                .find(|&pos| {
+                    raw[pos] == '\n'
+                        || ((raw[pos] == '[' || raw[pos] == ']') && !is_escaped(raw, pos))
+                })
                 .filter(|&pos| raw[pos] == '[')
             {
                 ranges.push((open, i));
             }
-            i = i + 2 + rel_end + 1;
+            i = end + 1;
             continue;
         }
         i += 1;

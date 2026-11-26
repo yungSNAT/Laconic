@@ -793,6 +793,9 @@ fn scan(
     let mut document = Document::default();
     let mut code_lines = Vec::new();
     let mut fence: Option<&str> = None;
+    // Whether a definition may open the next paragraph. None can interrupt a paragraph, so
+    // only a line after a blank line or a block that has ended may hold one.
+    let mut fresh = true;
     let mut list_indent = None;
     // The indent and length of the current run of bold-label bullets.
     let mut labels = (0, 0);
@@ -846,6 +849,7 @@ fn scan(
         if let Some(marker) = fence {
             if trimmed.starts_with(marker) {
                 fence = None;
+                fresh = true;
             }
             continue;
         }
@@ -868,7 +872,7 @@ fn scan(
             // A line of HTML or a quotation can still hold a link that leads nowhere.
             if include_opt_in && !trimmed.is_empty() && prose.is_none() {
                 let chars: Vec<char> = raw.chars().collect();
-                document.links.collect(&chars, |k| (line_no, k + 1));
+                document.links.collect(&chars, true, |k| (line_no, k + 1));
             }
             // A blank line ends the paragraph; a line of HTML tags holds no prose, and other
             // block quotations and an alert's marker line are not original prose.
@@ -894,6 +898,9 @@ fn scan(
                 include_opt_in,
                 prose.as_deref_mut(),
             );
+            // A quotation's next line may continue it lazily, and an HTML block of types 6
+            // and 7 runs to a blank line.
+            fresh = trimmed.is_empty() || html_block_closes(trimmed);
             continue;
         }
         let marker_width = if is_break_line(trimmed) {
@@ -949,6 +956,9 @@ fn scan(
         } else if !list_item && (single_line || !in_list) {
             labels = (0, 0);
         }
+        if paragraph.lines.is_empty() {
+            paragraph.can_define = fresh;
+        }
         paragraph.push(raw, line_no);
         // A hard line break (two trailing spaces or a backslash) also ends the run.
         if single_line || raw.ends_with("  ") || raw.trim_end().ends_with('\\') {
@@ -960,6 +970,12 @@ fn scan(
                 prose.as_deref_mut(),
             );
         }
+        // A heading, thematic break, setext underline, indented code or a closed HTML block
+        // ends here; a table row or paragraph line, hard break included, runs on.
+        fresh = indented_code
+            || is_break_line(trimmed)
+            || is_atx_heading(trimmed)
+            || html_block_closes(trimmed);
     }
     paragraph.flush(
         &mut findings,
@@ -1086,6 +1102,51 @@ fn is_alert_marker(rest: &str) -> bool {
     ]
     .iter()
     .any(|kind| marker.eq_ignore_ascii_case(kind))
+}
+
+/// An ATX heading: 1 to 6 `#`, then a space, a tab or the end of the line.
+fn is_atx_heading(trimmed: &str) -> bool {
+    let hashes = trimmed.chars().take_while(|&c| c == '#').count();
+    (1..=6).contains(&hashes)
+        && trimmed[hashes..]
+            .chars()
+            .next()
+            .is_none_or(|c| c == ' ' || c == '\t')
+}
+
+/// Whether the line opens an HTML block of CommonMark types 1 to 5 and closes it too, so
+/// the next line starts afresh. Types 6 and 7 run to a blank line.
+fn html_block_closes(trimmed: &str) -> bool {
+    let lower = trimmed.to_ascii_lowercase();
+    let raw_text = ["pre", "script", "style", "textarea"].iter().any(|name| {
+        lower
+            .strip_prefix('<')
+            .and_then(|rest| rest.strip_prefix(name))
+            .is_some_and(|rest| {
+                rest.chars()
+                    .next()
+                    .is_none_or(|c| c == ' ' || c == '\t' || c == '>')
+            })
+    });
+    if raw_text {
+        return ["</pre>", "</script>", "</style>", "</textarea>"]
+            .iter()
+            .any(|end| lower.contains(end));
+    }
+    if let Some(rest) = lower.strip_prefix("<![cdata[") {
+        return rest.contains("]]>");
+    }
+    if lower.starts_with("<!--") {
+        // `<!-->` and `<!--->` close at once.
+        return lower[2..].contains("-->");
+    }
+    if let Some(rest) = lower.strip_prefix("<?") {
+        return rest.contains("?>");
+    }
+    match lower.strip_prefix("<!") {
+        Some(rest) if rest.starts_with(|c: char| c.is_ascii_alphabetic()) => rest.contains('>'),
+        _ => false,
+    }
 }
 
 /// A line of HTML tags and comments only, such as `<p align="center">` or `</details>`. A tag
@@ -1266,6 +1327,8 @@ struct Paragraph {
     chars: Vec<char>,
     origin: Vec<(usize, usize)>,
     lines: Vec<(usize, Vec<char>)>,
+    /// Whether a link reference definition may open the first line.
+    can_define: bool,
 }
 
 impl Paragraph {
@@ -1306,7 +1369,9 @@ impl Paragraph {
         let (masked, doubles) = mask(&self.chars, true);
         document.collect(&masked, |column| self.at(column));
         if include_opt_in {
-            document.links.collect(&self.chars, |k| self.at(k + 1));
+            document
+                .links
+                .collect(&self.chars, self.can_define, |k| self.at(k + 1));
         }
         let mut found = Vec::new();
         // Once a span holds code, an HTML tag or a link, its marks may belong to them, and so

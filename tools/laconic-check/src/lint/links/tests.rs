@@ -402,7 +402,9 @@ fn unclosed_links_and_definitions_are_read_in_linear_time() {
             .map(|c| if c == '\n' { ' ' } else { c })
             .collect();
         let mut links = Links::default();
-        links.collect(&chars, |k| (lines.get(k).copied().unwrap_or(line), k + 1));
+        links.collect(&chars, true, |k| {
+            (lines.get(k).copied().unwrap_or(line), k + 1)
+        });
         links.findings(text, None)
     };
     let fastest = |text: &str| {
@@ -481,6 +483,48 @@ fn a_definition_cannot_interrupt_a_paragraph() {
 }
 
 #[test]
+fn a_definition_opens_only_after_a_block_that_has_ended() {
+    let root = tree("block-end", &[("README.md", "")]);
+    let workspace = Workspace::new(&root).unwrap();
+    let folder = workspace.folder_of(&root.join("README.md")).unwrap();
+    let place = Some((&workspace, folder.as_path()));
+    // The line continues a paragraph, a table, a quotation or an HTML block of type 6 or 7.
+    for before in [
+        "<b>Note</b> text",
+        "| a | b |",
+        "| a |\n| - |",
+        "> Quoted",
+        "Hard break\\",
+        "Hard break  ",
+        "<div>",
+        "<b>",
+        "<!-- open",
+        "#hashtag",
+    ] {
+        let text = format!("{before}\n[Note]: read this.\n");
+        assert!(names(&text, place).is_empty(), "{before:?}");
+    }
+    // A heading, thematic break, setext underline, fence, indented code or closed HTML block
+    // of types 1 to 5 has ended, so the next line may define.
+    for before in [
+        "# Heading",
+        "***",
+        "Title\n===",
+        "```\ncode\n```",
+        "    code",
+        "<!-- note -->",
+        "<script>x</script>",
+        "<?php x ?>",
+        "<!DOCTYPE html>",
+        "<![CDATA[x]]>",
+    ] {
+        let text = format!("{before}\n[a]: gone.md\n");
+        assert_eq!(names(&text, place), ["broken-link"], "{before:?}");
+    }
+    let _ = std::fs::remove_dir_all(&root);
+}
+
+#[test]
 fn a_large_folder_is_searched_once_per_target() {
     // Each target once scanned the whole listing of its folder, so missing links into a large
     // folder took time in the product of the two. Quadrupling both must take about 4 times as
@@ -495,7 +539,7 @@ fn a_large_folder_is_searched_once_per_target() {
         let text = "[a](Gone) ".repeat(n);
         let chars: Vec<char> = text.chars().collect();
         let mut links = Links::default();
-        links.collect(&chars, |k| (1, k + 1));
+        links.collect(&chars, true, |k| (1, k + 1));
         // The first run lists the folder; the fastest of 3 more times the lookups alone.
         links.findings(&text, Some((&workspace, &folder)));
         let fastest = (0..3)

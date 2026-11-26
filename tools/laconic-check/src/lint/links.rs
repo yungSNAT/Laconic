@@ -200,8 +200,14 @@ pub(super) struct Links {
 
 impl Links {
     /// Records the links in `chars`, the raw text of a paragraph or line; `at` maps a 0-based
-    /// index in it to its line and 1-based column.
-    pub(super) fn collect(&mut self, chars: &[char], at: impl Fn(usize) -> (usize, usize)) {
+    /// index in it to its line and 1-based column. `can_define` says whether a definition may
+    /// open its first line, which it may not where the line continues an earlier block.
+    pub(super) fn collect(
+        &mut self,
+        chars: &[char],
+        can_define: bool,
+        at: impl Fn(usize) -> (usize, usize),
+    ) {
         // Lint joins a paragraph's lines with a space; the scans stop at a line break where
         // CommonMark does, so each such space is read as one.
         let chars: Vec<char> = (0..chars.len())
@@ -226,7 +232,7 @@ impl Links {
         let mut after_definition = false;
         while line_start < chars.len() {
             let mut end = line_start;
-            let open = line_start == 0 || after_definition;
+            let open = (line_start == 0 && can_define) || after_definition;
             let found = open.then(|| definition(chars, line_start)).flatten();
             let title = after_definition && matches!(chars[line_start], '"' | '\'' | '(');
             after_definition = found.is_some() || title;

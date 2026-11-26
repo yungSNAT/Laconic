@@ -307,6 +307,17 @@ fn preflight_calls_each_skill_setup_and_reports_what_it_called() {
         overhead.ends_with("{\"stage\": \"preflight\", \"cost_usd\": 0.75}\n"),
         "{overhead}"
     );
+
+    let partial = |_: &[String], _: &Input, _: Duration| done(3, &stream, "");
+    let mut printed = Vec::new();
+    assert_eq!(preflight(dir.path(), &partial, &mut printed), Ok(1));
+    assert!(
+        String::from_utf8(printed)
+            .unwrap()
+            .contains("avoid: runner exited with status 3")
+    );
+    let overhead = fs::read_to_string(dir.path().join("overhead.jsonl")).unwrap();
+    assert_eq!(overhead.matches("\"cost_usd\": 0.75").count(), 2);
 }
 
 #[test]

@@ -324,7 +324,11 @@ pub fn preflight(here: &Path, exec: Exec, stdout: &mut dyn Write) -> Result<i32,
         .map_err(|e| e.message(&command[0]))?;
         let out = proc::text(&done.stdout)?;
         let used = skills_used(&out)?;
-        failures += i32::from(!used.contains(wanted));
+        failures += i32::from(done.code != 0 || !used.contains(wanted));
+        if done.code != 0 {
+            writeln!(stdout, "{name}: runner exited with status {}", done.code)
+                .map_err(|e| e.to_string())?;
+        }
         // A result event is any JSON object whose `type` is "result", whatever its spacing or
         // key order.
         let mut results = Vec::new();

@@ -282,7 +282,10 @@ fn a_junction_out_of_the_workspace_is_not_followed() {
         &[("ws/a.md", ""), ("ws/sub/c.md", ""), ("out/b.md", "# B\n")],
     );
     // Even a junction that stays inside is not followed: learning where it leads means looking.
-    for (name, to) in [("link", root.join("out")), ("inner", root.join("ws").join("sub"))] {
+    for (name, to) in [
+        ("link", root.join("out")),
+        ("inner", root.join("ws").join("sub")),
+    ] {
         let made = std::process::Command::new("cmd")
             .args(["/C", "mklink", "/J"])
             .arg(root.join("ws").join(name))
@@ -327,10 +330,89 @@ fn reading_stops_at_the_budget() {
 #[test]
 fn named_entities_in_headings_decode_or_leave_the_file_unchecked() {
     // GitHub slugs the rendered heading, so a named entity becomes its character.
-    let text = "## Caf&eacute; &mdash; menu\n\nSee [a](#café--menu) and [b](#cafeacute-mdash-menu).\n";
+    let text =
+        "## Caf&eacute; &mdash; menu\n\nSee [a](#café--menu) and [b](#cafeacute-mdash-menu).\n";
     let reported = found(text, None);
-    assert_eq!(reported.len(), 1, "only the entity spelling is reported: {reported:?}");
+    assert_eq!(
+        reported.len(),
+        1,
+        "only the entity spelling is reported: {reported:?}"
+    );
     // An entity this rule cannot decode leaves the heading's anchor unknown: nothing is reported.
     let text = "## The &bigstar; list\n\nSee [a](#the--list) and [b](#elsewhere).\n";
     assert!(found(text, None).is_empty());
+}
+
+#[test]
+fn unclosed_links_and_definitions_are_read_in_linear_time() {
+    // Each `](` once scanned to the paragraph's end for its `)`, so a paragraph of unclosed links
+    // took time in the square of its length. Quadrupling every hostile paragraph must take
+    // about 4 times as long, well under the 16 a square gives; the fastest of 3 runs keeps a
+    // busy machine from deciding the ratio. Only the link rules' own reading is timed: the rest of
+    // lint has costs of its own on such a paragraph.
+    let shapes = ["a](b c ", "](a", "[a\n", "x][a] ", "[a]: <b\n", "](<a "];
+    let read = |text: &str| {
+        let chars: Vec<char> = text.chars().collect();
+        let mut line = 1;
+        let lines: Vec<usize> = chars
+            .iter()
+            .map(|&c| {
+                let at = line;
+                line += usize::from(c == '\n');
+                at
+            })
+            .collect();
+        let mut links = Links::default();
+        links.collect(&chars, |k| (lines.get(k).copied().unwrap_or(line), k + 1));
+        links.findings(text, None)
+    };
+    let text = |n: usize| {
+        shapes
+            .iter()
+            .map(|s| s.repeat(n))
+            .collect::<Vec<_>>()
+            .join("\n\n")
+    };
+    let fastest = |text: &str| {
+        (0..3)
+            .map(|_| {
+                let start = std::time::Instant::now();
+                read(text);
+                start.elapsed()
+            })
+            .min()
+            .unwrap()
+    };
+    let (small, large) = (fastest(&text(1_000)), fastest(&text(4_000)));
+    assert!(
+        large < small * 8,
+        "4 times the input took {:.1} times as long ({small:?} to {large:?})",
+        large.as_secs_f64() / small.as_secs_f64()
+    );
+}
+
+#[test]
+fn an_inline_link_ends_at_its_title_and_closing_parenthesis() {
+    // Each of these links names a heading the file lacks, so each that is read as a link is
+    // reported once.
+    for link in [
+        "[a](#x)",
+        "[a](#x \"t (1)\")",
+        "[a](#x 't')",
+        "[a](#x (t))",
+        "[a](<#x> \"t\")",
+        "[a](#x\n  \"t\")",
+    ] {
+        assert_eq!(names(&format!("{link}\n"), None).len(), 1, "{link:?}");
+    }
+    // Text after the destination that is no title and a bracket in a bare destination make no
+    // link.
+    for text in ["[a](#x junk)", "[a](#x]y)", "[a](#x \"t\" junk)"] {
+        assert!(names(&format!("{text}\n"), None).is_empty(), "{text:?}");
+    }
+    // Nor does a line break in an angle-bracket destination. Lint joins a paragraph's lines with
+    // a space before the link rules read it, so this is checked on the destination itself.
+    let target = |text: &str| inline_target(&text.chars().collect::<Vec<_>>(), 0);
+    assert_eq!(target("<#x>)").map(|t| t.0), Some("#x".to_owned()));
+    assert_eq!(target("<#x\ny>)"), None);
 }

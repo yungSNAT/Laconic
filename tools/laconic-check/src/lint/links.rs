@@ -214,6 +214,7 @@ impl Links {
                 .find(|&i| at(i).0 != line)
                 .unwrap_or(chars.len());
         }
+        let openers = opening_brackets(chars);
         let mut i = 0;
         while i < chars.len() {
             if in_code[i] || is_escaped(chars, i) {
@@ -231,7 +232,7 @@ impl Links {
                 ']' if chars.get(i + 1) == Some(&'[') => {
                     if let Some(close) = (i + 2..chars.len()).find(|&k| chars[k] == ']') {
                         let label: String = chars[i + 2..close].iter().collect();
-                        let open = opening_bracket(chars, i);
+                        let open = openers[i];
                         let followed = matches!(chars.get(close + 1), Some('(' | ':'));
                         if let (Some(open), false) = (open, followed) {
                             let label = if label.trim().is_empty() {

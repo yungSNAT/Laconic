@@ -55,35 +55,67 @@ pub(super) fn code_spans(chars: &[char]) -> Vec<(usize, usize)> {
     spans
 }
 
-/// The `[` that opens the bracketed text closed at `close`, allowing nested brackets.
-pub(super) fn opening_bracket(chars: &[char], close: usize) -> Option<usize> {
-    let mut depth = 0;
-    for k in (0..close).rev() {
-        match chars[k] {
-            ']' if !is_escaped(chars, k) => depth += 1,
-            '[' if !is_escaped(chars, k) => {
-                if depth == 0 {
-                    return Some(k);
-                }
-                depth -= 1;
-            }
+/// For each unescaped `]` in `chars`, the `[` that opens its bracketed text, allowing nested
+/// brackets; found in one pass, as a search back from each `]` takes time in the square of a
+/// paragraph of unmatched brackets.
+pub(super) fn opening_brackets(chars: &[char]) -> Vec<Option<usize>> {
+    let mut open = Vec::new();
+    let mut found = vec![None; chars.len()];
+    for (k, &c) in chars.iter().enumerate() {
+        match c {
+            '[' if !is_escaped(chars, k) => open.push(k),
+            ']' if !is_escaped(chars, k) => found[k] = open.pop(),
             _ => {}
         }
     }
-    None
+    found
+}
+
+/// The first unescaped `close` from `from`, stopping without one at an unescaped character in
+/// `stop`, so that each scan ends where the next could begin.
+fn closing(chars: &[char], from: usize, close: char, stop: &[char]) -> Option<usize> {
+    let k = (from..chars.len())
+        .find(|&k| (chars[k] == close || stop.contains(&chars[k])) && !is_escaped(chars, k))?;
+    (chars[k] == close).then_some(k)
+}
+
+/// The index past the `)` that ends an inline link whose destination ends just before `from`,
+/// after an optional title in quotes or parentheses.
+fn link_end(chars: &[char], from: usize) -> Option<usize> {
+    let skip = |mut i: usize| {
+        while chars.get(i).is_some_and(|c| c.is_whitespace()) {
+            i += 1;
+        }
+        i
+    };
+    let mut i = skip(from);
+    if let Some(&quote) = chars.get(i).filter(|c| matches!(c, '"' | '\'' | '(')) {
+        let (close, stop) = if quote == '(' {
+            (')', &['('][..])
+        } else {
+            (quote, &[][..])
+        };
+        i = skip(closing(chars, i + 1, close, stop)? + 1);
+    }
+    (chars.get(i) == Some(&')')).then_some(i + 1)
 }
 
 /// The destination of an inline link whose `(` ends just before `from`: its text, where it
-/// starts and the index past the closing `)`.
+/// starts and the index past the closing `)`. Each scan stops where another link could begin,
+/// so a paragraph of unclosed links is read in linear time; a bare destination holding a
+/// bracket is taken as no link, which reports nothing.
 pub(super) fn inline_target(chars: &[char], from: usize) -> Option<(String, usize, usize)> {
     let mut i = from;
     while chars.get(i).is_some_and(|c| *c == ' ') {
         i += 1;
     }
     if chars.get(i) == Some(&'<') {
-        let end = (i + 1..chars.len()).find(|&k| chars[k] == '>' && !is_escaped(chars, k))?;
-        let close = (end..chars.len()).find(|&k| chars[k] == ')')?;
-        return Some((chars[i + 1..end].iter().collect(), i + 1, close + 1));
+        let end = closing(chars, i + 1, '>', &['<', '\n'])?;
+        return Some((
+            chars[i + 1..end].iter().collect(),
+            i + 1,
+            link_end(chars, end + 1)?,
+        ));
     }
     let start = i;
     let mut depth = 0;
@@ -96,13 +128,13 @@ pub(super) fn inline_target(chars: &[char], from: usize) -> Option<(String, usiz
                 }
                 depth -= 1;
             }
+            '[' | ']' if !is_escaped(chars, i) => return None,
             c if c.is_whitespace() => break,
             _ => {}
         }
         i += 1;
     }
-    let close = (i..chars.len()).find(|&k| chars[k] == ')')?;
-    Some((chars[start..i].iter().collect(), start, close + 1))
+    Some((chars[start..i].iter().collect(), start, link_end(chars, i)?))
 }
 
 /// A reference definition, `[label]: target`, opening the line at `at` (up to 3 spaces in):
@@ -117,7 +149,7 @@ pub(super) fn definition(chars: &[char], at: usize) -> Option<(String, String, u
     if indent > 3 || chars.get(open) != Some(&'[') || chars.get(open + 1) == Some(&'^') {
         return None;
     }
-    let close = (open + 1..chars.len()).find(|&k| chars[k] == ']' && !is_escaped(chars, k))?;
+    let close = closing(chars, open + 1, ']', &['['])?;
     if chars.get(close + 1) != Some(&':') || close == open + 1 {
         return None;
     }
@@ -127,8 +159,7 @@ pub(super) fn definition(chars: &[char], at: usize) -> Option<(String, String, u
         start += 1;
     }
     let (start, end) = if chars.get(start) == Some(&'<') {
-        let end = (start + 1..chars.len()).find(|&k| chars[k] == '>')?;
-        (start + 1, end)
+        (start + 1, closing(chars, start + 1, '>', &['<', '\n'])?)
     } else {
         let end = (start..chars.len())
             .find(|&k| chars[k].is_whitespace())
@@ -335,7 +366,7 @@ pub(super) fn slug(title: &str) -> String {
     let mut i = 0;
     while i < chars.len() {
         match chars[i] {
-            '<' => match (i..chars.len()).find(|&k| chars[k] == '>') {
+            '<' => match closing(&chars, i + 1, '>', &['<']) {
                 Some(end) => i = end + 1,
                 None => i += 1,
             },

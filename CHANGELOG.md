@@ -42,6 +42,7 @@ The manifests other than Claude Code's still declare plugin 0.5.0, so a build fr
 
 ### Plugin: fixed
 
+- The evaluation preflight now reports a runner's nonzero exit even if the runner had already called the expected skill. It retains the reported cost.
 - The prose skill asks for each quotation to be kept word for word, sample sentences and examples included, and each name and term the draft uses, and for both to be compared with the draft before it finishes. It has not been measured again. In the rewrites of the AI Humanizer Benchmark's 2026-10 texts (#171) it had changed words inside sample sentences set in quotation marks and dropped a programme name; its 3 new regression cases come from those edits.
 - The always-on banner names 'normal mode' beside 'stop laconic', as the skill turns off on either, and INSTALL.md shows how to run the shell and PowerShell versions of the hook where Node is missing.
 - Claude Code installs follow each commit: `.claude-plugin/plugin.json` no longer declares a version, so `claude plugin update` stops skipping changes made since 0.5.0.
@@ -50,6 +51,8 @@ The manifests other than Claude Code's still declare plugin 0.5.0, so a build fr
 - Remove the copy of the Australian Government Style Manual and correct the claim that it is CC BY 4.0: the manual is not openly licensed. The references now send agents to stylemanual.gov.au for rules they do not cover (#62).
 
 ### Plugin: security
+
+- The Pi smoke test uses minimatch 11.0.9 when matching package resources from the checkout.
 
 - Pin CI agent installs and disable lifecycle scripts (#28).
 - Keep scenario prompts out of Claude CLI arguments and reject model values that could become options (#30).

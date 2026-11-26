@@ -277,7 +277,7 @@ pub fn exec(command: &[String], input: &Input, timeout: Duration) -> Result<Outp
 }
 
 /// One call per skill setup, proving it loads its own skill. Prints each reply to read.
-/// Returns the exit status: 1 when a setup did not call its skill, or names no known skill.
+/// Returns 1 when a runner fails, misses its skill or names an unknown setup.
 pub fn preflight(here: &Path, exec: Exec, stdout: &mut dyn Write) -> Result<i32, String> {
     let config = parse(&read_text(&here.join("runners.json"))?)?;
     let config = config.as_object().ok_or("runners.json is not an object")?;
@@ -322,9 +322,25 @@ pub fn preflight(here: &Path, exec: Exec, stdout: &mut dyn Write) -> Result<i32,
             Duration::from_secs(600),
         )
         .map_err(|e| e.message(&command[0]))?;
-        let out = proc::text(&done.stdout)?;
+        let mut bytes = done.stdout.as_slice();
+        if done.code != 0 {
+            writeln!(stdout, "{name}: runner exited with status {}", done.code)
+                .map_err(|e| e.to_string())?;
+            // A terminated runner may leave a partial JSON event, even part of a UTF-8 character.
+            let last = bytes
+                .iter()
+                .rposition(|b| matches!(b, b'\r' | b'\n'))
+                .map_or(0, |i| i + 1);
+            let tail = &bytes[last..];
+            if tail.trim_ascii_start().starts_with(b"{")
+                && serde_json::from_slice::<Value>(tail).is_err()
+            {
+                bytes = &bytes[..last];
+            }
+        }
+        let out = proc::text(bytes)?;
         let used = skills_used(&out)?;
-        failures += i32::from(!used.contains(wanted));
+        failures += i32::from(done.code != 0 || !used.contains(wanted));
         // A result event is any JSON object whose `type` is "result", whatever its spacing or
         // key order.
         let mut results = Vec::new();

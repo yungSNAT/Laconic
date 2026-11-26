@@ -129,8 +129,14 @@ impl Workspace {
                     None => Resolved::Missing(part.clone()),
                 };
             }
-            // A symbolic link may lead out of the workspace: resolve each step and stay inside.
-            match here.join(part).canonicalize() {
+            // A symbolic link or junction may lead out of the workspace, and following it to
+            // find out would touch what lies outside, so a target through one is not checked.
+            let next = here.join(part);
+            let plain = std::fs::symlink_metadata(&next).is_ok_and(|m| !m.file_type().is_symlink());
+            if !plain {
+                return Resolved::Unchecked;
+            }
+            match next.canonicalize() {
                 Ok(next) if next.starts_with(&self.root) => here = next,
                 _ => return Resolved::Unchecked,
             }

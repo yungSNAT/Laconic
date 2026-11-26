@@ -223,7 +223,7 @@ pub(super) fn decode(text: &str) -> Option<String> {
 pub(super) fn has_anchor(anchors: &HashSet<String>, fragment: &str) -> bool {
     let fragment = fragment.to_lowercase();
     let bare = fragment.strip_prefix("user-content-").unwrap_or(&fragment);
-    bare == "top" || anchors.contains(bare)
+    bare == "top" || anchors.contains(ANY_ANCHOR) || anchors.contains(bare)
 }
 
 /// The anchors of a Markdown document, in lower case: each heading's GitHub anchor (with `-1`,
@@ -236,6 +236,9 @@ pub(super) fn anchors(text: &str) -> HashSet<String> {
         // A `{#id}` attribute names an anchor for renderers that read it; GitHub does not,
         // and slugs the whole title, attribute included.
         let title = title.trim_end();
+        if has_undecoded_entity(title) {
+            found.insert(ANY_ANCHOR.to_owned());
+        }
         if let Some((_, id)) = title
             .strip_suffix('}')
             .and_then(|rest| rest.rsplit_once("{#"))
@@ -375,7 +378,8 @@ fn unescape_html(text: &str) -> String {
                         Some(hex) => u32::from_str_radix(hex, 16).ok(),
                         None => n.parse().ok(),
                     })
-                    .and_then(char::from_u32),
+                    .and_then(char::from_u32)
+                    .or_else(|| named_entity(name)),
             };
             c.map(|c| (c, end + 1))
         });
@@ -384,6 +388,86 @@ fn unescape_html(text: &str) -> String {
         rest = &rest[len..];
     }
     out + rest
+}
+
+/// HTML's names for U+00A0 to U+00FF, in code point order.
+const LATIN_1: [&str; 96] = [
+    "nbsp", "iexcl", "cent", "pound", "curren", "yen", "brvbar", "sect", "uml", "copy", "ordf",
+    "laquo", "not", "shy", "reg", "macr", "deg", "plusmn", "sup2", "sup3", "acute", "micro",
+    "para", "middot", "cedil", "sup1", "ordm", "raquo", "frac14", "frac12", "frac34", "iquest",
+    "Agrave", "Aacute", "Acirc", "Atilde", "Auml", "Aring", "AElig", "Ccedil", "Egrave", "Eacute",
+    "Ecirc", "Euml", "Igrave", "Iacute", "Icirc", "Iuml", "ETH", "Ntilde", "Ograve", "Oacute",
+    "Ocirc", "Otilde", "Ouml", "times", "Oslash", "Ugrave", "Uacute", "Ucirc", "Uuml", "Yacute",
+    "THORN", "szlig", "agrave", "aacute", "acirc", "atilde", "auml", "aring", "aelig", "ccedil",
+    "egrave", "eacute", "ecirc", "euml", "igrave", "iacute", "icirc", "iuml", "eth", "ntilde",
+    "ograve", "oacute", "ocirc", "otilde", "ouml", "divide", "oslash", "ugrave", "uacute", "ucirc",
+    "uuml", "yacute", "thorn", "yuml",
+];
+
+/// Other named entities common in headings: typography, arrows and Latin Extended letters.
+const NAMED: &[(&str, char)] = &[
+    ("ndash", '\u{2013}'),
+    ("mdash", '\u{2014}'),
+    ("lsquo", '\u{2018}'),
+    ("rsquo", '\u{2019}'),
+    ("sbquo", '\u{201A}'),
+    ("ldquo", '\u{201C}'),
+    ("rdquo", '\u{201D}'),
+    ("bdquo", '\u{201E}'),
+    ("dagger", '\u{2020}'),
+    ("Dagger", '\u{2021}'),
+    ("bull", '\u{2022}'),
+    ("hellip", '\u{2026}'),
+    ("permil", '\u{2030}'),
+    ("prime", '\u{2032}'),
+    ("Prime", '\u{2033}'),
+    ("lsaquo", '\u{2039}'),
+    ("rsaquo", '\u{203A}'),
+    ("euro", '\u{20AC}'),
+    ("trade", '\u{2122}'),
+    ("larr", '\u{2190}'),
+    ("uarr", '\u{2191}'),
+    ("rarr", '\u{2192}'),
+    ("darr", '\u{2193}'),
+    ("harr", '\u{2194}'),
+    ("minus", '\u{2212}'),
+    ("ensp", '\u{2002}'),
+    ("emsp", '\u{2003}'),
+    ("thinsp", '\u{2009}'),
+    ("zwnj", '\u{200C}'),
+    ("zwj", '\u{200D}'),
+    ("OElig", '\u{152}'),
+    ("oelig", '\u{153}'),
+    ("Scaron", '\u{160}'),
+    ("scaron", '\u{161}'),
+    ("Yuml", '\u{178}'),
+    ("fnof", '\u{192}'),
+    ("circ", '\u{2C6}'),
+    ("tilde", '\u{2DC}'),
+];
+
+/// The character a named entity this rule knows stands for.
+fn named_entity(name: &str) -> Option<char> {
+    let latin = LATIN_1.iter().position(|&n| n == name);
+    latin
+        .and_then(|k| char::from_u32(0xA0 + k as u32))
+        .or_else(|| NAMED.iter().find(|&&(n, _)| n == name).map(|&(_, c)| c))
+}
+
+/// Recorded with a document's anchors when a heading holds a named entity this rule cannot
+/// decode: HTML defines over 2,000, so its anchor is unknown and no fragment is reported.
+pub(super) const ANY_ANCHOR: &str = "\u{0}";
+
+/// Whether `title` holds `&name;` for a name other than the markup ones and those above.
+fn has_undecoded_entity(title: &str) -> bool {
+    title.split('&').skip(1).any(|rest| {
+        rest.split_once(';').is_some_and(|(name, _)| {
+            name.starts_with(|c: char| c.is_ascii_alphabetic())
+                && name.chars().all(|c| c.is_ascii_alphanumeric())
+                && !matches!(name, "amp" | "lt" | "gt" | "quot" | "apos")
+                && named_entity(name).is_none()
+        })
+    })
 }
 
 /// `text` without the `_` runs that open or close emphasis, which the rendered heading drops;

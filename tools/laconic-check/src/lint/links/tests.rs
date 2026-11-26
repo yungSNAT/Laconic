@@ -172,13 +172,18 @@ fn nothing_outside_the_workspace_is_read() {
 #[cfg(unix)]
 #[test]
 fn a_symbolic_link_out_of_the_workspace_is_not_followed() {
-    let root = tree("symlink", &[("ws/a.md", ""), ("out/b.md", "# B\n")]);
+    let root = tree(
+        "symlink",
+        &[("ws/a.md", ""), ("ws/sub/c.md", ""), ("out/b.md", "# B\n")],
+    );
     std::os::unix::fs::symlink(root.join("out"), root.join("ws/link")).unwrap();
+    // Even a link that stays inside is not followed: learning where it leads means looking.
+    std::os::unix::fs::symlink(root.join("ws/sub"), root.join("ws/inner")).unwrap();
     let workspace = Workspace::new(&root.join("ws")).unwrap();
     let folder = workspace.folder_of(&root.join("ws/a.md")).unwrap();
     assert!(
         found(
-            "[b](link/b.md#nope) [c](link/none.md)\n",
+            "[b](link/b.md#nope) [c](link/none.md) [d](inner/none.md)\n",
             Some((&workspace, &folder))
         )
         .is_empty()
@@ -272,19 +277,25 @@ fn a_fifo_is_never_opened() {
 #[cfg(windows)]
 #[test]
 fn a_junction_out_of_the_workspace_is_not_followed() {
-    let root = tree("junction", &[("ws/a.md", ""), ("out/b.md", "# B\n")]);
-    let made = std::process::Command::new("cmd")
-        .args(["/C", "mklink", "/J"])
-        .arg(root.join("ws").join("link"))
-        .arg(root.join("out"))
-        .status()
-        .unwrap();
-    assert!(made.success());
+    let root = tree(
+        "junction",
+        &[("ws/a.md", ""), ("ws/sub/c.md", ""), ("out/b.md", "# B\n")],
+    );
+    // Even a junction that stays inside is not followed: learning where it leads means looking.
+    for (name, to) in [("link", root.join("out")), ("inner", root.join("ws").join("sub"))] {
+        let made = std::process::Command::new("cmd")
+            .args(["/C", "mklink", "/J"])
+            .arg(root.join("ws").join(name))
+            .arg(to)
+            .status()
+            .unwrap();
+        assert!(made.success());
+    }
     let workspace = Workspace::new(&root.join("ws")).unwrap();
     let folder = workspace.folder_of(&root.join("ws/a.md")).unwrap();
     assert!(
         found(
-            "[b](link/b.md#nope) [c](link/none.md)\n",
+            "[b](link/b.md#nope) [c](link/none.md) [d](inner/none.md)\n",
             Some((&workspace, &folder))
         )
         .is_empty()
@@ -311,4 +322,15 @@ fn reading_stops_at_the_budget() {
     let folder = workspace.folder_of(&root.join("a.md")).unwrap();
     assert!(found("[x](missing.md)\n", Some((&workspace, &folder))).is_empty());
     std::fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
+fn named_entities_in_headings_decode_or_leave_the_file_unchecked() {
+    // GitHub slugs the rendered heading, so a named entity becomes its character.
+    let text = "## Caf&eacute; &mdash; menu\n\nSee [a](#café--menu) and [b](#cafeacute-mdash-menu).\n";
+    let reported = found(text, None);
+    assert_eq!(reported.len(), 1, "only the entity spelling is reported: {reported:?}");
+    // An entity this rule cannot decode leaves the heading's anchor unknown: nothing is reported.
+    let text = "## The &bigstar; list\n\nSee [a](#the--list) and [b](#elsewhere).\n";
+    assert!(found(text, None).is_empty());
 }

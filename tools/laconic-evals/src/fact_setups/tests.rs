@@ -216,14 +216,20 @@ fn skills_used_reads_skill_calls_from_the_stream() {
         r#"{"message": {"content": [{"type": "tool_use", "name": "Skill", "input": {}}]}}"#,
         r#"{"message": {"content": "text"}}"#,
         r#"{"message": null}"#,
+        r#"  {"message": {"content": [{"type": "tool_use", "name": "Skill", "input": {"skill": "indented"}}]}}"#,
     ]
     .join("\n");
     assert_eq!(
         skills_used(&stream),
-        Ok(BTreeSet::from(["laconic-prose".to_owned(), String::new()]))
+        Ok(BTreeSet::from([
+            "laconic-prose".to_owned(),
+            "indented".to_owned(),
+            String::new()
+        ]))
     );
     for bad in [
         "{broken",
+        "  {broken",
         r#"{"message": 3}"#,
         r#"{"message": {"content": 3}}"#,
         r#"{"message": {"content": [{"type": "tool_use", "name": "Skill"}]}}"#,
@@ -331,6 +337,71 @@ fn preflight_passes_when_every_setup_calls_its_skill() {
 }
 
 #[test]
+fn preflight_reads_result_events_whatever_their_spacing_or_key_order() {
+    let dir = tempfile::tempdir().unwrap();
+    write_config(
+        dir.path(),
+        &json!({"avoid": {"command": ["claude", "--plugin-dir", "a"]}}),
+    );
+    let stream = [
+        r#"{"message": {"content": [{"type": "tool_use", "name": "Skill", "input": {"skill": "avoid-ai-writing"}}]}}"#,
+        "progress text",
+        r#"{"subtype": "success", "type": "result", "result": "Done.", "total_cost_usd": 0.5}"#,
+        r#"  {"type" : "result", "total_cost_usd": 0.25}"#,
+        r#"{"type": "assistant", "result": "not a result"}"#,
+    ]
+    .join("\n");
+    let fake = |_: &[String], _: &Input, _: Duration| done(0, &stream, "");
+    let mut printed = Vec::new();
+    assert_eq!(preflight(dir.path(), &fake, &mut printed), Ok(0));
+    assert_eq!(
+        String::from_utf8(printed).unwrap(),
+        "avoid: wanted avoid-ai-writing, called ['avoid-ai-writing']\nDone.\n\n"
+    );
+    let overhead = fs::read_to_string(dir.path().join("overhead.jsonl")).unwrap();
+    assert!(
+        overhead.ends_with("{\"stage\": \"preflight\", \"cost_usd\": 0.75}\n"),
+        "{overhead}"
+    );
+}
+
+#[test]
+fn preflight_fails_a_setup_with_no_known_skill_and_checks_the_rest() {
+    let dir = tempfile::tempdir().unwrap();
+    write_config(
+        dir.path(),
+        &json!({
+            "mine": {"command": ["claude", "--plugin-dir", "m"]},
+            "caveman": {"command": ["claude", "--plugin-dir", "c"]},
+        }),
+    );
+    let recorder = Recorder::new();
+    let fake = |command: &[String], input: &Input, _: Duration| {
+        recorder.record(command, input);
+        done(
+            0,
+            r#"{"message": {"content": [{"type": "tool_use", "name": "Skill", "input": {"skill": "caveman"}}]}}"#,
+            "",
+        )
+    };
+    let mut printed = Vec::new();
+    assert_eq!(preflight(dir.path(), &fake, &mut printed), Ok(1));
+    // The unknown setup is not run, so it costs nothing.
+    assert_eq!(recorder.calls().len(), 1);
+    assert_eq!(
+        String::from_utf8(printed).unwrap(),
+        "mine: no skill is known for this setup\n\ncaveman: wanted caveman, called ['caveman']\n\n\n"
+    );
+    // A closed output stops it at the unknown setup's line, before any call.
+    let mut closed: &mut [u8] = &mut [];
+    assert_eq!(
+        preflight(dir.path(), &fake, &mut closed),
+        Err("failed to write whole buffer".into())
+    );
+    assert_eq!(recorder.calls().len(), 1);
+}
+
+#[test]
 fn preflight_errors_stop_it() {
     let dir = tempfile::tempdir().unwrap();
     let here = dir.path();
@@ -343,10 +414,6 @@ fn preflight_errors_stop_it() {
     assert!(run(json!([]), &quiet).is_err());
     assert!(run(json!({"a": {}}), &quiet).is_err());
     assert!(run(json!({"a": {"command": "x"}}), &quiet).is_err());
-    assert_eq!(
-        run(json!({"other": {"command": ["--plugin-dir"]}}), &quiet),
-        Err("'other'".into())
-    );
     let gone =
         |_: &[String], _: &Input, _: Duration| -> Result<Output, Failure> { Err(Failure::Timeout) };
     assert!(

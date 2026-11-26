@@ -857,9 +857,9 @@ fn scan(
         }
         // An HTML block of types 1 to 5 runs, blank lines included, to the line that meets its
         // end condition, whether it opened on that line or earlier. One opened inside an alert
-        // or a list item would end with it, so only a line outside both opens one.
+        // or a list item would end with it, so only a line outside both leaves one open.
         let outside = !alert && (list_indent.is_none() || indent == 0);
-        let lower = if html_end.is_some() || (outside && !code_line && trimmed.starts_with('<')) {
+        let lower = if html_end.is_some() || (!code_line && trimmed.starts_with('<')) {
             trimmed.to_ascii_lowercase()
         } else {
             String::new()
@@ -870,7 +870,7 @@ fn scan(
         {
             Some((ends, from)) => {
                 let met = ends.iter().any(|end| lower[from..].contains(end));
-                html_end = (!met).then_some(ends);
+                html_end = (!met && (outside || html_end.is_some())).then_some(ends);
                 met
             }
             None => false,

@@ -596,6 +596,15 @@ fn definitions_after_blocks_read_as_commonmark_does() {
             "- item\n\n<script>\nx\n</script>\n[a]: gone.md\n",
             &["broken-link"],
         ),
+        // A block that opens and closes on one line ends there, in a container too.
+        (
+            "> [!NOTE]\n> <!-- c -->\n[a]: gone.md\n\n[x][a]\n",
+            &["broken-link"],
+        ),
+        (
+            "- item\n\n  <!-- c -->\n[a]: gone.md\n\n[x][a]\n",
+            &["broken-link"],
+        ),
     ] {
         assert_eq!(names(text, place), expected, "{text:?}");
     }

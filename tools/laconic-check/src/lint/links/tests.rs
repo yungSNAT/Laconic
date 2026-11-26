@@ -463,6 +463,61 @@ fn an_inline_link_ends_at_its_title_and_closing_parenthesis() {
 }
 
 #[test]
+fn a_definition_cannot_interrupt_a_paragraph() {
+    let root = tree("interrupt", &[("README.md", ""), ("x.md", "")]);
+    let workspace = Workspace::new(&root).unwrap();
+    let folder = workspace.folder_of(&root.join("README.md")).unwrap();
+    let place = Some((&workspace, folder.as_path()));
+    // A line shaped like a definition inside a paragraph is prose, and defines nothing.
+    assert!(names("Intro line.\n[Note]: read this first.\n", place).is_empty());
+    assert_eq!(
+        names("Intro line.\n[Note]: x.md\n\nSee [a][note].\n", place),
+        ["broken-anchor"]
+    );
+    // Definitions may follow one another, with a title or target on the next line.
+    let text = "[a]: x.md\n  \"Title\"\n[b]:\nx.md\n[c]: gone.md\n\n[1][a] [2][b]\n";
+    assert_eq!(names(text, place), ["broken-link"]);
+    let _ = std::fs::remove_dir_all(&root);
+}
+
+#[test]
+fn a_large_folder_is_searched_once_per_target() {
+    // Each target once scanned the whole listing of its folder, so missing links into a large
+    // folder took time in the product of the two. Quadrupling both must take about 4 times as
+    // long, not 16.
+    let time = |n: usize| {
+        let files: Vec<(String, &str)> = (0..n).map(|k| (format!("f{k}.md"), "")).collect();
+        let mut listed: Vec<(&str, &str)> = files.iter().map(|(f, b)| (f.as_str(), *b)).collect();
+        listed.push(("README.md", ""));
+        let root = tree(&format!("large-{n}"), &listed);
+        let workspace = Workspace::new(&root).unwrap();
+        let folder = workspace.folder_of(&root.join("README.md")).unwrap();
+        let text = "[a](Gone) ".repeat(n);
+        let chars: Vec<char> = text.chars().collect();
+        let mut links = Links::default();
+        links.collect(&chars, |k| (1, k + 1));
+        // The first run lists the folder; the fastest of 3 more times the lookups alone.
+        links.findings(&text, Some((&workspace, &folder)));
+        let fastest = (0..3)
+            .map(|_| {
+                let start = std::time::Instant::now();
+                links.findings(&text, Some((&workspace, &folder)));
+                start.elapsed()
+            })
+            .min()
+            .unwrap();
+        let _ = std::fs::remove_dir_all(&root);
+        fastest
+    };
+    let (small, large) = (time(1_000), time(4_000));
+    assert!(
+        large < small * 8,
+        "4 times the links took {:.1} times as long ({small:?} to {large:?})",
+        large.as_secs_f64() / small.as_secs_f64()
+    );
+}
+
+#[test]
 fn a_bracket_in_a_bare_destination_is_part_of_it() {
     // As in CommonMark, so a missing target there is still reported.
     for text in ["[a](#x]y)", "[a](#x[1])", "[a](#notes[1]x)"] {

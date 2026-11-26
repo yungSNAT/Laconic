@@ -29,12 +29,20 @@ const MAX_TARGET_BYTES: u64 = 1 << 20;
 /// How many folder listings and file reads one workspace allows; past it, targets go unchecked.
 const MAX_READS: usize = 10_000;
 
+/// A folder's names: exactly, and by their lower case (the first name for each), so each
+/// target costs one lookup however large the folder.
+#[derive(Default)]
+struct Listing {
+    exact: HashSet<OsString>,
+    lower: HashMap<String, String>,
+}
+
 /// The folder `broken-link` resolves relative targets within. A target that leads outside it
 /// by `..`, or through any symbolic link or junction (inside the folder or not), is not
 /// checked.
 pub struct Workspace {
     root: PathBuf,
-    listings: RefCell<HashMap<PathBuf, Option<Rc<Vec<OsString>>>>>,
+    listings: RefCell<HashMap<PathBuf, Option<Rc<Listing>>>>,
     anchors: RefCell<HashMap<PathBuf, Option<Rc<HashSet<String>>>>>,
     reads: Cell<usize>,
 }
@@ -75,17 +83,19 @@ impl Workspace {
     }
 
     /// The names in `folder`, which must already be resolved and inside the workspace.
-    fn listing(&self, folder: &Path) -> Option<Rc<Vec<OsString>>> {
+    fn listing(&self, folder: &Path) -> Option<Rc<Listing>> {
         if let Some(cached) = self.listings.borrow().get(folder) {
             return cached.clone();
         }
         let names = if self.spend() {
             std::fs::read_dir(folder).ok().map(|entries| {
-                Rc::new(
-                    entries
-                        .filter_map(|e| e.ok().map(|e| e.file_name()))
-                        .collect(),
-                )
+                let mut listing = Listing::default();
+                for name in entries.filter_map(|e| e.ok().map(|e| e.file_name())) {
+                    let lossy = name.to_string_lossy().into_owned();
+                    listing.lower.entry(lossy.to_lowercase()).or_insert(lossy);
+                    listing.exact.insert(name);
+                }
+                Rc::new(listing)
             })
         } else {
             None
@@ -122,13 +132,9 @@ impl Workspace {
             let Some(names) = self.listing(&here) else {
                 return Resolved::Unchecked;
             };
-            if !names.iter().any(|n| n == part.as_str()) {
-                let lower = part.to_lowercase();
-                return match names
-                    .iter()
-                    .find(|n| n.to_string_lossy().to_lowercase() == lower)
-                {
-                    Some(n) => Resolved::Case(part.clone(), n.to_string_lossy().into_owned()),
+            if !names.exact.contains(std::ffi::OsStr::new(part)) {
+                return match names.lower.get(&part.to_lowercase()) {
+                    Some(n) => Resolved::Case(part.clone(), n.clone()),
                     None => Resolved::Missing(part.clone()),
                 };
             }
@@ -213,16 +219,24 @@ impl Links {
             let (line, column) = at(i);
             list.push(Target { text, line, column });
         };
-        // A definition, `[label]: target`, opens a line; it is recognised at the paragraph's
-        // start and after each line break.
+        // A definition, `[label]: target`, opens a line. It cannot interrupt a paragraph, so it
+        // is recognised on the paragraph's first line and on a line straight after another
+        // definition or its title.
         let mut line_start = 0;
+        let mut after_definition = false;
         while line_start < chars.len() {
-            if let Some((label, target, start)) = definition(chars, line_start) {
+            let mut end = line_start;
+            let open = line_start == 0 || after_definition;
+            let found = open.then(|| definition(chars, line_start)).flatten();
+            let title = after_definition && matches!(chars[line_start], '"' | '\'' | '(');
+            after_definition = found.is_some() || title;
+            if let Some((label, target, start)) = found {
                 self.defined.insert(normalise(&label));
+                end = start + target.chars().count();
                 push(&mut self.targets, target, start);
             }
-            let (line, _) = at(line_start);
-            line_start = (line_start..chars.len())
+            let (line, _) = at(end);
+            line_start = (end..chars.len())
                 .find(|&i| at(i).0 != line)
                 .unwrap_or(chars.len());
         }

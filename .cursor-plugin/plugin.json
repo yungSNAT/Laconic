@@ -19,5 +19,9 @@
   ],
   "logo": ".claude-plugin/icon.png",
   "skills": "./skills/",
-  "rules": "./.cursor-plugin/rules/"
+  "rules": "./.cursor-plugin/rules/",
+  "hooks": {
+    "version": 1,
+    "hooks": {}
+  }
 }

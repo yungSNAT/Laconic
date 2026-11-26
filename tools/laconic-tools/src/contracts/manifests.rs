@@ -102,3 +102,17 @@ fn changelog_names_the_current_versions() {
         "{checker}"
     );
 }
+
+/// Cursor scans default folders for any component its manifest leaves out, and would read
+/// `hooks/hooks.json` (Claude Code's format) and the root `rules/` (no rule frontmatter). The
+/// manifest must name its skills and rules and declare its hooks, which are none.
+#[test]
+fn cursor_manifest_names_every_component_it_ships() {
+    let manifest = read_json(&root().join(".cursor-plugin/plugin.json"));
+    assert_eq!(manifest["skills"], "./skills/");
+    assert_eq!(manifest["rules"], "./.cursor-plugin/rules/");
+    assert_eq!(
+        manifest["hooks"],
+        serde_json::json!({"version": 1, "hooks": {}})
+    );
+}

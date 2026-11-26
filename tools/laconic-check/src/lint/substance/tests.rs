@@ -261,7 +261,10 @@ fn markdown_links_labelled_todo_or_tbd_do_not_trigger_ai_placeholder() {
     assert_eq!(count("See [TODO](<my file.md) later."), 1);
     assert_eq!(count("See [TODO](url (a (b)) later."), 1);
     assert_eq!(count("See [TODO](<a<b>) later."), 1);
-    assert_eq!(count("See [TODO](<a\nb>) later."), 1);
+    // Lint joins a paragraph's lines with a space before this rule reads it, so a line break
+    // inside '<...>' is checked on the destination itself.
+    let broken: Vec<char> = "[TODO](<a\nb>)".chars().collect();
+    assert_eq!(super::link_tail_end(&broken, 5), None);
     // Escaped parentheses do not count towards the balance; an empty destination is a link.
     assert_eq!(count(r"See [TODO](a\(b) later."), 0);
     assert_eq!(count(r"See [TODO](<a\>b>) later."), 0);

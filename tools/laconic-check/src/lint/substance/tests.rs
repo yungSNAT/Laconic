@@ -261,12 +261,46 @@ fn markdown_links_labelled_todo_or_tbd_do_not_trigger_ai_placeholder() {
     assert_eq!(count("See [TODO](<my file.md) later."), 1);
     assert_eq!(count("See [TODO](url (a (b)) later."), 1);
     assert_eq!(count("See [TODO](<a<b>) later."), 1);
-    // Lint joins a paragraph's lines with a space before this rule reads it, so a line break
-    // inside '<...>' is checked on the destination itself.
-    let broken: Vec<char> = "[TODO](<a\nb>)".chars().collect();
-    assert_eq!(super::link_tail_end(&broken, 5), None);
+    // A line break inside '<...>' leaves no link; one before a title or the destination does not.
+    assert_eq!(count("See [TODO](<a\nb>) later."), 1);
+    assert_eq!(count("See [TODO](a\n\"t\") later."), 0);
+    assert_eq!(count("See [TODO](\na) later."), 0);
+    // Link text may span lines.
+    assert_eq!(count("See [TODO\nlist](a) later."), 0);
     // Escaped parentheses do not count towards the balance; an empty destination is a link.
     assert_eq!(count(r"See [TODO](a\(b) later."), 0);
     assert_eq!(count(r"See [TODO](<a\>b>) later."), 0);
     assert_eq!(count("See [TODO]() later."), 0);
+}
+
+#[test]
+fn bare_link_destinations_are_read_in_linear_time() {
+    // A bare destination runs to the next space, and each `](` it passes adds a level of
+    // parentheses, so a paragraph of them was read again from every `]`. Quadrupling a shape must
+    // take well under the 16 times a square gives; the fastest of 5 runs decides.
+    let fastest = |text: &str| {
+        let chars: Vec<char> = text.chars().collect();
+        (0..5)
+            .map(|_| {
+                let start = std::time::Instant::now();
+                super::markdown_link_label_ranges(&chars);
+                start.elapsed()
+            })
+            .min()
+            .unwrap()
+    };
+    let slow: Vec<String> = ["](a", "](a(", "[TODO](a"]
+        .iter()
+        .filter_map(|unit| {
+            let text = |chars: usize| unit.repeat(chars / unit.len());
+            let (small, large) = (fastest(&text(16_000)), fastest(&text(64_000)));
+            (large >= small * 8).then(|| {
+                format!(
+                    "{unit:?}: 4 times the input took {:.1} times as long ({small:?} to {large:?})",
+                    large.as_secs_f64() / small.as_secs_f64()
+                )
+            })
+        })
+        .collect();
+    assert!(slow.is_empty(), "{slow:#?}");
 }

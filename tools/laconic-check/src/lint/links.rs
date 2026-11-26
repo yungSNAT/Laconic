@@ -12,6 +12,7 @@
 use std::cell::{Cell, RefCell};
 use std::collections::{HashMap, HashSet};
 use std::ffi::OsString;
+use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
 
@@ -143,9 +144,19 @@ impl Workspace {
         if let Some(cached) = self.anchors.borrow().get(path) {
             return cached.clone();
         }
-        let small = std::fs::metadata(path).is_ok_and(|m| m.len() <= MAX_TARGET_BYTES);
+        // Only a regular file is opened: opening a FIFO waits for a writer, and a device may
+        // never end. The read stays capped should the file grow after the check.
+        let small =
+            std::fs::metadata(path).is_ok_and(|m| m.is_file() && m.len() <= MAX_TARGET_BYTES);
         let found = (small && self.spend())
-            .then(|| std::fs::read_to_string(path).ok())
+            .then(|| {
+                let mut text = String::new();
+                std::fs::File::open(path)
+                    .and_then(|f| f.take(MAX_TARGET_BYTES + 1).read_to_string(&mut text))
+                    .ok()
+                    .filter(|&n| n as u64 <= MAX_TARGET_BYTES)
+                    .map(|_| text)
+            })
             .flatten()
             .map(|text| Rc::new(anchors(&text)));
         self.anchors
@@ -248,7 +259,14 @@ impl Links {
     pub(super) fn findings(&self, text: &str, place: Option<(&Workspace, &Path)>) -> Vec<Finding> {
         let mut found = Vec::new();
         let own = anchors(text);
-        for r in &self.references {
+        // A link inside an HTML comment renders nothing, so it leads nowhere and is not read.
+        let comments = comment_spans(text);
+        let live = |t: &&Target| {
+            !comments
+                .iter()
+                .any(|&(start, end)| (start..=end).contains(&(t.line, t.column)))
+        };
+        for r in self.references.iter().filter(live) {
             if !self.defined.contains(&normalise(&r.text)) {
                 found.push(finding(
                     r,
@@ -261,7 +279,7 @@ impl Links {
                 ));
             }
         }
-        for t in &self.targets {
+        for t in self.targets.iter().filter(live) {
             let Some((path, fragment)) = split_target(&t.text) else {
                 continue;
             };

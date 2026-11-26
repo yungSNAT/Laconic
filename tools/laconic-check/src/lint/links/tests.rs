@@ -216,6 +216,91 @@ fn slugs_follow_github() {
         "docs-and-bold-my_var"
     );
     assert_eq!(slug("Café olé"), "café-olé");
+    // GitHub slugs the rendered text: emphasis marks and entity escapes go first.
+    assert_eq!(slug("_Emph_ words"), "emph-words");
+    assert_eq!(slug("__init__ and snake_case"), "init-and-snake_case");
+    assert_eq!(
+        slug("A &amp; B &#38; C &#x26; D &unknown; E & F"),
+        "a--b--c--d-unknown-e--f"
+    );
+}
+
+#[test]
+fn heading_anchors_match_github_for_emphasis_entities_and_attributes() {
+    let text = "## Title {#custom}\n\n## _Emph_ words\n\n## A &amp; B\n\nSee [a](#custom), [b](#title-custom), [c](#emph-words), [d](#a--b) and [e](#title).\n";
+    assert_eq!(names(text, None), ["broken-anchor"]);
+    assert!(found(text, None)[0].3.contains("'#title'"));
+}
+
+#[test]
+fn links_in_html_comments_are_not_read() {
+    let text = "<!-- [a](#gone-one) -->\n\nText <!-- [b](#gone-two) --> and [c](#gone-three).\n\n<!--\n[d](#gone-four) [e][nowhere]\n\n[f](#gone-five)\n-->\n\n`<!--` opens nothing in code: [g](#gone-six).\n";
+    let hits = found(text, None);
+    assert_eq!(hits.len(), 2, "{hits:?}");
+    assert!(hits[0].3.contains("#gone-three"), "{hits:?}");
+    assert!(hits[1].3.contains("#gone-six"), "{hits:?}");
+    // A comment left open hides the rest of the text.
+    assert!(found("<!-- [h](#gone)\n", None).is_empty());
+}
+
+#[cfg(unix)]
+#[test]
+fn a_fifo_is_never_opened() {
+    let root = tree("fifo", &[("ws/a.md", "")]);
+    let ws = root.join("ws");
+    let made = std::process::Command::new("mkfifo")
+        .arg(ws.join("pipe.md"))
+        .status()
+        .unwrap();
+    assert!(made.success());
+    // Opening a FIFO waits for a writer, so the check runs on its own thread with a deadline.
+    let (sent, received) = std::sync::mpsc::channel();
+    let probe = ws.clone();
+    std::thread::spawn(move || {
+        let workspace = Workspace::new(&probe).unwrap();
+        let folder = workspace.folder_of(&probe.join("a.md")).unwrap();
+        let _ = sent.send(names("[f](pipe.md#x)\n", Some((&workspace, &folder))));
+    });
+    let result = received.recv_timeout(std::time::Duration::from_secs(10));
+    assert_eq!(
+        result.expect("reading a FIFO hung the run"),
+        Vec::<String>::new()
+    );
+    std::fs::remove_dir_all(root).unwrap();
+}
+
+#[cfg(windows)]
+#[test]
+fn a_junction_out_of_the_workspace_is_not_followed() {
+    let root = tree("junction", &[("ws/a.md", ""), ("out/b.md", "# B\n")]);
+    let made = std::process::Command::new("cmd")
+        .args(["/C", "mklink", "/J"])
+        .arg(root.join("ws").join("link"))
+        .arg(root.join("out"))
+        .status()
+        .unwrap();
+    assert!(made.success());
+    let workspace = Workspace::new(&root.join("ws")).unwrap();
+    let folder = workspace.folder_of(&root.join("ws/a.md")).unwrap();
+    assert!(
+        found(
+            "[b](link/b.md#nope) [c](link/none.md)\n",
+            Some((&workspace, &folder))
+        )
+        .is_empty()
+    );
+    std::fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
+fn unc_and_drive_letter_targets_are_refused_without_a_read() {
+    let root = tree("unc", &[("ws/a.md", "")]);
+    let workspace = Workspace::new(&root.join("ws")).unwrap();
+    let folder = workspace.folder_of(&root.join("ws/a.md")).unwrap();
+    let text = r"[a](\\server\share\x.md) [b](%5C%5Cserver%5Cshare%5Cx.md) [c](C:/x.md) [d](C%3A/x.md) [e](//server/share/x.md)";
+    assert!(found(text, Some((&workspace, &folder))).is_empty());
+    assert_eq!(workspace.reads.get(), 0);
+    std::fs::remove_dir_all(root).unwrap();
 }
 
 #[test]

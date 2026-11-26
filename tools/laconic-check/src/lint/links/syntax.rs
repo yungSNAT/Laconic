@@ -188,7 +188,8 @@ pub(super) fn split_target(target: &str) -> Option<(String, Option<String>)> {
     };
     let path = rest.split('?').next().unwrap_or("");
     let path = decode(path)?;
-    if path.contains(':') {
+    // A drive letter or a backslash, encoded, could still name a UNC or absolute path.
+    if path.contains([':', '\\']) {
         return None;
     }
     Some((path, fragment.filter(|f| !f.is_empty())))
@@ -232,14 +233,13 @@ pub(super) fn anchors(text: &str) -> HashSet<String> {
     let mut found = HashSet::new();
     let mut seen: HashMap<String, usize> = HashMap::new();
     let mut heading = |title: &str, found: &mut HashSet<String>| {
-        let (title, custom) = match title.trim_end().strip_suffix('}') {
-            Some(rest) => match rest.rsplit_once("{#") {
-                Some((title, id)) => (title, Some(id)),
-                None => (title, None),
-            },
-            None => (title, None),
-        };
-        if let Some(id) = custom {
+        // A `{#id}` attribute names an anchor for renderers that read it; GitHub does not,
+        // and slugs the whole title, attribute included.
+        let title = title.trim_end();
+        if let Some((_, id)) = title
+            .strip_suffix('}')
+            .and_then(|rest| rest.rsplit_once("{#"))
+        {
             found.insert(id.to_lowercase());
         }
         let slug = slug(title);
@@ -324,8 +324,8 @@ pub(super) fn collect_ids(line: &str, found: &mut HashSet<String>) {
     }
 }
 
-/// GitHub's anchor for a heading: its text without links' targets, HTML tags and punctuation
-/// other than hyphens and underscores, in lower case, with each space a hyphen.
+/// GitHub's anchor for a heading: its rendered text (without links' targets, HTML tags,
+/// emphasis marks and entity escapes) without punctuation other than hyphens and underscores, in lower case, with each space a hyphen.
 pub(super) fn slug(title: &str) -> String {
     let chars: Vec<char> = title.chars().collect();
     let mut text = String::new();
@@ -346,9 +346,109 @@ pub(super) fn slug(title: &str) -> String {
             }
         }
     }
-    text.to_lowercase()
+    without_emphasis(&unescape_html(&text))
+        .to_lowercase()
         .chars()
         .filter(|c| c.is_alphanumeric() || matches!(c, ' ' | '-' | '_'))
         .map(|c| if c == ' ' { '-' } else { c })
         .collect()
+}
+
+/// `text` with the entities for markup characters and numeric character references decoded,
+/// as GitHub renders a heading before taking its anchor.
+fn unescape_html(text: &str) -> String {
+    let mut out = String::new();
+    let mut rest = text;
+    while let Some(at) = rest.find('&') {
+        out.push_str(&rest[..at]);
+        rest = &rest[at..];
+        let decoded = rest.find(';').and_then(|end| {
+            let c = match &rest[1..end] {
+                "amp" => Some('&'),
+                "lt" => Some('<'),
+                "gt" => Some('>'),
+                "quot" => Some('"'),
+                "apos" => Some('\''),
+                name => name
+                    .strip_prefix('#')
+                    .and_then(|n| match n.strip_prefix(['x', 'X']) {
+                        Some(hex) => u32::from_str_radix(hex, 16).ok(),
+                        None => n.parse().ok(),
+                    })
+                    .and_then(char::from_u32),
+            };
+            c.map(|c| (c, end + 1))
+        });
+        let (c, len) = decoded.unwrap_or(('&', 1));
+        out.push(c);
+        rest = &rest[len..];
+    }
+    out + rest
+}
+
+/// `text` without the `_` runs that open or close emphasis, which the rendered heading drops;
+/// an `_` inside a word, as in `snake_case`, stays.
+fn without_emphasis(text: &str) -> String {
+    let chars: Vec<char> = text.chars().collect();
+    let word = |c: Option<&char>| c.is_some_and(|c| c.is_alphanumeric());
+    (0..chars.len())
+        .filter(|&i| {
+            chars[i] != '_'
+                || (word(chars[..i].iter().rev().find(|&&c| c != '_'))
+                    && word(chars[i + 1..].iter().find(|&&c| c != '_')))
+        })
+        .map(|i| chars[i])
+        .collect()
+}
+
+/// Where a place in the text sits: 1-based line and character column.
+pub(super) type Place = (usize, usize);
+
+/// The HTML comments in `text` outside fenced code, from `<!--` to the end of `-->`. A `<!--`
+/// inside a code span opens nothing; a comment left open runs to the end of the text.
+pub(super) fn comment_spans(text: &str) -> Vec<(Place, Place)> {
+    let mut spans = Vec::new();
+    let mut open: Option<Place> = None;
+    let mut fence: Option<&str> = None;
+    for (index, line) in text.lines().enumerate() {
+        let trimmed = line.trim_start();
+        if open.is_none() {
+            if let Some(marker) = fence {
+                if trimmed.starts_with(marker) {
+                    fence = None;
+                }
+                continue;
+            }
+            if trimmed.starts_with("```") || trimmed.starts_with("~~~") {
+                fence = Some(&trimmed[..3]);
+                continue;
+            }
+        }
+        let chars: Vec<char> = line.chars().collect();
+        let code = code_spans(&chars);
+        let mut i = 0;
+        while i < chars.len() {
+            let at = |token: &str| {
+                chars[i..]
+                    .iter()
+                    .copied()
+                    .take(token.len())
+                    .eq(token.chars())
+            };
+            match open {
+                None if at("<!--") && !code.iter().any(|&(s, e)| (s..e).contains(&i)) => {
+                    open = Some((index + 1, i + 1));
+                    i += 4;
+                }
+                Some(start) if at("-->") => {
+                    spans.push((start, (index + 1, i + 3)));
+                    open = None;
+                    i += 3;
+                }
+                _ => i += 1,
+            }
+        }
+    }
+    spans.extend(open.map(|start| (start, (usize::MAX, usize::MAX))));
+    spans
 }

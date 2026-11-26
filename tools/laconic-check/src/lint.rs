@@ -311,7 +311,7 @@ rules! {
     BrokenAnchor = opt_in(
         "broken-anchor",
         Confidence::High,
-        "A link to '#fragment' that matches no heading or HTML id in the same file (headings take GitHub's anchors), and a full or collapsed reference link ('[text][label]', '[text][]') with no '[label]: target' definition. It needs only the text, so it also runs on standard input and in the MCP server. Enabled by --only, a project file or the docs profile.",
+        "A link to '#fragment' that matches no heading or HTML id in the same file (headings take GitHub's anchors), and a full or collapsed reference link (`[text][label]`, `[text][]`) with no `[label]: target` definition. It needs only the text, so it also runs on standard input and in the MCP server. Enabled by --only, a project file or the docs profile.",
     ),
     BrokenLink = opt_in(
         "broken-link",

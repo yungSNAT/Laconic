@@ -6,7 +6,7 @@
 
 Each example is a seeded fault: the tests plant it in clean prose, and `lint` must flag it exactly once. The human prose figures count findings in 3 Productivity Commission reports released in 2018 and 2021 (205,299 whitespace-separated words of Australian Government prose under CC BY 3.0 AU, in `tools/laconic-check/tests/corpus`). Most of them are house-style differences the Commission's own style allows, such as spaced dashes, words for numbers below 10 and serial commas, rather than errors.
 
-The outside figures come from the 150 human-written news articles in `human_detectors.json` from jenna-russell/human_detectors at commit `afcf03d` (110,723 words of mostly American prose, not stored here because the texts have no stated licence). `laconic-tools calibrate` lints them from a local download. Articles with odd prompt ids are the calibration half, for tuning rules; the even half is held out, and the table shows how many of those 75 articles each rule flags. A new advisory rule must flag under 5% of them. Measured and dropped as advisories: sentence-length rhythm, which flagged 3 of the 75 held-out human articles but only 4 of the 75 AI-written ones in the same corpus, so it does not mark the pattern it targets; capitalisation consistency, which flagged 71 of 75; and meaning reversals in edits, which need before-and-after pairs that this corpus lacks.
+The outside figures come from the 150 human-written news articles in `human_detectors.json` from jenna-russell/human_detectors at commit `afcf03d` (110,723 words of mostly American prose, not stored here because the texts have no stated licence). `laconic-tools calibrate` lints them from a local download. Articles with odd prompt ids are the calibration half, for tuning rules; the even half is held out, and the table shows how many of those 75 articles each rule flags. A new advisory or opt-in rule must flag under 5% of them. Measured and dropped as advisories: sentence-length rhythm, which flagged 3 of the 75 held-out human articles but only 4 of the 75 AI-written ones in the same corpus, so it does not mark the pattern it targets; capitalisation consistency, which flagged 71 of 75; and meaning reversals in edits, which need before-and-after pairs that this corpus lacks.
 
 To report a finding that should not have been flagged, use the [false-positive form](https://github.com/yungSNAT/Laconic/issues/new?template=false-positive.yml).
 
@@ -298,7 +298,7 @@ Example: `Define clean gates and seams before coding.`.
 
 ### broken-anchor
 
-A link to '#fragment' that matches no heading or HTML id in the same file (headings take GitHub's anchors), and a full or collapsed reference link ('[text][label]', '[text][]') with no '[label]: target' definition. It needs only the text, so it also runs on standard input and in the MCP server. Enabled by --only, a project file or the docs profile.
+A link to '#fragment' that matches no heading or HTML id in the same file (headings take GitHub's anchors), and a full or collapsed reference link (`[text][label]`, `[text][]`) with no `[label]: target` definition. It needs only the text, so it also runs on standard input and in the MCP server. Enabled by --only, a project file or the docs profile.
 
 Fails `lint`: yes. Not a Style Manual rule. Human prose: 70 findings, 0.34 per 1,000 words. Outside articles: flags 0 of 75 held out (0 findings) and 0 of 75 for calibration.
 

@@ -460,9 +460,15 @@ const CALIBRATE: &str =
     "cargo run --manifest-path tools/laconic-tools/Cargo.toml -- calibrate <human_detectors.json>";
 /// The row of outside-corpus totals: articles and words per split, then local words.
 const TOTALS: &str = "(articles and words)";
-/// Advisory rules that predate the 5% gate: clause-dashes flags about a fifth of the
-/// held-out articles.
-const GRANDFATHERED: &[&str] = &["clause-dashes"];
+/// Rules that predate the 5% gate: clause-dashes flags about a fifth of the held-out
+/// articles, and the opt-in unglossed-term, unanchored-magnitude and unnamed-evidence flag
+/// 17, 4 and 12 of 75, which is why they are off by default.
+const GRANDFATHERED: &[&str] = &[
+    "clause-dashes",
+    "unglossed-term",
+    "unanchored-magnitude",
+    "unnamed-evidence",
+];
 
 /// tests/outside-corpus.tsv by row name. Each row holds calibration articles and findings,
 /// then held-out articles and findings; the totals row holds articles and words in the same
@@ -606,7 +612,7 @@ fn reference() -> String {
          # laconic-check rules\n\n\
          `laconic-check lint` reports each finding as `file:line:column: rule: message`. Each rule below is headed by its name, so `docs/rules.md#<rule>` links to it. A finding is a reason to look, not proof of a defect. Advisory rules never fail `lint`.\n\n\
          Each example is a seeded fault: the tests plant it in clean prose, and `lint` must flag it exactly once. The human prose figures count findings in 3 Productivity Commission reports released in 2018 and 2021 ({} whitespace-separated words of Australian Government prose under CC BY 3.0 AU, in `tools/laconic-check/tests/corpus`). Most of them are house-style differences the Commission's own style allows, such as spaced dashes, words for numbers below 10 and serial commas, rather than errors.\n\n\
-         The outside figures come from the {} human-written news articles in `human_detectors.json` from jenna-russell/human_detectors at commit `afcf03d` ({} words of mostly American prose, not stored here because the texts have no stated licence). `laconic-tools calibrate` lints them from a local download. Articles with odd prompt ids are the calibration half, for tuning rules; the even half is held out, and the table shows how many of those {} articles each rule flags. A new advisory rule must flag under 5% of them. Measured and dropped as advisories: sentence-length rhythm, which flagged 3 of the 75 held-out human articles but only 4 of the 75 AI-written ones in the same corpus, so it does not mark the pattern it targets; capitalisation consistency, which flagged 71 of 75; and meaning reversals in edits, which need before-and-after pairs that this corpus lacks.\n\n\
+         The outside figures come from the {} human-written news articles in `human_detectors.json` from jenna-russell/human_detectors at commit `afcf03d` ({} words of mostly American prose, not stored here because the texts have no stated licence). `laconic-tools calibrate` lints them from a local download. Articles with odd prompt ids are the calibration half, for tuning rules; the even half is held out, and the table shows how many of those {} articles each rule flags. A new advisory or opt-in rule must flag under 5% of them. Measured and dropped as advisories: sentence-length rhythm, which flagged 3 of the 75 held-out human articles but only 4 of the 75 AI-written ones in the same corpus, so it does not mark the pattern it targets; capitalisation consistency, which flagged 71 of 75; and meaning reversals in edits, which need before-and-after pairs that this corpus lacks.\n\n\
          To report a finding that should not have been flagged, use the [false-positive form]({ISSUE_FORM}false-positive.yml).\n\n\
          | Rule | Fails `lint` | Style Manual section | Human prose, per 1,000 words | Outside articles flagged |\n\
          | --- | --- | --- | --- | --- |",
@@ -724,17 +730,17 @@ fn outside_corpus_lists_every_rule() {
 }
 
 #[test]
-fn advisory_rules_flag_under_5_percent_of_held_out_articles() {
+fn advisory_and_opt_in_rules_flag_under_5_percent_of_held_out_articles() {
     let outside = outside();
     let held_out = outside[TOTALS][2];
     for rule in RULES
         .iter()
-        .filter(|r| r.advisory && !r.opt_in && !GRANDFATHERED.contains(&r.name))
+        .filter(|r| (r.advisory || r.opt_in) && !GRANDFATHERED.contains(&r.name))
     {
         let flagged = outside[rule.name][2];
         assert!(
             flagged * 20 < held_out,
-            "{} flags {flagged} of {held_out} held-out human articles; an advisory must stay under 5%",
+            "{} flags {flagged} of {held_out} held-out human articles; an advisory or opt-in rule must stay under 5%",
             rule.name
         );
     }

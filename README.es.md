@@ -321,6 +321,8 @@ El 13 de noviembre de 2026, `preserve` se ejecutó sobre las 363 reescrituras de
 | Nombres alterados | 28 | 20 listan un nombre para revisar | 20 | 20 |
 | Todas las unidades conservadas | 258 | 17 pasan; 224 fallan solo por palabras de sentido; 0 fallan por un mes, código en línea o URL; 17 fallan por un número, cantidad o cita | 23 pasan; 222; 0; 13 | 64 pasan; 182; 0; 12 |
 
+`laconic-check instructions` imprime lo que un agente de programación necesita para usar el comprobador en un repositorio: qué comprueban `lint` y `preserve`, cómo leer y atender un hallazgo, cómo bloquear la CI y cómo configurar `laconic.toml`. `laconic-check instructions config` enumera las claves del archivo de proyecto y `laconic-check instructions rules` cada regla, si hace fallar `lint` y si es opcional. `laconic-check mcp` ofrece el mismo texto como el prompt `instructions`.
+
 `laconic-check mcp` ofrece `lint` y `preserve` como herramientas MCP por la entrada y salida estándar, sin nada más que instalar. La herramienta `preserve` acepta `loose: true` para lo que hace `--loose`, y la herramienta `lint` aplica el archivo `laconic.toml` o `.laconic-check` del directorio en el que se ejecuta el servidor, como hace `lint`, releído en cada llamada; uno mal formado convierte la llamada en un error que nombra su línea (ambos desde 0.6.0):
 
 ```bash

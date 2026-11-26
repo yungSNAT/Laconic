@@ -9,8 +9,9 @@ use super::{re, read, read_json, root};
 use serde_json::Value;
 use std::collections::BTreeSet;
 
-const VERSIONED: [&str; 5] = [
+const VERSIONED: [&str; 6] = [
     ".codex-plugin/plugin.json",
+    ".cursor-plugin/plugin.json",
     "gemini-extension.json",
     "qwen-extension.json",
     "kimi.plugin.json",

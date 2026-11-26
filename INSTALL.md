@@ -859,6 +859,8 @@ npx skills remove laconic -g    # if installed globally
 
 Paste this into your agent's persistent rules file. Cursor: **Settings → Rules → User Rules**, or a project rule under `.cursor/rules/` with `alwaysApply: true`. OpenCode: `~/.config/opencode/AGENTS.md`.
 
+The repository also carries a Cursor plugin manifest, `.cursor-plugin/plugin.json`, with `.cursor-plugin/marketplace.json` for a marketplace import. It packages both skills and this text as an always-applied rule, `.cursor-plugin/rules/laconic.mdc`, which `laconic-tools sync-rules` keeps in step with `rules/laconic.md`. Cursor's [plugin documentation](https://cursor.com/docs/plugins) covers importing a repository and loading a plugin folder.
+
 ```markdown
 ## Output style
 

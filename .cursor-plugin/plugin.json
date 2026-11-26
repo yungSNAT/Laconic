@@ -1,0 +1,23 @@
+{
+  "name": "laconic",
+  "displayName": "Laconic",
+  "description": "Concise, answer-first output in correct Australian English. Leads with the answer, then justifies it; marks unverified claims as unverified; cuts preamble, recaps, closers and AI writing patterns without losing substance. Also writes, edits and audits prose.",
+  "version": "0.5.0",
+  "author": {
+    "name": "yungSNAT"
+  },
+  "homepage": "https://github.com/yungSNAT/laconic",
+  "repository": "https://github.com/yungSNAT/laconic",
+  "license": "Apache-2.0 AND MIT",
+  "keywords": [
+    "concise",
+    "australian-english",
+    "writing",
+    "prose",
+    "skills",
+    "cursor"
+  ],
+  "logo": ".claude-plugin/icon.png",
+  "skills": "./skills/",
+  "rules": "./.cursor-plugin/rules/"
+}

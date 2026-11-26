@@ -19,6 +19,7 @@ The manifests other than Claude Code's still declare plugin 0.5.0, so a build fr
 - Report each response's length as a share of its case's `target_words` in `run_evals.py checks`, with 2 drafting cases that ask for about 400 and 150 words.
 - `allowed-tools` in both skills pre-approves the `laconic-check` checks that read only the prose they are given: `laconic-check lint --warn -` on standard input and the MCP `lint` tool, plus the MCP `preserve` tool for `laconic-prose`. A `laconic-check` command that names files still asks. Claude Code clears the grant at the next message; tools not listed keep their usual permissions.
 - Add `--setups` to `laconic-evals fact-survival report` so runs can verify custom setup lists instead of only the built-in 8.
+- A Cursor plugin manifest, `.cursor-plugin/plugin.json` with a marketplace manifest, that packages both skills and the compact rules as an always-applied Cursor rule; `laconic-tools sync-rules` writes the rule from `rules/laconic.md` and `--check` fails when it is out of step.
 
 ### Plugin: changed
 

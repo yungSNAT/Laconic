@@ -1,0 +1,16 @@
+{
+  "name": "laconic",
+  "owner": {
+    "name": "yungSNAT"
+  },
+  "metadata": {
+    "description": "Laconic for Cursor: concise, answer-first output in Australian English."
+  },
+  "plugins": [
+    {
+      "name": "laconic",
+      "source": ".",
+      "description": "Concise, answer-first output in Australian English for Cursor."
+    }
+  ]
+}

@@ -307,17 +307,6 @@ fn preflight_calls_each_skill_setup_and_reports_what_it_called() {
         overhead.ends_with("{\"stage\": \"preflight\", \"cost_usd\": 0.75}\n"),
         "{overhead}"
     );
-
-    let partial = |_: &[String], _: &Input, _: Duration| done(3, &stream, "");
-    let mut printed = Vec::new();
-    assert_eq!(preflight(dir.path(), &partial, &mut printed), Ok(1));
-    assert!(
-        String::from_utf8(printed)
-            .unwrap()
-            .contains("avoid: runner exited with status 3")
-    );
-    let overhead = fs::read_to_string(dir.path().join("overhead.jsonl")).unwrap();
-    assert_eq!(overhead.matches("\"cost_usd\": 0.75").count(), 2);
 }
 
 #[test]
@@ -373,6 +362,38 @@ fn preflight_reads_result_events_whatever_their_spacing_or_key_order() {
     assert!(
         overhead.ends_with("{\"stage\": \"preflight\", \"cost_usd\": 0.75}\n"),
         "{overhead}"
+    );
+}
+
+#[test]
+fn preflight_rejects_an_unsuccessful_runner_and_records_complete_costs() {
+    let dir = tempfile::tempdir().unwrap();
+    write_config(
+        dir.path(),
+        &json!({"avoid": {"command": ["claude", "--plugin-dir", "a"]}}),
+    );
+    let stream = concat!(
+        r#"{"message":{"content":[{"type":"tool_use","name":"Skill","input":{"skill":"avoid-ai-writing"}}]}}"#,
+        "\n",
+        r#"{"type":"result","total_cost_usd":0.75}"#
+    );
+    for tail in ["", "\n{\"type\":"] {
+        let partial =
+            |_: &[String], _: &Input, _: Duration| done(3, &format!("{stream}{tail}"), "");
+        let mut printed = Vec::new();
+        assert_eq!(preflight(dir.path(), &partial, &mut printed), Ok(1));
+        assert!(
+            String::from_utf8(printed)
+                .unwrap()
+                .contains("avoid: runner exited with status 3")
+        );
+    }
+    let overhead = fs::read_to_string(dir.path().join("overhead.jsonl")).unwrap();
+    assert_eq!(overhead.lines().count(), 2);
+    assert!(
+        overhead
+            .lines()
+            .all(|line| line.ends_with("\"cost_usd\": 0.75}"))
     );
 }
 

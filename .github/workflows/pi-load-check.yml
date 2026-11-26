@@ -42,6 +42,8 @@ jobs:
       - name: Install Pi
         run: |
           npm ci --ignore-scripts --prefix ci/pi
+          # The bundled CLI embeds its own minimatch. The module CLI uses this fixture's lock.
+          ln -sfn ../@earendil-works/pi-coding-agent/dist/cli.js ci/pi/node_modules/.bin/pi
           echo "$GITHUB_WORKSPACE/ci/pi/node_modules/.bin" >> "$GITHUB_PATH"
       - name: Verify the Pi package, commands, status, and persisted mode
         run: cargo run --locked --quiet --manifest-path tools/laconic-tools/Cargo.toml -- check-pi

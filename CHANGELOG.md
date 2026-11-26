@@ -52,6 +52,8 @@ The manifests other than Claude Code's still declare plugin 0.5.0, so a build fr
 
 ### Plugin: security
 
+- The Pi smoke test uses minimatch 11.0.9 when matching package resources from the checkout.
+
 - Pin CI agent installs and disable lifecycle scripts (#28).
 - Keep scenario prompts out of Claude CLI arguments and reject model values that could become options (#30).
 

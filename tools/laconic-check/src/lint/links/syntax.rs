@@ -540,7 +540,10 @@ pub(super) fn comment_spans(text: &str) -> Vec<(Place, Place)> {
             }
         }
         let chars: Vec<char> = line.chars().collect();
-        let code = code_spans(&chars);
+        let mut in_code = vec![false; chars.len()];
+        for (start, end) in code_spans(&chars) {
+            in_code[start..end].fill(true);
+        }
         let mut i = 0;
         while i < chars.len() {
             let at = |token: &str| {
@@ -551,7 +554,7 @@ pub(super) fn comment_spans(text: &str) -> Vec<(Place, Place)> {
                     .eq(token.chars())
             };
             match open {
-                None if at("<!--") && !code.iter().any(|&(s, e)| (s..e).contains(&i)) => {
+                None if at("<!--") && !in_code[i] => {
                     open = Some((index + 1, i + 1));
                     i += 4;
                 }

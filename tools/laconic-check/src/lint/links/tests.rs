@@ -350,7 +350,17 @@ fn unclosed_links_and_definitions_are_read_in_linear_time() {
     // about 4 times as long, well under the 16 a square gives; the fastest of 3 runs keeps a
     // busy machine from deciding the ratio. Only the link rules' own reading is timed: the rest of
     // lint has costs of its own on such a paragraph.
-    let shapes = ["a](b c ", "](a", "[a\n", "x][a] ", "[a]: <b\n", "](<a "];
+    let shapes = [
+        "a](b c ",
+        "](a",
+        "](a(",
+        "[a\n",
+        "x][a] ",
+        "[a]: <b\n",
+        "](<a ",
+        "`a` <!-- c --> [b](#x) ",
+        "<!-- c -->\n[b](#x)\n",
+    ];
     let read = |text: &str| {
         let chars: Vec<char> = text.chars().collect();
         let mut line = 1;

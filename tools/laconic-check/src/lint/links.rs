@@ -267,11 +267,13 @@ impl Links {
         let mut found = Vec::new();
         let own = anchors(text);
         // A link inside an HTML comment renders nothing, so it leads nowhere and is not read.
+        // The comments come in order without overlapping, so only the last one starting at or
+        // before a link can hold it.
         let comments = comment_spans(text);
         let live = |t: &&Target| {
-            !comments
-                .iter()
-                .any(|&(start, end)| (start..=end).contains(&(t.line, t.column)))
+            let at = (t.line, t.column);
+            let before = comments.partition_point(|&(start, _)| start <= at);
+            before == 0 || comments[before - 1].1 < at
         };
         for r in self.references.iter().filter(live) {
             if !self.defined.contains(&normalise(&r.text)) {

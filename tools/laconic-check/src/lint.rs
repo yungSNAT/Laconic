@@ -856,8 +856,10 @@ fn scan(
             continue;
         }
         // An HTML block of types 1 to 5 runs, blank lines included, to the line that meets its
-        // end condition, whether it opened on that line or earlier.
-        let lower = if html_end.is_some() || (!code_line && trimmed.starts_with('<')) {
+        // end condition, whether it opened on that line or earlier. One opened inside an alert
+        // or a list item would end with it, so only a line outside both opens one.
+        let outside = !alert && (list_indent.is_none() || indent == 0);
+        let lower = if html_end.is_some() || (outside && !code_line && trimmed.starts_with('<')) {
             trimmed.to_ascii_lowercase()
         } else {
             String::new()

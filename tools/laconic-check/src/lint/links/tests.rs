@@ -583,6 +583,19 @@ fn definitions_after_blocks_read_as_commonmark_does() {
         ("## The `&nbsp;` entity\n\n[e](#the-nbsp-entity)\n", &[]),
         ("[x](notes[1].md)\n", &["broken-link"]),
         ("   [a]: gone.md\n\n[1][a]\n", &["broken-link"]),
+        // An HTML block left open in an alert or a list item ends with it.
+        (
+            "> [!NOTE]\n> <pre>\n\nPara.\n\n[a]: gone.md\n\n[x][a]\n",
+            &["broken-link"],
+        ),
+        (
+            "- item\n\n  <pre>\n  x\n\nPara.\n\n[a]: gone.md\n\n[x][a]\n",
+            &["broken-link"],
+        ),
+        (
+            "- item\n\n<script>\nx\n</script>\n[a]: gone.md\n",
+            &["broken-link"],
+        ),
     ] {
         assert_eq!(names(text, place), expected, "{text:?}");
     }

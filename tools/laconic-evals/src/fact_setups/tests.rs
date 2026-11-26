@@ -398,6 +398,18 @@ fn preflight_rejects_an_unsuccessful_runner_and_records_complete_costs() {
             .lines()
             .all(|line| line.ends_with("\"cost_usd\": 0.75}"))
     );
+    let mut closed: &mut [u8] = &mut [];
+    let failed = |_: &[String], _: &Input, _: Duration| done(3, stream, "");
+    assert_eq!(
+        preflight(dir.path(), &failed, &mut closed),
+        Err("failed to write whole buffer".into())
+    );
+    let invalid_success = |_: &[String], _: &Input, _: Duration| {
+        let mut output = done(0, stream, "")?;
+        output.stdout.extend_from_slice(b"\n{\"result\":\"\xc3");
+        Ok(output)
+    };
+    assert!(preflight(dir.path(), &invalid_success, &mut Vec::new()).is_err());
 }
 
 #[test]

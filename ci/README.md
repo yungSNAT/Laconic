@@ -13,6 +13,9 @@ Update manifests and regenerate the corresponding lockfile on Linux with
 or `npm install --package-lock-only --ignore-scripts --prefix ci/pi`.
 Check `npm audit` and run the isolated load checks before changing the pins.
 
+The Pi workflow launches the package's `dist/cli.js` entry so it loads the
+matcher from this lockfile. Pi's default bundled entry embeds a separate copy.
+
 Pi 1.5.2 requires Undici 8.12.3 and minimatch 11.0.3, so it no longer needs the
 overrides that excluded Undici 8.0.0 through 8.12.1 and minimatch before 11.0.1
 (GHSA-g3hv-75wg-m249). The contract tests in `tools/laconic-tools` fail if the Pi

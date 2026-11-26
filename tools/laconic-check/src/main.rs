@@ -18,7 +18,7 @@ use std::process::ExitCode;
 use laconic_check::mcp::Json;
 use laconic_check::metrics::ProseMetrics;
 use laconic_check::settings::{self, LineProtectCache, Settings};
-use laconic_check::{action, completions, hook, lint, lsp, mcp, preserve, sarif};
+use laconic_check::{action, completions, hook, instructions, lint, lsp, mcp, preserve, sarif};
 
 fn usage_text() -> String {
     let advisory: Vec<&str> = lint::RULES
@@ -27,7 +27,7 @@ fn usage_text() -> String {
         .map(|r| r.name)
         .collect();
     format!(
-        "usage:\n  laconic-check lint [options] <file.md | ->...\n  laconic-check preserve [--strict] [--loose] <original> <edited>\n  laconic-check mcp\n  laconic-check lsp\n  laconic-check hook\n  laconic-check completions <bash|zsh|fish|powershell>\n\n\
+        "usage:\n  laconic-check lint [options] <file.md | ->...\n  laconic-check preserve [--strict] [--loose] <original> <edited>\n  laconic-check mcp\n  laconic-check lsp\n  laconic-check hook\n  laconic-check completions <bash|zsh|fish|powershell>\n  laconic-check instructions [config|rules]\n\n\
          lint options:\n  \
            --format <name>     output format: text (default), json or sarif\n  \
            --json              print one JSON document instead of a line a finding\n  \
@@ -60,6 +60,8 @@ fn usage_text() -> String {
          asks the agent to look at lint's failing findings in the uncommitted Markdown of\n\
          the repository that holds the event's directory before it finishes.\n\
          completions prints a shell completion script for bash, zsh, fish or powershell.\n\
+         instructions prints what a coding agent needs to use laconic-check in a repository;\n\
+         its topics cover the project file and every rule.\n\
          --version prints the version and --help this text.",
         advisory.join(", "),
         lint::RULES_URL
@@ -409,6 +411,24 @@ fn main() -> ExitCode {
                 ExitCode::from(2)
             }
         },
+        Some("instructions") if args.len() <= 2 => {
+            let topic = args.get(1).map(String::as_str);
+            let topic = topic.filter(|t| !matches!(*t, "-h" | "--help"));
+            match instructions::render(topic) {
+                Some(text) => {
+                    print!("{text}");
+                    ExitCode::SUCCESS
+                }
+                None => {
+                    eprint!(
+                        "laconic-check: unknown topic '{}'\n{}",
+                        args[1],
+                        instructions::topics()
+                    );
+                    ExitCode::from(2)
+                }
+            }
+        }
         Some("--help") if args.len() == 1 => {
             println!("{}", usage_text());
             ExitCode::SUCCESS

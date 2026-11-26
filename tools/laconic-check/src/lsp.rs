@@ -310,7 +310,10 @@ impl Server {
             .as_ref()
             .and_then(|file| self.folder_of(file))
             .and_then(Workspace::new);
-        let folder = workspace.as_ref().zip(file.as_ref()).and_then(|(w, f)| w.folder_of(f));
+        let folder = workspace
+            .as_ref()
+            .zip(file.as_ref())
+            .and_then(|(w, f)| w.folder_of(f));
         let place = workspace.as_ref().zip(folder.as_deref());
         let found = lint::lint_in(body, &settings.rules, settings.needs_opt_in(), place).0;
         let mut protect_cache = LineProtectCache::default();

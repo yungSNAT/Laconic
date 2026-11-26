@@ -1165,6 +1165,9 @@ fn link_targets_resolve_within_the_documents_workspace_folder() {
     fs::remove_dir_all(&root).unwrap();
     let found = published(&replies[1]);
     assert_eq!(found.len(), 1, "{found:?}");
-    assert_eq!((found[0].0.as_str(), found[0].2.as_str()), ("broken-link", "29"));
+    assert_eq!(
+        (found[0].0.as_str(), found[0].2.as_str()),
+        ("broken-link", "29")
+    );
     assert_eq!(published(&replies[2]), []);
 }

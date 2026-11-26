@@ -40,6 +40,8 @@ To report a finding that should not have been flagged, use the [false-positive f
 | [`unnamed-evidence`](#unnamed-evidence) | no (advisory, opt-in) | none | 0.11 | 12 of 75 |
 | [`ai-placeholder`](#ai-placeholder) | no (advisory, opt-in) | none | 0.00 | 0 of 75 |
 | [`chat-filler`](#chat-filler) | no (advisory, opt-in) | none | 0.00 | 0 of 75 |
+| [`broken-anchor`](#broken-anchor) | yes | none | 0.34 | 0 of 75 |
+| [`broken-link`](#broken-link) | yes | none | 0.00 | 0 of 75 |
 | [`unused-suppression`](#unused-suppression) | no (advisory) | none | 0.00 | 0 of 75 |
 
 ## Style Manual coverage
@@ -58,7 +60,7 @@ To report a finding that should not have been flagged, use the [false-positive f
 | [Dates and time](../skills/laconic-prose/references/style-manual-rules.md#dates-and-time) | `date`, `weekday`, `time` |
 | [Shortened forms](../skills/laconic-prose/references/style-manual-rules.md#shortened-forms) | `latin`, `acronym-before-definition`, `unglossed-term` |
 
-The rules with no Style Manual section flag writing patterns from [patterns.md](../skills/laconic-prose/references/patterns.md), chat-tool residue or suppression comments: `closer`, `stock-phrase`, `stacked-hedge`, `bold-label`, `staged-contrast`, `reveal-question`, `residue`, `unanchored-magnitude`, `unattributed-superlative`, `unnamed-evidence`, `ai-placeholder`, `chat-filler`, `unused-suppression`.
+The rules with no Style Manual section flag writing patterns from [patterns.md](../skills/laconic-prose/references/patterns.md), chat-tool residue or suppression comments: `closer`, `stock-phrase`, `stacked-hedge`, `bold-label`, `staged-contrast`, `reveal-question`, `residue`, `unanchored-magnitude`, `unattributed-superlative`, `unnamed-evidence`, `ai-placeholder`, `chat-filler`, `broken-anchor`, `broken-link`, `unused-suppression`.
 
 ## Rules
 
@@ -293,6 +295,22 @@ Architectural riddle filler in chat plans ('gates and seams', 'natural seam', 'v
 Fails `lint`: no (advisory, opt-in). Not a Style Manual rule. Human prose: 0 findings, 0.00 per 1,000 words. Outside articles: flags 0 of 75 held out (0 findings) and 0 of 75 for calibration.
 
 Example: `Define clean gates and seams before coding.`.
+
+### broken-anchor
+
+A link to '#fragment' that matches no heading or HTML id in the same file (headings take GitHub's anchors), and a full or collapsed reference link ('[text][label]', '[text][]') with no '[label]: target' definition. It needs only the text, so it also runs on standard input and in the MCP server. Enabled by --only, a project file or the docs profile.
+
+Fails `lint`: yes. Not a Style Manual rule. Human prose: 70 findings, 0.34 per 1,000 words. Outside articles: flags 0 of 75 held out (0 findings) and 0 of 75 for calibration.
+
+Example: `Each member gets a [healthcare plan](#plans).`.
+
+### broken-link
+
+A relative link, image, reference definition, or HTML href or src target that names no file or folder, or names one only in another letter case, which a case-sensitive host such as GitHub will not find; and a 'file.md#fragment' whose file has no such heading. Targets resolve from the linted file's folder and are checked only inside the folder lint runs in (the workspace folder for the language server, the repository for the Stop hook); URLs with a scheme and root-relative targets are not checked, and nothing goes over the network. Enabled by --only, a project file or the docs profile.
+
+Fails `lint`: yes. Not a Style Manual rule. Human prose: 0 findings, 0.00 per 1,000 words. Outside articles: flags 0 of 75 held out (0 findings) and 0 of 75 for calibration.
+
+Example: `Each member gets a [healthcare plan](plans.md).`.
 
 ### unused-suppression
 

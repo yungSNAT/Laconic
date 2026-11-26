@@ -95,11 +95,7 @@ const fn advisory(
     }
 }
 
-const fn opt_in(
-    name: &'static str,
-    confidence: Confidence,
-    checks: &'static str,
-) -> Rule {
+const fn opt_in(name: &'static str, confidence: Confidence, checks: &'static str) -> Rule {
     Rule {
         name,
         advisory: false,

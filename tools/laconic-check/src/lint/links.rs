@@ -177,7 +177,7 @@ impl Links {
         for (start, end) in code_spans(chars) {
             in_code[start..end].fill(true);
         }
-        let mut push = |list: &mut Vec<Target>, text: String, i: usize| {
+        let push = |list: &mut Vec<Target>, text: String, i: usize| {
             let (line, column) = at(i);
             list.push(Target { text, line, column });
         };
@@ -289,9 +289,9 @@ impl Links {
                 ),
                 Resolved::Found(file) => {
                     let Some(fragment) = fragment else { continue };
-                    let markdown = file
-                        .extension()
-                        .is_some_and(|e| e.eq_ignore_ascii_case("md") || e.eq_ignore_ascii_case("markdown"));
+                    let markdown = file.extension().is_some_and(|e| {
+                        e.eq_ignore_ascii_case("md") || e.eq_ignore_ascii_case("markdown")
+                    });
                     if !markdown {
                         continue;
                     }
@@ -423,7 +423,11 @@ fn inline_target(chars: &[char], from: usize) -> Option<(String, usize, usize)> 
 /// A reference definition, `[label]: target`, opening the line at `at` (up to 3 spaces in):
 /// its label, target and the target's start.
 fn definition(chars: &[char], at: usize) -> Option<(String, String, usize)> {
-    let indent = chars[at..].iter().take(4).take_while(|&&c| c == ' ').count();
+    let indent = chars[at..]
+        .iter()
+        .take(4)
+        .take_while(|&&c| c == ' ')
+        .count();
     let open = at + indent;
     if indent > 3 || chars.get(open) != Some(&'[') || chars.get(open + 1) == Some(&'^') {
         return None;
@@ -480,12 +484,11 @@ fn attribute(chars: &[char], eq: usize) -> Option<(String, usize, usize)> {
 /// checks: an absolute URL or path, a template placeholder or a target that does not decode.
 fn split_target(target: &str) -> Option<(String, Option<String>)> {
     let target = target.trim();
-    let scheme = target
-        .split_once(':')
-        .is_some_and(|(s, _)| {
-            s.chars().next().is_some_and(|c| c.is_ascii_alphabetic())
-                && s.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '+' | '.' | '-'))
-        });
+    let scheme = target.split_once(':').is_some_and(|(s, _)| {
+        s.chars().next().is_some_and(|c| c.is_ascii_alphabetic())
+            && s.chars()
+                .all(|c| c.is_ascii_alphanumeric() || matches!(c, '+' | '.' | '-'))
+    });
     if target.is_empty()
         || scheme
         || target.starts_with('/')
@@ -592,7 +595,10 @@ pub(super) fn anchors(text: &str) -> HashSet<String> {
         let hashes = trimmed.chars().take_while(|&c| c == '#').count();
         let atx = indent < 4
             && (1..=6).contains(&hashes)
-            && trimmed[hashes..].chars().next().is_none_or(|c| c == ' ' || c == '\t');
+            && trimmed[hashes..]
+                .chars()
+                .next()
+                .is_none_or(|c| c == ' ' || c == '\t');
         let underline = indent < 4
             && !trimmed.is_empty()
             && (trimmed.trim_end().chars().all(|c| c == '=')
@@ -624,10 +630,10 @@ fn collect_ids(line: &str, found: &mut HashSet<String>) {
             if !before.is_some_and(char::is_whitespace) {
                 continue;
             }
-            if let Some(quote) = after.chars().next().filter(|c| matches!(c, '"' | '\'')) {
-                if let Some(value) = after[1..].split(quote).next() {
-                    found.insert(value.to_lowercase());
-                }
+            if let Some(quote) = after.chars().next().filter(|c| matches!(c, '"' | '\''))
+                && let Some(value) = after[1..].split(quote).next()
+            {
+                found.insert(value.to_lowercase());
             }
         }
     }

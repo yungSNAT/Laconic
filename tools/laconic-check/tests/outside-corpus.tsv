@@ -3,7 +3,7 @@
 # blob eb4030e4591de8fd687089b15bf86d6688b128eb), which are not stored here. Calibration articles have odd prompt ids and
 # held-out articles even ones. The fingerprint covers the counts and the rule sources;
 # a test fails when either changes without a rerun.
-# fingerprint d72bc9c1babbaa4a
+# fingerprint 9b8d088912383a18
 rule	calibration articles	calibration findings	held-out articles	held-out findings
 (articles and words)	75	54423	75	56300
 us-spelling	69	265	71	366
@@ -34,4 +34,6 @@ unattributed-superlative	1	1	0	0
 unnamed-evidence	6	6	12	15
 ai-placeholder	0	0	0	0
 chat-filler	0	0	0	0
+broken-anchor	0	0	0	0
+broken-link	0	0	0	0
 unused-suppression	0	0	0	0

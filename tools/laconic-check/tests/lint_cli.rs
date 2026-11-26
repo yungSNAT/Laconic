@@ -757,3 +757,34 @@ fn format_flag_confidence_scope_protect_and_substance_rules_work_end_to_end() {
         "{out}"
     );
 }
+
+#[test]
+fn broken_link_checks_relative_targets_from_the_current_folder_when_enabled() {
+    let dir = folder(
+        "links",
+        &[
+            ("guide.md", "# Use it\n\nSee [there](#use-it).\n"),
+            (
+                "index.md",
+                "See [the guide](guide.md#use-it), [gone](missing.md) and [no](guide.md#nope).\n",
+            ),
+        ],
+    );
+    let only = [
+        "--only",
+        "broken-link,broken-anchor",
+        "index.md",
+        "guide.md",
+    ];
+    let (code, out, err) = lint(&dir, &only);
+    assert_eq!((code, err.as_str()), (1, ""));
+    let rules: Vec<&str> = out
+        .lines()
+        .map(|l| l.split(": ").nth(1).unwrap_or(""))
+        .collect();
+    assert_eq!(rules, ["broken-link", "broken-link"], "{out}");
+    assert!(out.contains("index.md:1:"), "{out}");
+    // Off by default: the default rule set reports neither.
+    let (_, out, _) = lint(&dir, &["index.md"]);
+    assert!(!out.contains("broken-link"), "{out}");
+}

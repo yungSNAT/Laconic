@@ -50,7 +50,8 @@ fn a_fragment_must_name_a_heading_or_id_in_the_file() {
 
 #[test]
 fn repeated_headings_take_numbered_anchors() {
-    let text = "## Notes\n\n## Notes\n\nSee [first](#notes), [second](#notes-1) and [third](#notes-2).\n";
+    let text =
+        "## Notes\n\n## Notes\n\nSee [first](#notes), [second](#notes-1) and [third](#notes-2).\n";
     assert_eq!(names(text, None), ["broken-anchor"]);
     assert!(found(text, None)[0].3.contains("#notes-2"));
 }
@@ -144,7 +145,9 @@ fn a_target_in_another_case_is_reported() {
             .into_iter()
             .map(|f| f.3)
             .collect::<Vec<_>>(),
-        ["'docs/guide.md': 'guide.md' is 'Guide.md' on disk; a case-sensitive host will not find it"]
+        [
+            "'docs/guide.md': 'guide.md' is 'Guide.md' on disk; a case-sensitive host will not find it"
+        ]
     );
     std::fs::remove_dir_all(root).unwrap();
 }
@@ -208,7 +211,10 @@ fn targets_that_are_not_relative_paths_are_skipped() {
 fn slugs_follow_github() {
     assert_eq!(slug("The `lint` command"), "the-lint-command");
     assert_eq!(slug("What's new in 0.6?"), "whats-new-in-06");
-    assert_eq!(slug("[Docs](x.md) and <b>bold</b> my_var"), "docs-and-bold-my_var");
+    assert_eq!(
+        slug("[Docs](x.md) and <b>bold</b> my_var"),
+        "docs-and-bold-my_var"
+    );
     assert_eq!(slug("Café olé"), "café-olé");
 }
 

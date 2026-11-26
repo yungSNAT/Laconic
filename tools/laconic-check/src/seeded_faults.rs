@@ -224,7 +224,11 @@ fn lint_seeded(text: &str) -> Vec<Finding> {
 
 fn rules_for(rule: &str, text: &str) -> Vec<&'static str> {
     let opt_in = RuleId::named(rule).is_some_and(|id| id.rule().opt_in);
-    let found = if opt_in { lint_seeded(text) } else { lint(text) };
+    let found = if opt_in {
+        lint_seeded(text)
+    } else {
+        lint(text)
+    };
     found
         .into_iter()
         .map(|f| f.rule.house().unwrap().name())
@@ -768,7 +772,13 @@ fn rule_reference_links_resolve() {
     let text = read(REFERENCE);
     let docs = repo_root().join("docs");
     let mut checked = 0;
-    for target in text.split("](").skip(1).filter_map(|s| s.split(')').next()) {
+    // A link inside a code span, such as a link rule's example, is not a link.
+    let prose = text.split('`').step_by(2).collect::<Vec<_>>().join(" ");
+    for target in prose
+        .split("](")
+        .skip(1)
+        .filter_map(|s| s.split(')').next())
+    {
         checked += 1;
         if let Some(form) = target.strip_prefix(ISSUE_FORM) {
             let path = repo_root().join(".github/ISSUE_TEMPLATE").join(form);

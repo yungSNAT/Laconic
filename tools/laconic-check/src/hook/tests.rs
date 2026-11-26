@@ -252,11 +252,15 @@ fn checks_link_targets_within_the_repository_when_the_project_file_enables_them(
     .unwrap();
     let reason = reason(&stop(&event(&dir, false)).unwrap().unwrap());
     assert!(
-        reason.contains("\nREADME.md:1:50: broken-link: 'docs/setup.md': no file or folder named 'setup.md'"),
+        reason.contains(
+            "\nREADME.md:1:50: broken-link: 'docs/setup.md': no file or folder named 'setup.md'"
+        ),
         "{reason}"
     );
     assert!(
-        reason.contains("\nREADME.md:1:77: broken-anchor: '#usage' matches no heading or id in this file"),
+        reason.contains(
+            "\nREADME.md:1:77: broken-anchor: '#usage' matches no heading or id in this file"
+        ),
         "{reason}"
     );
     assert!(!reason.contains("guide.md"), "{reason}");

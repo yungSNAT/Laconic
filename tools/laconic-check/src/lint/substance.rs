@@ -347,13 +347,13 @@ fn is_escaped(raw: &[char], at: usize) -> bool {
     raw[..at].iter().rev().take_while(|&&c| c == '\\').count() % 2 == 1
 }
 
+/// The deepest parentheses a bare destination may nest.
+const MAX_DEPTH: usize = 32;
+
 /// The index of the `)` ending an inline link destination that opens at `raw[close + 1]`, when
 /// `raw[close]` is an unescaped `]`, read as CommonMark reads it: an angle-bracket destination
 /// may hold spaces, a bare one balanced parentheses, and an optional title after a space is
 /// quoted or parenthesised. So `[TODO](see below)` is no link.
-/// The deepest parentheses a bare destination may nest.
-const MAX_DEPTH: usize = 32;
-
 fn link_tail_end(raw: &[char], close: usize) -> Option<usize> {
     if raw.get(close) != Some(&']') || is_escaped(raw, close) || raw.get(close + 1) != Some(&'(') {
         return None;
@@ -458,7 +458,7 @@ fn check_ai_placeholders(view: &ParagraphView<'_>, findings: &mut Vec<Finding>) 
             let col_idx = view.lower[..from + pos].chars().count();
             if let Some(close) = view.lower_chars[col_idx..].iter().position(|&c| c == ']') {
                 let end = col_idx + close;
-                if is_markdown_link_tail(view.raw, end) {
+                if is_markdown_link_tail(view.lined, end) {
                     from += pos + opener.len();
                     continue;
                 }

@@ -274,6 +274,33 @@ fn markdown_links_labelled_todo_or_tbd_do_not_trigger_ai_placeholder() {
 }
 
 #[test]
+fn bracket_placeholders_read_line_breaks_in_link_syntax() {
+    // Lint's mask blanks every `[...](...)` before this rule runs, so the bracket path is
+    // driven here with unmasked text: a line break inside `<...>` leaves no link.
+    for text in ["Insert name", "your name", "placeholder"] {
+        let raw: Vec<char> = format!("See [{text}](<a b>) later.").chars().collect();
+        let mut lined = raw.clone();
+        let space = raw.iter().rposition(|&c| c == ' ').unwrap() - 4;
+        lined[space] = '\n';
+        let mut findings = Vec::new();
+        super::check(&raw, &raw, &lined, &mut findings);
+        let placeholders = findings
+            .iter()
+            .filter(|f| f.rule.house() == Some(RuleId::AiPlaceholder))
+            .count();
+        assert_eq!(placeholders, 1, "{text:?}");
+        findings.clear();
+        super::check(&raw, &raw, &raw, &mut findings);
+        assert!(
+            findings
+                .iter()
+                .all(|f| f.rule.house() != Some(RuleId::AiPlaceholder)),
+            "{text:?}: {findings:?}"
+        );
+    }
+}
+
+#[test]
 fn bare_link_destinations_are_read_in_linear_time() {
     // A bare destination runs to the next space, and each `](` it passes adds a level of
     // parentheses, so a paragraph of them was read again from every `]`. Quadrupling a shape must

@@ -276,7 +276,7 @@ pub fn exec(command: &[String], input: &Input, timeout: Duration) -> Result<Outp
 }
 
 /// One call per skill setup, proving it loads its own skill. Prints each reply to read.
-/// Returns the exit status: 1 when a setup did not call its skill.
+/// Returns the exit status: 1 when a setup did not call its skill, or names no known skill.
 pub fn preflight(here: &Path, exec: Exec, stdout: &mut dyn Write) -> Result<i32, String> {
     let config = parse(&read_text(&here.join("runners.json"))?)?;
     let config = config.as_object().ok_or("runners.json is not an object")?;
@@ -294,6 +294,17 @@ pub fn preflight(here: &Path, exec: Exec, stdout: &mut dyn Write) -> Result<i32,
         if !command.iter().any(|arg| arg == "--plugin-dir") {
             continue;
         }
+        // A setup this file does not know fails and is not run; the rest are still checked.
+        let Some(wanted) = SKILLS
+            .iter()
+            .find(|(setup, _)| setup == name)
+            .map(|(_, skill)| *skill)
+        else {
+            failures += 1;
+            writeln!(stdout, "{name}: no skill is known for this setup\n")
+                .map_err(|e| e.to_string())?;
+            continue;
+        };
         let command: Vec<String> = command
             .iter()
             .flat_map(|arg| {
@@ -312,18 +323,18 @@ pub fn preflight(here: &Path, exec: Exec, stdout: &mut dyn Write) -> Result<i32,
         .map_err(|e| e.message(&command[0]))?;
         let out = proc::text(&done.stdout)?;
         let used = skills_used(&out)?;
-        let wanted = SKILLS
-            .iter()
-            .find(|(setup, _)| setup == name)
-            .map(|(_, skill)| *skill);
-        let wanted = wanted.ok_or_else(|| py::str_repr(name))?;
         failures += i32::from(!used.contains(wanted));
+        // A result event is any JSON object whose `type` is "result", whatever its spacing or
+        // key order.
         let mut results = Vec::new();
-        for line in py::split_lines(&out)
-            .into_iter()
-            .filter(|line| line.starts_with(r#"{"type":"result""#))
-        {
-            results.push(parse(line)?);
+        for line in py::split_lines(&out) {
+            if !line.trim_start().starts_with('{') {
+                continue;
+            }
+            let event = parse(line)?;
+            if py::get(&event, "type").and_then(Value::as_str) == Some("result") {
+                results.push(event);
+            }
         }
         let costs = results
             .iter()

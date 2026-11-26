@@ -9,8 +9,9 @@ use super::{re, read, read_json, root};
 use serde_json::Value;
 use std::collections::BTreeSet;
 
-const VERSIONED: [&str; 5] = [
+const VERSIONED: [&str; 6] = [
     ".codex-plugin/plugin.json",
+    ".cursor-plugin/plugin.json",
     "gemini-extension.json",
     "qwen-extension.json",
     "kimi.plugin.json",
@@ -99,5 +100,19 @@ fn changelog_names_the_current_versions() {
     assert!(
         changelog.contains(&format!("## [laconic-check {checker}] - ")),
         "{checker}"
+    );
+}
+
+/// Cursor scans default folders for any component its manifest leaves out, and would read
+/// `hooks/hooks.json` (Claude Code's format) and the root `rules/` (no rule frontmatter). The
+/// manifest must name its skills and rules and declare its hooks, which are none.
+#[test]
+fn cursor_manifest_names_every_component_it_ships() {
+    let manifest = read_json(&root().join(".cursor-plugin/plugin.json"));
+    assert_eq!(manifest["skills"], "./skills/");
+    assert_eq!(manifest["rules"], "./.cursor-plugin/rules/");
+    assert_eq!(
+        manifest["hooks"],
+        serde_json::json!({"version": 1, "hooks": {}})
     );
 }

@@ -17,11 +17,11 @@ Agents can access the complete project by reading repository-relative files afte
 | Area | Location | Purpose |
 | --- | --- | --- |
 | Canonical skill | `skills/laconic/SKILL.md` | The source of truth for the response rules and Australian English rules. |
-| Prose skill | `skills/laconic-prose/SKILL.md` | Model-invocable writing, editing and audit skill; replaces No AI Slop. |
+| Prose skill | `skills/laconic-prose/SKILL.md` | Model-invocable writing, editing and audit skill; replaces the prose skill credited in NOTICE. |
 | Compact rules | `rules/laconic.md`, `tools/laconic-tools/` | Always-loaded prose rules; the source for every always-on snippet in `INSTALL.md`, which `laconic-tools sync-rules` copies them into. |
 | House-style checker | `tools/laconic-check/` | Rust CLI: `lint` flags style candidates in Markdown prose (`-` reads standard input); `preserve` reports numbers, code, URLs and negation, modal, quantifier and bound words an edit dropped. `laconic-tools gen-au-words` regenerates `src/us_words.txt` from the English Speller Database, with Style Manual overrides; `laconic-tools package-manifests` writes each release's package manifests, which `laconic-check-release.yml` attaches; `src/seeded_faults.rs` measures each rule against planted faults and generates the rule reference `docs/rules.md` from the rule table in `src/lint.rs`; `laconic-tools calibrate` records each rule's findings on a pinned outside corpus in `tests/outside-corpus.tsv`, which the reference and the 5% advisory gate read; rerun it after any change to `src/lint.rs`, its word list or calibrate, since a test checks the file's fingerprint; `mcp` serves both as MCP tools (`src/mcp.rs`), and `instructions` prints the onboarding text for a coding agent (`src/instructions.rs`), which `mcp` also offers as a prompt. CI lints the skills, rules and READMEs. |
 | Skill mirror | `.cursor/skills/` | Cursor-compatible copy of both skill folders; keep it synchronised with `skills/`. |
-| Claude and Codex metadata | `.claude-plugin/`, `.codex-plugin/`, `.agents/plugins/` | Plugin manifests and marketplace metadata. |
+| Claude, Codex and Cursor metadata | `.claude-plugin/`, `.codex-plugin/`, `.agents/plugins/`, `.cursor-plugin/` | Plugin manifests and marketplace metadata; `.cursor-plugin/rules/laconic.mdc` is generated from `rules/laconic.md` by `laconic-tools sync-rules`. |
 | Plugin directory edition | `tools/laconic-tools/src/plugin_dist.rs`, `tools/laconic-tools/src/plugin_dist/`, `docs/plugin-directory-readme.md`, `.claude-plugin/icon.png`, `.github/workflows/plugin-dist.yml` | `laconic-tools build-plugin-dist` builds the skills-only plugin the Claude plugin directory reads and refuses any other file; a push to `main` publishes it to the `claude-plugin` branch once the version in `package.json` has risen. |
 | Shared hooks | `hooks/hooks.json`, `hooks/always-on.*` | Hook declarations and cross-platform always-on behaviour. |
 | Pi and OMP | `package.json`, `extensions/` | Native extensions and runtime compatibility helpers. |
@@ -40,6 +40,7 @@ When debugging or changing one integration, begin with its entry point:
 | --- | --- |
 | Claude Code | `.claude-plugin/plugin.json`, `hooks/hooks.json`, `hooks/always-on.mjs` |
 | Codex | `.codex-plugin/plugin.json`, `.agents/plugins/marketplace.json`, `hooks/hooks.json` |
+| Cursor | `.cursor-plugin/plugin.json`, `.cursor-plugin/rules/laconic.mdc`, `tools/laconic-tools/src/main.rs` (`sync-rules`) |
 | Grok | `plugin.json`, `skills/laconic/SKILL.md`, `INSTALL.md` |
 | Pi | `package.json` (`pi`), `extensions/laconic.ts` |
 | OMP | `package.json` (`omp`), `extensions/laconic.ts`, `extensions/context-compat.ts` |

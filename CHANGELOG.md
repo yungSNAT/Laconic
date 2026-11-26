@@ -19,12 +19,14 @@ The manifests other than Claude Code's still declare plugin 0.5.0, so a build fr
 - Report each response's length as a share of its case's `target_words` in `run_evals.py checks`, with 2 drafting cases that ask for about 400 and 150 words.
 - `allowed-tools` in both skills pre-approves the `laconic-check` checks that read only the prose they are given: `laconic-check lint --warn -` on standard input and the MCP `lint` tool, plus the MCP `preserve` tool for `laconic-prose`. A `laconic-check` command that names files still asks. Claude Code clears the grant at the next message; tools not listed keep their usual permissions.
 - Add `--setups` to `laconic-evals fact-survival report` so runs can verify custom setup lists instead of only the built-in 8.
+- A Cursor plugin manifest, `.cursor-plugin/plugin.json` with a marketplace manifest, that packages both skills and the compact rules as an always-applied Cursor rule; `laconic-tools sync-rules` writes the rule from `rules/laconic.md` and `--check` fails when it is out of step.
 
 ### Plugin: changed
 
+- The pattern coverage page moved from `docs/humanizer-coverage.md` to `docs/pattern-coverage.md`.
 - Relicense Ryan Duguid's work under Apache-2.0 instead of FSL-1.1-ALv2; the MIT portions stay MIT. Earlier commits keep the licence their LICENSE file named.
 - The GitHub prose reference keeps session IDs, local paths, private host names and internal IDs out of posted text, and points the reader to the public artefact instead.
-- Make Laconic a full replacement for stop-slop and No AI Slop.
+- Make Laconic a full replacement for the 2 pattern lists credited in NOTICE.
 - Forbid typical-range estimates in place of evidence.
 - Move the compact rule's mechanics into a before-sending checklist (#34).
 - Relicense under FSL-1.1-ALv2 (#25), replacing the Apache-2.0 licence adopted the same day (#22).

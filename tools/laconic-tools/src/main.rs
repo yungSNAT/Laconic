@@ -5,7 +5,8 @@
 //! apart from the shipped `laconic-check` binary.
 //!
 //!   laconic-tools sync-rules [--check]   copy rules/laconic.md into every
-//!                                        always-on snippet in INSTALL.md
+//!                                        always-on snippet in INSTALL.md and
+//!                                        the Cursor plugin's always-on rule
 //!   laconic-tools check-pi [--runtime pi|omp]
 //!                                        smoke-test the Pi or OMP package over RPC
 //!   laconic-tools gen-au-words <scowl-pre.txt> <style-manual.txt>
@@ -46,6 +47,15 @@ const SNIPPETS: usize = 7;
 /// rules/laconic.md is loaded into every session; keep it short.
 const MAX_WORDS: usize = 240;
 const RUN: &str = "cargo run --manifest-path tools/laconic-tools/Cargo.toml -- sync-rules";
+/// The Cursor plugin's always-on rule, which `.cursor-plugin/plugin.json` names.
+const CURSOR_RULE: &str = ".cursor-plugin/rules/laconic.mdc";
+
+/// The Cursor rule for the compact rules `body`: Cursor's frontmatter, then the body.
+fn cursor_rule(body: &str) -> String {
+    format!(
+        "---\ndescription: Laconic prose rules for concise, answer-first output in correct Australian English\nalwaysApply: true\n---\n\n{body}\n"
+    )
+}
 
 /// The repository root: two levels above this crate.
 fn root() -> PathBuf {
@@ -91,7 +101,8 @@ fn synced(install: &str, body: &str) -> (String, usize) {
     (out, count)
 }
 
-/// Writes the synced INSTALL.md, or with `check` only reports whether it differs.
+/// Writes the synced INSTALL.md and Cursor rule, or with `check` only reports whether either
+/// differs.
 fn sync_rules(root: &Path, check: bool) -> Result<String, String> {
     let read = |name: &str| {
         fs::read_to_string(root.join(name))
@@ -112,16 +123,24 @@ fn sync_rules(root: &Path, check: bool) -> Result<String, String> {
             "expected {SNIPPETS} always-on snippets in INSTALL.md, found {count}"
         ));
     }
-    if updated == install {
-        Ok("INSTALL.md snippets match rules/laconic.md".into())
+    let rule = cursor_rule(&body);
+    // A missing rule file counts as out of date, so a fresh checkout's run writes it.
+    let current = read(CURSOR_RULE).unwrap_or_default();
+    if updated == install && current == rule {
+        Ok("INSTALL.md snippets and the Cursor rule match rules/laconic.md".into())
     } else if check {
         Err(format!(
-            "INSTALL.md snippets differ from rules/laconic.md; run {RUN}"
+            "INSTALL.md snippets or the Cursor rule differ from rules/laconic.md; run {RUN}"
         ))
     } else {
         fs::write(root.join("INSTALL.md"), updated)
             .map_err(|e| format!("cannot write INSTALL.md: {e}"))?;
-        Ok("INSTALL.md snippets updated".into())
+        let path = root.join(CURSOR_RULE);
+        path.parent()
+            .map_or(Ok(()), fs::create_dir_all)
+            .and_then(|()| fs::write(&path, rule))
+            .map_err(|e| format!("cannot write {CURSOR_RULE}: {e}"))?;
+        Ok("INSTALL.md snippets and the Cursor rule updated".into())
     }
 }
 
@@ -191,7 +210,7 @@ mod tests {
     fn repository_snippets_match_the_rules() {
         assert_eq!(
             sync_rules(&root(), true),
-            Ok("INSTALL.md snippets match rules/laconic.md".into())
+            Ok("INSTALL.md snippets and the Cursor rule match rules/laconic.md".into())
         );
     }
 
@@ -258,11 +277,20 @@ mod tests {
 
         assert!(sync_rules(&dir, true).unwrap_err().contains("differ"));
         assert_eq!(fs::read_to_string(dir.join("INSTALL.md")).unwrap(), stale);
+        assert!(!dir.join(CURSOR_RULE).exists());
         assert_eq!(
             sync_rules(&dir, false),
-            Ok("INSTALL.md snippets updated".into())
+            Ok("INSTALL.md snippets and the Cursor rule updated".into())
         );
         assert!(sync_rules(&dir, true).is_ok());
+        assert_eq!(
+            fs::read_to_string(dir.join(CURSOR_RULE)).unwrap(),
+            "---\ndescription: Laconic prose rules for concise, answer-first output in correct Australian English\nalwaysApply: true\n---\n\nKeep it short.\n"
+        );
+        // A hand edit to the Cursor rule alone is caught too.
+        fs::write(dir.join(CURSOR_RULE), "edited").unwrap();
+        assert!(sync_rules(&dir, true).unwrap_err().contains("Cursor rule"));
+        assert!(sync_rules(&dir, false).is_ok());
 
         fs::write(dir.join("INSTALL.md"), snippet("old")).unwrap();
         assert!(sync_rules(&dir, false).unwrap_err().contains("found 1"));

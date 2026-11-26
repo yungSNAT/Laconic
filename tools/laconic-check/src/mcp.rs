@@ -436,11 +436,13 @@ fn get_prompt(params: Option<&Json>) -> Result<Json, (i32, String)> {
     if name != Some("instructions") {
         return invalid(format!("unknown prompt {}", name.unwrap_or("(none)")));
     }
-    let topic = match params
-        .and_then(|p| p.get("arguments"))
-        .and_then(|a| a.get("topic"))
-    {
+    let arguments = match params.and_then(|p| p.get("arguments")) {
         None | Some(Json::Null) => None,
+        Some(arguments @ Json::Object(_)) => Some(arguments),
+        Some(_) => return invalid("arguments must be an object".into()),
+    };
+    let topic = match arguments.and_then(|a| a.get("topic")) {
+        None => None,
         Some(Json::String(topic)) if topic.is_empty() => None,
         Some(Json::String(topic)) => Some(topic.as_str()),
         Some(_) => return invalid("topic must be a string".into()),
@@ -907,10 +909,13 @@ mod tests {
             body(r#"{"name":"instructions"}"#),
             instructions::render(None).unwrap()
         );
-        assert_eq!(
-            body(r#"{"name":"instructions","arguments":{"topic":""}}"#),
-            instructions::render(None).unwrap()
-        );
+        for params in [
+            r#"{"name":"instructions","arguments":{"topic":""}}"#,
+            r#"{"name":"instructions","arguments":{}}"#,
+            r#"{"name":"instructions","arguments":null}"#,
+        ] {
+            assert_eq!(body(params), instructions::render(None).unwrap());
+        }
         for (topic, _) in instructions::TOPICS {
             assert_eq!(
                 body(&format!(
@@ -924,6 +929,9 @@ mod tests {
             r#"{}"#,
             r#"{"name":"instructions","arguments":{"topic":"update"}}"#,
             r#"{"name":"instructions","arguments":{"topic":1}}"#,
+            r#"{"name":"instructions","arguments":{"topic":null}}"#,
+            r#"{"name":"instructions","arguments":"config"}"#,
+            r#"{"name":"instructions","arguments":["config"]}"#,
         ] {
             let reply = parse(
                 &handle_line(&format!(

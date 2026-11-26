@@ -101,11 +101,11 @@ fn link_end(chars: &[char], from: usize) -> Option<usize> {
 
 /// The destination of an inline link whose `(` ends just before `from`: its text, where it
 /// starts and the index past the closing `)`. Each scan stops where another link could begin,
-/// so a paragraph of unclosed links is read in linear time; a bare destination holding a
-/// bracket is taken as no link, which reports nothing.
+/// so a paragraph of unclosed links is read in linear time: a bare destination ends without a
+/// link at the next `](`, and an angle-bracket one at a `<` or a line break.
 pub(super) fn inline_target(chars: &[char], from: usize) -> Option<(String, usize, usize)> {
     let mut i = from;
-    while chars.get(i).is_some_and(|c| *c == ' ') {
+    while chars.get(i).is_some_and(|c| c.is_whitespace()) {
         i += 1;
     }
     if chars.get(i) == Some(&'<') {
@@ -127,7 +127,7 @@ pub(super) fn inline_target(chars: &[char], from: usize) -> Option<(String, usiz
                 }
                 depth -= 1;
             }
-            '[' | ']' if !is_escaped(chars, i) => return None,
+            ']' if chars.get(i + 1) == Some(&'(') && !is_escaped(chars, i) => return None,
             c if c.is_whitespace() => break,
             _ => {}
         }
@@ -154,7 +154,7 @@ pub(super) fn definition(chars: &[char], at: usize) -> Option<(String, String, u
     }
     let label: String = chars[open + 1..close].iter().collect();
     let mut start = close + 2;
-    while chars.get(start).is_some_and(|c| *c == ' ') {
+    while chars.get(start).is_some_and(|c| c.is_whitespace()) {
         start += 1;
     }
     let (start, end) = if chars.get(start) == Some(&'<') {

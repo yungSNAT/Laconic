@@ -24,7 +24,7 @@ pub(super) fn anchors(text: &str) -> HashSet<String> {
         // A `{#id}` attribute names an anchor for renderers that read it; GitHub does not,
         // and slugs the whole title, attribute included.
         let title = title.trim_end();
-        if has_undecoded_entity(title) {
+        if has_undecoded_entity(&rendered(title)) {
             found.insert(ANY_ANCHOR.to_owned());
         }
         if let Some((_, id)) = title
@@ -118,32 +118,58 @@ pub(super) fn collect_ids(line: &str, found: &mut HashSet<String>) {
 /// GitHub's anchor for a heading: its rendered text (without links' targets, HTML tags,
 /// emphasis marks and entity escapes) without punctuation other than hyphens and underscores, in lower case, with each space a hyphen.
 pub(super) fn slug(title: &str) -> String {
-    let chars: Vec<char> = title.chars().collect();
-    let mut text = String::new();
-    let mut i = 0;
-    while i < chars.len() {
-        match chars[i] {
-            '<' => match closing(&chars, i + 1, '>', &['<']) {
-                Some(end) => i = end + 1,
-                None => i += 1,
-            },
-            ']' if chars.get(i + 1) == Some(&'(') => match inline_target(&chars, i + 2) {
-                Some((_, _, end)) => i = end,
-                None => i += 1,
-            },
-            c => {
-                text.push(c);
-                i += 1;
-            }
-        }
-    }
-    without_emphasis(&unescape_html(&text))
+    without_emphasis(&unescape_html(&rendered(title)))
+        .replace(LITERAL_UNDERSCORE, "_")
         .to_lowercase()
         .chars()
         .filter(|c| c.is_alphanumeric() || matches!(c, ' ' | '-' | '_'))
         .map(|c| if c == ' ' { '-' } else { c })
         .collect()
 }
+
+/// Stand-ins for an `&` and an `_` that a code span or a backslash keeps literal, so that no
+/// entity or emphasis is read from them; the slug drops the first and restores the second.
+const LITERAL_AMPERSAND: char = '\u{1}';
+const LITERAL_UNDERSCORE: char = '\u{2}';
+
+/// `title` as its anchor is read from it: without links' targets and HTML tags, and with the
+/// text of code spans and backslash escapes kept literal.
+fn rendered(title: &str) -> String {
+    let chars: Vec<char> = title.chars().collect();
+    let mut in_code = vec![false; chars.len()];
+    for (start, end) in code_spans(&chars) {
+        in_code[start..end].fill(true);
+    }
+    let mut text = String::new();
+    let mut i = 0;
+    while i < chars.len() {
+        let c = chars[i];
+        // Only these characters are tested for an escape, which keeps the test linear.
+        let literal = matches!(c, '<' | ']' | '&' | '_') && (in_code[i] || is_escaped(&chars, i));
+        let skip_to = match c {
+            '<' if !literal => closing(&chars, i + 1, '>', &['<']).map(|end| end + 1),
+            ']' if !literal && chars.get(i + 1) == Some(&'(') => {
+                inline_target(&chars, i + 2).map(|(_, _, end)| end)
+            }
+            _ => None,
+        };
+        if let Some(end) = skip_to {
+            i = end;
+            continue;
+        }
+        text.push(match c {
+            '&' if literal => LITERAL_AMPERSAND,
+            '_' if literal => LITERAL_UNDERSCORE,
+            c => c,
+        });
+        i += 1;
+    }
+    text
+}
+
+/// The longest entity name HTML defines (`CounterClockwiseContourIntegral`) has 31 characters,
+/// so the `;` that ends an entity is at most this many characters past its `&`.
+const LONGEST_ENTITY: usize = 32;
 
 /// `text` with the entities for markup characters and numeric character references decoded,
 /// as GitHub renders a heading before taking its anchor.
@@ -153,7 +179,12 @@ fn unescape_html(text: &str) -> String {
     while let Some(at) = rest.find('&') {
         out.push_str(&rest[..at]);
         rest = &rest[at..];
-        let decoded = rest.find(';').and_then(|end| {
+        let end = rest
+            .char_indices()
+            .take(LONGEST_ENTITY + 1)
+            .find(|&(_, c)| c == ';')
+            .map(|(k, _)| k);
+        let decoded = end.and_then(|end| {
             let c = match &rest[1..end] {
                 "amp" => Some('&'),
                 "lt" => Some('<'),
@@ -246,7 +277,9 @@ fn named_entity(name: &str) -> Option<char> {
 /// decode: HTML defines over 2,000, so its anchor is unknown and no fragment is reported.
 pub(super) const ANY_ANCHOR: &str = "\u{0}";
 
-/// Whether `title` holds `&name;` for a name other than the markup ones and those above.
+/// Whether `title` holds `&name;` for a name other than the markup ones and those above. Any
+/// such word counts, so `R&D;`, which renders literally, also leaves the file's fragments
+/// unchecked: the rule then reports less, never wrongly.
 fn has_undecoded_entity(title: &str) -> bool {
     title.split('&').skip(1).any(|rest| {
         rest.split_once(';').is_some_and(|(name, _)| {
@@ -262,13 +295,25 @@ fn has_undecoded_entity(title: &str) -> bool {
 /// an `_` inside a word, as in `snake_case`, stays.
 fn without_emphasis(text: &str) -> String {
     let chars: Vec<char> = text.chars().collect();
-    let word = |c: Option<&char>| c.is_some_and(|c| c.is_alphanumeric());
-    (0..chars.len())
-        .filter(|&i| {
-            chars[i] != '_'
-                || (word(chars[..i].iter().rev().find(|&&c| c != '_'))
-                    && word(chars[i + 1..].iter().find(|&&c| c != '_')))
-        })
-        .map(|i| chars[i])
-        .collect()
+    // Whether the first character other than `_` from each index on is a word character, found
+    // in one pass back, as a scan from each `_` takes time in the square of a run of them.
+    let mut word_after = vec![false; chars.len() + 1];
+    for i in (0..chars.len()).rev() {
+        word_after[i] = if chars[i] == '_' {
+            word_after[i + 1]
+        } else {
+            chars[i].is_alphanumeric()
+        };
+    }
+    let mut word_before = false;
+    let mut out = String::new();
+    for (i, &c) in chars.iter().enumerate() {
+        if c != '_' {
+            word_before = c.is_alphanumeric();
+            out.push(c);
+        } else if word_before && word_after[i + 1] {
+            out.push(c);
+        }
+    }
+    out
 }

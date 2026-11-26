@@ -228,6 +228,27 @@ fn slugs_follow_github() {
         slug("A &amp; B &#38; C &#x26; D &unknown; E & F"),
         "a--b--c--d-unknown-e--f"
     );
+    // A code span and a backslash keep their text literal: no entity, tag, link or emphasis.
+    assert_eq!(slug("The `&nbsp;` entity"), "the-nbsp-entity");
+    assert_eq!(slug("A \\&eacute; b"), "a-eacute-b");
+    assert_eq!(slug("The `__init__` method"), "the-__init__-method");
+    assert_eq!(slug("Tag `<b>` and \\<i>"), "tag-b-and-i");
+}
+
+#[test]
+fn entities_in_code_spans_and_after_a_backslash_stay_literal() {
+    let wrong: Vec<_> = [
+        ("The `&nbsp;` entity", "#the-nbsp-entity"),
+        ("Use `&copy;`", "#use-copy"),
+        ("A \\&eacute; b", "#a-eacute-b"),
+    ]
+    .into_iter()
+    .filter(|(heading, fragment)| {
+        let text = format!("## {heading}\n\nSee [e]({fragment}) and [f](#nowhere).\n");
+        names(&text, None) != ["broken-anchor"]
+    })
+    .collect();
+    assert!(wrong.is_empty(), "{wrong:?}");
 }
 
 #[test]
@@ -347,44 +368,45 @@ fn named_entities_in_headings_decode_or_leave_the_file_unchecked() {
 fn unclosed_links_and_definitions_are_read_in_linear_time() {
     // Each `](` once scanned to the paragraph's end for its `)`, so a paragraph of unclosed links
     // took time in the square of its length. Quadrupling every hostile paragraph must take
-    // about 4 times as long, well under the 16 a square gives; the fastest of 3 runs keeps a
+    // about 4 times as long, well under the 16 a square gives; the fastest of 5 runs keeps a
     // busy machine from deciding the ratio. Only the link rules' own reading is timed: the rest of
-    // lint has costs of its own on such a paragraph.
+    // lint has costs of its own on such a paragraph. Each shape (a heading prefix and a repeated
+    // unit) is timed alone, so a fast shape cannot hide a slow one.
     let shapes = [
-        "a](b c ",
-        "](a",
-        "](a(",
-        "[a\n",
-        "x][a] ",
-        "[a]: <b\n",
-        "](<a ",
-        "`a` <!-- c --> [b](#x) ",
-        "<!-- c -->\n[b](#x)\n",
+        ("", "a](b c "),
+        ("", "](a"),
+        ("", "](a("),
+        ("", "[a\n"),
+        ("", "x][a] "),
+        ("", "[a]: <b\n"),
+        ("", "](<a "),
+        ("", "`a` <!-- c --> [b](#x) "),
+        ("", "<!-- c -->\n[b](#x)\n"),
+        ("", "\\"),
+        ("# ", "_"),
+        ("# ", "&"),
     ];
+    // As lint reads a paragraph: its lines joined by a space, which belongs to the line before.
     let read = |text: &str| {
-        let chars: Vec<char> = text.chars().collect();
         let mut line = 1;
-        let lines: Vec<usize> = chars
-            .iter()
-            .map(|&c| {
+        let lines: Vec<usize> = text
+            .chars()
+            .map(|c| {
                 let at = line;
                 line += usize::from(c == '\n');
                 at
             })
             .collect();
+        let chars: Vec<char> = text
+            .chars()
+            .map(|c| if c == '\n' { ' ' } else { c })
+            .collect();
         let mut links = Links::default();
         links.collect(&chars, |k| (lines.get(k).copied().unwrap_or(line), k + 1));
         links.findings(text, None)
     };
-    let text = |n: usize| {
-        shapes
-            .iter()
-            .map(|s| s.repeat(n))
-            .collect::<Vec<_>>()
-            .join("\n\n")
-    };
     let fastest = |text: &str| {
-        (0..3)
+        (0..5)
             .map(|_| {
                 let start = std::time::Instant::now();
                 read(text);
@@ -393,12 +415,20 @@ fn unclosed_links_and_definitions_are_read_in_linear_time() {
             .min()
             .unwrap()
     };
-    let (small, large) = (fastest(&text(1_000)), fastest(&text(4_000)));
-    assert!(
-        large < small * 8,
-        "4 times the input took {:.1} times as long ({small:?} to {large:?})",
-        large.as_secs_f64() / small.as_secs_f64()
-    );
+    let slow: Vec<String> = shapes
+        .iter()
+        .filter_map(|&(head, unit)| {
+            let text = |chars: usize| format!("{head}{}", unit.repeat(chars / unit.len()));
+            let (small, large) = (fastest(&text(16_000)), fastest(&text(64_000)));
+            (large >= small * 8).then(|| {
+                format!(
+                    "{unit:?}: 4 times the input took {:.1} times as long ({small:?} to {large:?})",
+                    large.as_secs_f64() / small.as_secs_f64()
+                )
+            })
+        })
+        .collect();
+    assert!(slow.is_empty(), "{slow:#?}");
 }
 
 #[test]
@@ -415,14 +445,27 @@ fn an_inline_link_ends_at_its_title_and_closing_parenthesis() {
     ] {
         assert_eq!(names(&format!("{link}\n"), None).len(), 1, "{link:?}");
     }
-    // Text after the destination that is no title and a bracket in a bare destination make no
-    // link.
-    for text in ["[a](#x junk)", "[a](#x]y)", "[a](#x \"t\" junk)"] {
+    // Text after the destination that is no title makes no link, nor does a line break in an
+    // angle-bracket destination, inline or in a definition.
+    for text in [
+        "[a](#x junk)",
+        "[a](#x \"t\" junk)",
+        "[a](<#x\ny>)",
+        "[a]: <#b\nc>",
+    ] {
         assert!(names(&format!("{text}\n"), None).is_empty(), "{text:?}");
     }
-    // Nor does a line break in an angle-bracket destination. Lint joins a paragraph's lines with
-    // a space before the link rules read it, so this is checked on the destination itself.
+    // A destination may start on the next line: the definition's label is defined, and the
+    // link rules now see the line break itself.
+    assert!(names("[t][a]\n\n[a]:\nx.md\n", None).is_empty());
     let target = |text: &str| inline_target(&text.chars().collect::<Vec<_>>(), 0);
-    assert_eq!(target("<#x>)").map(|t| t.0), Some("#x".to_owned()));
-    assert_eq!(target("<#x\ny>)"), None);
+    assert_eq!(target("\n#x)").map(|t| t.0), Some("#x".to_owned()));
+}
+
+#[test]
+fn a_bracket_in_a_bare_destination_is_part_of_it() {
+    // As in CommonMark, so a missing target there is still reported.
+    for text in ["[a](#x]y)", "[a](#x[1])", "[a](#notes[1]x)"] {
+        assert_eq!(names(&format!("{text}\n"), None).len(), 1, "{text:?}");
+    }
 }

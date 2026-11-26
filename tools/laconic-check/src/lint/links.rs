@@ -29,8 +29,9 @@ const MAX_TARGET_BYTES: u64 = 1 << 20;
 /// How many folder listings and file reads one workspace allows; past it, targets go unchecked.
 const MAX_READS: usize = 10_000;
 
-/// The folder `broken-link` resolves relative targets within. A target that leads outside it,
-/// by `..` or through a symbolic link, is not checked.
+/// The folder `broken-link` resolves relative targets within. A target that leads outside it
+/// by `..`, or through any symbolic link or junction (inside the folder or not), is not
+/// checked.
 pub struct Workspace {
     root: PathBuf,
     listings: RefCell<HashMap<PathBuf, Option<Rc<Vec<OsString>>>>>,
@@ -195,6 +196,15 @@ impl Links {
     /// Records the links in `chars`, the raw text of a paragraph or line; `at` maps a 0-based
     /// index in it to its line and 1-based column.
     pub(super) fn collect(&mut self, chars: &[char], at: impl Fn(usize) -> (usize, usize)) {
+        // Lint joins a paragraph's lines with a space; the scans stop at a line break where
+        // CommonMark does, so each such space is read as one.
+        let chars: Vec<char> = (0..chars.len())
+            .map(|k| match chars[k] {
+                ' ' if k + 1 < chars.len() && at(k + 1).0 != at(k).0 => '\n',
+                c => c,
+            })
+            .collect();
+        let chars = &chars[..];
         let mut in_code = vec![false; chars.len()];
         for (start, end) in code_spans(chars) {
             in_code[start..end].fill(true);
@@ -219,7 +229,9 @@ impl Links {
         let openers = opening_brackets(chars);
         let mut i = 0;
         while i < chars.len() {
-            if in_code[i] || is_escaped(chars, i) {
+            // Only `]` and `=` start anything, so only they are tested for an escape: testing
+            // every character walks a run of backslashes back from each of its members.
+            if in_code[i] || (matches!(chars[i], ']' | '=') && is_escaped(chars, i)) {
                 i += 1;
                 continue;
             }

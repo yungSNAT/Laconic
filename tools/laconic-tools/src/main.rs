@@ -53,7 +53,7 @@ const CURSOR_RULE: &str = ".cursor-plugin/rules/laconic.mdc";
 /// The Cursor rule for the compact rules `body`: Cursor's frontmatter, then the body.
 fn cursor_rule(body: &str) -> String {
     format!(
-        "---\ndescription: Laconic's prose rules: answer first, concise, correct Australian English\nalwaysApply: true\n---\n\n{body}\n"
+        "---\ndescription: Laconic prose rules for concise, answer-first output in correct Australian English\nalwaysApply: true\n---\n\n{body}\n"
     )
 }
 
@@ -285,7 +285,7 @@ mod tests {
         assert!(sync_rules(&dir, true).is_ok());
         assert_eq!(
             fs::read_to_string(dir.join(CURSOR_RULE)).unwrap(),
-            "---\ndescription: Laconic's prose rules: answer first, concise, correct Australian English\nalwaysApply: true\n---\n\nKeep it short.\n"
+            "---\ndescription: Laconic prose rules for concise, answer-first output in correct Australian English\nalwaysApply: true\n---\n\nKeep it short.\n"
         );
         // A hand edit to the Cursor rule alone is caught too.
         fs::write(dir.join(CURSOR_RULE), "edited").unwrap();

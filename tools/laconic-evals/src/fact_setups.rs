@@ -232,7 +232,8 @@ fn not_iterable(value: &Value) -> String {
 pub fn skills_used(stream: &str) -> Result<BTreeSet<String>, String> {
     let mut used = BTreeSet::new();
     for line in py::split_lines(stream) {
-        if !line.starts_with('{') {
+        // Picked as `preflight` picks result events, so both read the same lines.
+        if !line.trim_start().starts_with('{') {
             continue;
         }
         let event = parse(line)?;

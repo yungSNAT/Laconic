@@ -216,14 +216,20 @@ fn skills_used_reads_skill_calls_from_the_stream() {
         r#"{"message": {"content": [{"type": "tool_use", "name": "Skill", "input": {}}]}}"#,
         r#"{"message": {"content": "text"}}"#,
         r#"{"message": null}"#,
+        r#"  {"message": {"content": [{"type": "tool_use", "name": "Skill", "input": {"skill": "indented"}}]}}"#,
     ]
     .join("\n");
     assert_eq!(
         skills_used(&stream),
-        Ok(BTreeSet::from(["laconic-prose".to_owned(), String::new()]))
+        Ok(BTreeSet::from([
+            "laconic-prose".to_owned(),
+            "indented".to_owned(),
+            String::new()
+        ]))
     );
     for bad in [
         "{broken",
+        "  {broken",
         r#"{"message": 3}"#,
         r#"{"message": {"content": 3}}"#,
         r#"{"message": {"content": [{"type": "tool_use", "name": "Skill"}]}}"#,

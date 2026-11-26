@@ -247,6 +247,81 @@ fn every_seeded_fault_is_caught_exactly_once() {
     );
 }
 
+/// A TOML basic string holding `text`, with every character outside printable ASCII escaped.
+fn toml_string(text: &str) -> String {
+    let mut out = String::from("\"");
+    for c in text.chars() {
+        match c {
+            '"' => out.push_str("\\\""),
+            '\\' => out.push_str("\\\\"),
+            ' ' => out.push(' '),
+            c if c.is_ascii_graphic() => out.push(c),
+            c if (c as u32) <= 0xFFFF => {
+                let _ = write!(out, "\\u{:04X}", c as u32);
+            }
+            c => {
+                let _ = write!(out, "\\U{:08X}", c as u32);
+            }
+        }
+    }
+    out.push('"');
+    out
+}
+
+/// One `[protect]` phrase must exempt its span from every rule, through the filter the CLI,
+/// MCP server, language server and Stop hook apply (`keeps` and `keeps_cached`): each seed's
+/// faulty fragment, protected, leaves no finding of its rule, and unprotected it leaves one.
+#[test]
+fn every_seeded_fault_is_exempt_when_its_fragment_is_protected() {
+    use crate::settings::{LineProtectCache, Settings};
+    let clean = corpus();
+    let mut failures = Vec::new();
+    for &(rule, from, to) in SEEDS {
+        let text = clean.replacen(from, to, 1);
+        let lines: Vec<&str> = text.lines().collect();
+        let kept = |config: &str| -> Result<(usize, usize), String> {
+            let settings = Settings::parse("laconic.toml", config)?;
+            let found = lint_all(&text);
+            let line = |line: usize| lines.get(line.wrapping_sub(1)).copied().unwrap_or("");
+            let plain = found
+                .iter()
+                .filter(|f| settings.keeps(f, line(f.line)))
+                .count();
+            let mut cache = LineProtectCache::default();
+            let cached = found
+                .iter()
+                .filter(|f| settings.keeps_cached(f, line(f.line), &mut cache))
+                .count();
+            Ok((plain, cached))
+        };
+        let only = format!("only = [{}]\n", toml_string(rule));
+        // A phrase matches within one line, so a fault spanning lines (3 bold-label bullets)
+        // is protected by the line its finding is reported on.
+        let phrase = if to.contains('\n') {
+            lint_all(&text)
+                .iter()
+                .find(|f| f.rule.house().map(|id| id.name()) == Some(rule))
+                .map_or("", |f| lines[f.line - 1].trim())
+        } else {
+            to
+        };
+        let protected = format!("{only}[protect]\nphrases = [{}]\n", toml_string(phrase));
+        match (kept(&only), kept(&protected)) {
+            (Ok((1, 1)), Ok((0, 0))) => {}
+            (bare, guarded) => failures.push(format!(
+                "{rule}: {to:?}: unprotected {bare:?}, protected {guarded:?}"
+            )),
+        }
+    }
+    assert!(
+        failures.is_empty(),
+        "{} of {} seeds not exempted by [protect]:\n{}",
+        failures.len(),
+        SEEDS.len(),
+        failures.join("\n")
+    );
+}
+
 /// docs/rules.md shows each seed's faulty form as an example, so it must flag its rule alone.
 /// An example with invisible characters is printed with escapes and labelled as such.
 #[test]

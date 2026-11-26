@@ -392,6 +392,13 @@ fn preflight_fails_a_setup_with_no_known_skill_and_checks_the_rest() {
         String::from_utf8(printed).unwrap(),
         "mine: no skill is known for this setup\n\ncaveman: wanted caveman, called ['caveman']\n\n\n"
     );
+    // A closed output stops it at the unknown setup's line, before any call.
+    let mut closed: &mut [u8] = &mut [];
+    assert_eq!(
+        preflight(dir.path(), &fake, &mut closed),
+        Err("failed to write whole buffer".into())
+    );
+    assert_eq!(recorder.calls().len(), 1);
 }
 
 #[test]

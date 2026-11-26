@@ -58,7 +58,13 @@ impl Profile {
                     | RuleId::UnnamedEvidence
                     | RuleId::AiPlaceholder
             ),
-            Self::Docs => matches!(id, RuleId::UnattributedSuperlative | RuleId::AiPlaceholder),
+            Self::Docs => matches!(
+                id,
+                RuleId::UnattributedSuperlative
+                    | RuleId::AiPlaceholder
+                    | RuleId::BrokenAnchor
+                    | RuleId::BrokenLink
+            ),
             Self::Chat => matches!(id, RuleId::ChatFiller | RuleId::AiPlaceholder),
         }
     }

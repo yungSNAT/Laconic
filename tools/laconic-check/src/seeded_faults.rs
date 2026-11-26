@@ -7,7 +7,7 @@
 //! planting one known fault in it must produce exactly that rule, once. The rule reference,
 //! `docs/rules.md`, is generated here from the rule table, the seeds and the human corpus.
 
-use crate::lint::{RULES, RuleId, lint, lint_all};
+use crate::lint::{Finding, RULES, RuleId, Workspace, lint, lint_all, lint_in};
 use std::collections::BTreeMap;
 use std::fmt::Write;
 use std::path::Path;
@@ -193,6 +193,16 @@ const SEEDS: &[(&str, &str, &str)] = &[
         "Define clean gates and seams before coding.",
     ),
     (
+        "broken-anchor",
+        "Each member gets a healthcare plan.",
+        "Each member gets a [healthcare plan](#plans).",
+    ),
+    (
+        "broken-link",
+        "Each member gets a healthcare plan.",
+        "Each member gets a [healthcare plan](plans.md).",
+    ),
+    (
         "unused-suppression",
         "Each member gets a healthcare plan.",
         "<!-- laconic-check-disable-next-line em-dash -->",
@@ -203,9 +213,18 @@ fn corpus() -> String {
     CLEAN.join("\n\n")
 }
 
+/// Every rule's findings in `text`, as a file in this crate's folder, so `broken-link` can
+/// resolve its targets there.
+fn lint_seeded(text: &str) -> Vec<Finding> {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let workspace = Workspace::new(root).unwrap();
+    let folder = workspace.folder_of(&root.join("Cargo.toml")).unwrap();
+    lint_in(text, &[], true, Some((&workspace, &folder))).0
+}
+
 fn rules_for(rule: &str, text: &str) -> Vec<&'static str> {
     let opt_in = RuleId::named(rule).is_some_and(|id| id.rule().opt_in);
-    let found = if opt_in { lint_all(text) } else { lint(text) };
+    let found = if opt_in { lint_seeded(text) } else { lint(text) };
     found
         .into_iter()
         .map(|f| f.rule.house().unwrap().name())
@@ -281,7 +300,7 @@ fn every_seeded_fault_is_exempt_when_its_fragment_is_protected() {
         let lines: Vec<&str> = text.lines().collect();
         let kept = |config: &str| -> Result<(usize, usize), String> {
             let settings = Settings::parse("laconic.toml", config)?;
-            let found = lint_all(&text);
+            let found = lint_seeded(&text);
             let line = |line: usize| lines.get(line.wrapping_sub(1)).copied().unwrap_or("");
             let plain = found
                 .iter()

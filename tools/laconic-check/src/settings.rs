@@ -264,6 +264,23 @@ impl Settings {
         self.profile.is_some_and(|p| p.enables_opt_in())
     }
 
+    /// Whether `lint` reports the house rule `id` at all under these settings, so a surface
+    /// reads the file system for `broken-link` only when that rule is on.
+    pub fn enables(&self, id: RuleId) -> bool {
+        let name = id.name();
+        if self.disable.iter().any(|n| n == name) {
+            return false;
+        }
+        if !self.only.is_empty() {
+            return self.only.iter().any(|n| n == name);
+        }
+        match self.profile {
+            Some(profile) if id.rule().opt_in => profile.enables(id),
+            Some(profile) => !profile.disables(id),
+            None => !id.rule().opt_in,
+        }
+    }
+
     fn push_protect(&mut self, phrase: String) {
         self.protect.push(phrase);
     }

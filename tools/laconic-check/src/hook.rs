@@ -10,7 +10,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
-use crate::lint;
+use crate::lint::{self, RuleId, Workspace};
 use crate::mcp::{self, Json};
 use crate::settings::{self, LineProtectCache, Settings};
 
@@ -49,22 +49,35 @@ pub fn stop(input: &str) -> Result<Option<String>, String> {
         ],
     )?
     .ok_or("git status: not a Git repository")?;
+    // `broken-link` resolves targets within the repository, and only when it is on.
+    let workspace = settings
+        .enables(RuleId::BrokenLink)
+        .then(|| Workspace::new(&root))
+        .flatten();
     let mut found = Vec::new();
     for file in markdown(&status)? {
-        found.extend(failing(&root, &file, &settings)?);
+        found.extend(failing(&root, &file, &settings, workspace.as_ref())?);
     }
     Ok((found.len() > settings.max_findings).then(|| decision(&found)))
 }
 
 /// `lint`'s failing findings in one file, one line each as `lint` prints them. A file it cannot
 /// read is an error, so `max-findings` never lets an unread file through.
-fn failing(root: &Path, file: &Path, settings: &Settings) -> Result<Vec<String>, String> {
+fn failing(
+    root: &Path,
+    file: &Path,
+    settings: &Settings,
+    workspace: Option<&Workspace>,
+) -> Result<Vec<String>, String> {
     let path = file.display();
-    let text = fs::read_to_string(root.join(file)).map_err(|e| format!("{path}: {e}"))?;
+    let full = root.join(file);
+    let text = fs::read_to_string(&full).map_err(|e| format!("{path}: {e}"))?;
+    let folder = workspace.and_then(|w| w.folder_of(&full));
+    let place = workspace.zip(folder.as_deref());
     let lines: Vec<&str> = text.lines().collect();
     let mut protect_cache = LineProtectCache::default();
     Ok(
-        lint::lint_counting_with(&text, &settings.rules, settings.needs_opt_in())
+        lint::lint_in(&text, &settings.rules, settings.needs_opt_in(), place)
             .0
             .into_iter()
             .filter(|f| {

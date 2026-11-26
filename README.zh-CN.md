@@ -321,6 +321,8 @@ repos:
 | 名称被改动 | 28 | 20 篇列出待查名称 | 20 | 20 |
 | 所有单元都保留 | 258 | 17 篇通过；224 篇只因语义词失败；0 篇因月份、行内代码或 URL 失败；17 篇因数字、数量或引文失败 | 23 篇通过；222；0；13 | 64 篇通过；182；0；12 |
 
+`laconic-check instructions` 输出编程智能体在仓库中使用检查器所需的内容：`lint` 和 `preserve` 检查什么、如何阅读和处理一条发现、如何在 CI 中设卡，以及如何设置 `laconic.toml`。`laconic-check instructions config` 列出项目文件的键，`laconic-check instructions rules` 列出每条规则，以及它是否会让 `lint` 失败、是否需要选择启用。`laconic-check mcp` 以提示 `instructions` 提供相同内容。
+
 `laconic-check mcp` 通过标准输入输出把 `lint` 和 `preserve` 作为 MCP 工具提供，无需另外安装任何东西。`preserve` 工具接受 `loose: true`，作用与 `--loose` 相同；`lint` 工具与 `lint` 一样，应用服务器运行目录中的 `laconic.toml` 或 `.laconic-check` 文件，每次调用都重新读取；文件格式错误时，调用会返回一个指出其行号的错误（两者均自 0.6.0 起）：
 
 ```bash

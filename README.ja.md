@@ -321,6 +321,8 @@ GitHub Actions では、コンポジット Action がランナー（Linux x86_64
 | 名前が変わった | 28 | 20 件が確認用の名前を一覧化 | 20 | 20 |
 | すべての単位を保持 | 258 | 17 件合格、224 件が意味を担う語だけで失敗、0 件が月・インラインコード・URL で失敗、17 件が数値・量・引用で失敗 | 23 件合格; 222; 0; 13 | 64 件合格; 182; 0; 12 |
 
+`laconic-check instructions` は、コーディングエージェントがリポジトリでチェッカーを使うのに必要なこと、つまり `lint` と `preserve` が何を確認するか、指摘の読み方と対応、CI でのゲートのかけ方、`laconic.toml` の設定方法を表示します。`laconic-check instructions config` はプロジェクトファイルのキーを、`laconic-check instructions rules` は各ルールと、それが `lint` を失敗させるか、オプトインかを一覧にします。`laconic-check mcp` は同じ内容をプロンプト `instructions` として提供します。
+
 `laconic-check mcp` は、`lint` と `preserve` を標準入出力で MCP ツールとして提供し、ほかに何もインストールする必要はありません。`preserve` ツールは `--loose` と同じ動作のために `loose: true` を受け付け、`lint` ツールは `lint` と同様にサーバーが動くディレクトリの `laconic.toml` または `.laconic-check` ファイルを呼び出しごとに読み直して適用します。ファイルの形式が誤っていれば、呼び出しはその行を示すエラーになります（どちらも 0.6.0 から）。
 
 ```bash

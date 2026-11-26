@@ -55,6 +55,7 @@ The manifests other than Claude Code's still declare plugin 0.5.0, so a build fr
 
 ### laconic-check: added
 
+- `laconic-check instructions [config|rules]` prints what a coding agent needs to use the checker in a repository, the project file's keys or every rule with its kind; `laconic-check mcp` offers the same text as the prompt `instructions`, and the completions cover it.
 - A test that one `[protect]` phrase exempts every seeded fault from its rule, through the filter the CLI, MCP server, language server and Stop hook share.
 
 ## [laconic-check 0.6.1] - 2026-11-25

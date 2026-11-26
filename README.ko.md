@@ -321,6 +321,8 @@ GitHub Actions에서는 복합 Action이 러너(Linux x86_64, Windows x86_64, Ap
 | 이름이 바뀜 | 28 | 20 확인할 이름 나열 | 20 | 20 |
 | 모든 단위 유지 | 258 | 17 통과, 224 의미 단어만으로 실패, 0 월·인라인 코드·URL로 실패, 17 숫자·양·인용으로 실패 | 23 통과; 222; 0; 13 | 64 통과; 182; 0; 12 |
 
+`laconic-check instructions`는 코딩 에이전트가 저장소에서 검사기를 쓰는 데 필요한 내용, 곧 `lint`와 `preserve`가 무엇을 검사하는지, 지적을 읽고 처리하는 방법, CI에서 막는 방법, `laconic.toml` 설정 방법을 출력합니다. `laconic-check instructions config`는 프로젝트 파일의 키를, `laconic-check instructions rules`는 각 규칙과 그 규칙이 `lint`를 실패시키는지, 옵트인인지를 나열합니다. `laconic-check mcp`는 같은 내용을 프롬프트 `instructions`로 제공합니다.
+
 `laconic-check mcp`는 `lint`와 `preserve`를 표준 입출력으로 MCP 도구로 제공하며, 따로 설치할 것이 없습니다. `preserve` 도구는 `--loose`와 같은 동작을 위해 `loose: true`를 받고, `lint` 도구는 `lint`처럼 서버가 실행되는 디렉터리의 `laconic.toml` 또는 `.laconic-check` 파일을 호출마다 다시 읽어 적용합니다. 형식이 잘못된 파일이면 호출이 그 줄을 알려 주는 오류가 됩니다(둘 다 0.6.0부터).
 
 ```bash

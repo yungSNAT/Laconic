@@ -7,6 +7,7 @@
 pub mod action;
 pub mod completions;
 pub mod hook;
+pub mod instructions;
 pub mod lint;
 pub mod lsp;
 pub mod mcp;

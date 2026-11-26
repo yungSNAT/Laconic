@@ -49,7 +49,7 @@ fn bash(rules: &[&str]) -> String {
     prev="${{COMP_WORDS[COMP_CWORD-1]}}"
 
     if [[ $COMP_CWORD -eq 1 ]]; then
-        COMPREPLY=( $(compgen -W "lint preserve mcp lsp hook completions --help --version" -- "$cur") )
+        COMPREPLY=( $(compgen -W "lint preserve mcp lsp hook completions instructions --help --version" -- "$cur") )
         return
     fi
 
@@ -95,6 +95,11 @@ fn bash(rules: &[&str]) -> String {
                 COMPREPLY=( $(compgen -W "bash zsh fish powershell" -- "$cur") )
             fi
             ;;
+        instructions)
+            if [[ $COMP_CWORD -eq 2 ]]; then
+                COMPREPLY=( $(compgen -W "config rules" -- "$cur") )
+            fi
+            ;;
         mcp|lsp|hook)
             ;;
     esac
@@ -120,6 +125,7 @@ _laconic-check() {{
         'lsp:Run the language server over standard input and output'
         'hook:Run the Stop hook for Claude Code and Codex'
         'completions:Print a shell completion script'
+        'instructions:Print what a coding agent needs to use laconic-check'
     )
 
     _arguments -C \
@@ -160,6 +166,10 @@ _laconic-check() {{
                     _arguments \
                         '1:shell:(bash zsh fish powershell)'
                     ;;
+                instructions)
+                    _arguments \
+                        '1:topic:(config rules)'
+                    ;;
                 mcp|lsp|hook)
                     ;;
             esac
@@ -188,6 +198,7 @@ complete -c laconic-check -n "__fish_use_subcommand" -f -a "mcp" -d "Serve lint 
 complete -c laconic-check -n "__fish_use_subcommand" -f -a "lsp" -d "Run the language server"
 complete -c laconic-check -n "__fish_use_subcommand" -f -a "hook" -d "Run the Stop hook for Claude Code and Codex"
 complete -c laconic-check -n "__fish_use_subcommand" -f -a "completions" -d "Print a shell completion script"
+complete -c laconic-check -n "__fish_use_subcommand" -f -a "instructions" -d "Print what a coding agent needs to use laconic-check"
 
 complete -c laconic-check -n "__fish_seen_subcommand_from lint" -l json -d "Print one JSON document"
 complete -c laconic-check -n "__fish_seen_subcommand_from lint" -l sarif -d "Print a SARIF 2.1.0 log"
@@ -205,6 +216,7 @@ complete -c laconic-check -n "__fish_seen_subcommand_from preserve" -l strict -d
 complete -c laconic-check -n "__fish_seen_subcommand_from preserve" -l loose -d "List lost hedge or frequency words to check"
 
 complete -c laconic-check -n "__fish_seen_subcommand_from completions; and not __fish_seen_subcommand_from bash zsh fish powershell" -f -a "bash zsh fish powershell" -d "Target shell"
+complete -c laconic-check -n "__fish_seen_subcommand_from instructions; and not __fish_seen_subcommand_from config rules" -f -a "config rules" -d "Topic"
 complete -c laconic-check -n "__fish_seen_subcommand_from mcp lsp hook" -f
 "#
     )
@@ -244,6 +256,7 @@ fn powershell(rules: &[&str]) -> String {
             [System.Management.Automation.CompletionResult]::new('lsp', 'lsp', [System.Management.Automation.CompletionResultType]::ParameterValue, 'Run the language server')
             [System.Management.Automation.CompletionResult]::new('hook', 'hook', [System.Management.Automation.CompletionResultType]::ParameterValue, 'Run the Stop hook for Claude Code and Codex')
             [System.Management.Automation.CompletionResult]::new('completions', 'completions', [System.Management.Automation.CompletionResultType]::ParameterValue, 'Print a shell completion script')
+            [System.Management.Automation.CompletionResult]::new('instructions', 'instructions', [System.Management.Automation.CompletionResultType]::ParameterValue, 'Print what a coding agent needs to use laconic-check')
             [System.Management.Automation.CompletionResult]::new('--help', '--help', [System.Management.Automation.CompletionResultType]::ParameterName, 'Print usage information')
             [System.Management.Automation.CompletionResult]::new('--version', '--version', [System.Management.Automation.CompletionResultType]::ParameterName, 'Print version information')
         )
@@ -289,6 +302,12 @@ fn powershell(rules: &[&str]) -> String {
                 [System.Management.Automation.CompletionResult]::new('powershell', 'powershell', [System.Management.Automation.CompletionResultType]::ParameterValue, 'PowerShell completion script')
             )
         }}
+    }} elseif ($subcommand -eq 'instructions') {{
+        if ($tokens.Count -eq 2 -or ($tokens.Count -eq 3 -and $wordToComplete)) {{
+            $candidates = @('config', 'rules') | ForEach-Object {{
+                [System.Management.Automation.CompletionResult]::new($_, $_, [System.Management.Automation.CompletionResultType]::ParameterValue, 'Topic')
+            }}
+        }}
     }}
 
     $candidates | Where-Object {{ $_.CompletionText -like "$wordToComplete*" }}
@@ -314,7 +333,15 @@ mod tests {
 
     #[test]
     fn every_script_covers_subcommands_flags_shells_and_rules() {
-        let subcommands = ["lint", "preserve", "mcp", "lsp", "hook", "completions"];
+        let subcommands = [
+            "lint",
+            "preserve",
+            "mcp",
+            "lsp",
+            "hook",
+            "completions",
+            "instructions",
+        ];
         let flags = [
             "format",
             "json",

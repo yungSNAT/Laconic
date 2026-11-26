@@ -249,3 +249,30 @@ fn markdown_links_labelled_todo_or_tbd_do_not_trigger_ai_placeholder() {
     // A destination with a space and no title is not a link.
     assert_eq!(count("See [TODO](see below) later."), 1);
 }
+
+#[test]
+fn a_long_paragraph_of_links_is_checked_about_as_fast_as_its_lines_apart() {
+    // The ai-placeholder pass once compared each character with every link label in its
+    // paragraph, so 8,000 lines of 2 links took many times as long as one paragraph as they
+    // did with blank lines between them. The fastest of 3 runs keeps a busy machine from
+    // deciding the ratio.
+    let lines: Vec<String> = (0..8_000)
+        .map(|i| format!("[l](deep/a/b/missing{i}.md#h) [m](#none{i})"))
+        .collect();
+    let fastest = |text: &str| {
+        (0..3)
+            .map(|_| {
+                let start = std::time::Instant::now();
+                assert!(!lint_all(text).is_empty());
+                start.elapsed()
+            })
+            .min()
+            .unwrap()
+    };
+    let (joined, apart) = (fastest(&lines.join("\n")), fastest(&lines.join("\n\n")));
+    assert!(
+        joined < apart * 2,
+        "one paragraph took {:.1} times as long as its lines apart ({joined:?} to {apart:?})",
+        joined.as_secs_f64() / apart.as_secs_f64()
+    );
+}

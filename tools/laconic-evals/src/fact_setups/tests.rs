@@ -366,6 +366,53 @@ fn preflight_reads_result_events_whatever_their_spacing_or_key_order() {
 }
 
 #[test]
+fn preflight_rejects_an_unsuccessful_runner_and_records_complete_costs() {
+    let dir = tempfile::tempdir().unwrap();
+    write_config(
+        dir.path(),
+        &json!({"avoid": {"command": ["claude", "--plugin-dir", "a"]}}),
+    );
+    let stream = concat!(
+        r#"{"message":{"content":[{"type":"tool_use","name":"Skill","input":{"skill":"avoid-ai-writing"}}]}}"#,
+        "\n",
+        r#"{"type":"result","total_cost_usd":0.75}"#
+    );
+    for tail in [b"".as_slice(), b"\n{\"type\":", b"\n{\"result\":\"\xc3"] {
+        let partial = |_: &[String], _: &Input, _: Duration| {
+            let mut output = done(3, stream, "")?;
+            output.stdout.extend_from_slice(tail);
+            Ok(output)
+        };
+        let mut printed = Vec::new();
+        assert_eq!(preflight(dir.path(), &partial, &mut printed), Ok(1));
+        assert!(
+            String::from_utf8(printed)
+                .unwrap()
+                .contains("avoid: runner exited with status 3")
+        );
+    }
+    let overhead = fs::read_to_string(dir.path().join("overhead.jsonl")).unwrap();
+    assert_eq!(overhead.lines().count(), 3);
+    assert!(
+        overhead
+            .lines()
+            .all(|line| line.ends_with("\"cost_usd\": 0.75}"))
+    );
+    let mut closed: &mut [u8] = &mut [];
+    let failed = |_: &[String], _: &Input, _: Duration| done(3, stream, "");
+    assert_eq!(
+        preflight(dir.path(), &failed, &mut closed),
+        Err("failed to write whole buffer".into())
+    );
+    let invalid_success = |_: &[String], _: &Input, _: Duration| {
+        let mut output = done(0, stream, "")?;
+        output.stdout.extend_from_slice(b"\n{\"result\":\"\xc3");
+        Ok(output)
+    };
+    assert!(preflight(dir.path(), &invalid_success, &mut Vec::new()).is_err());
+}
+
+#[test]
 fn preflight_fails_a_setup_with_no_known_skill_and_checks_the_rest() {
     let dir = tempfile::tempdir().unwrap();
     write_config(

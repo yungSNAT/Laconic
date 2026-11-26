@@ -18,7 +18,9 @@ use std::rc::Rc;
 
 use super::{Finding, RuleId};
 
+mod anchors;
 mod syntax;
+use anchors::*;
 use syntax::*;
 
 /// The largest Markdown file whose headings `broken-link` reads.

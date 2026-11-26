@@ -193,7 +193,7 @@ scoop install https://github.com/yungSNAT/Laconic/releases/latest/download/lacon
 
 Homebrew のフォーミュラと winget のマニフェストは tap と winget カタログ用に添付していますが、tap と winget カタログにはまだ laconic-check が掲載されていません。
 
-[docs/rules.md](docs/rules.md) は各ルールを名前ごとに、例、対応する Style Manual の節、人が書いた文章をどのくらいの頻度で指摘するかとともに説明し、チェッカーが扱う Style Manual の節も示します。誤検知は [issue フォーム](https://github.com/yungSNAT/Laconic/issues/new?template=false-positive.yml)で報告してください。[docs/humanizer-coverage.md](docs/humanizer-coverage.md) は `humanizer` 4.0.0 の 26 パターンそれぞれを、それを扱うルールと散文スキルの節に対応付けています。スキルは 26 すべてを扱い、`lint` はそのうち 8 つを何らかの形で指摘します。
+[docs/rules.md](docs/rules.md) は各ルールを名前ごとに、例、対応する Style Manual の節、人が書いた文章をどのくらいの頻度で指摘するかとともに説明し、チェッカーが扱う Style Manual の節も示します。誤検知は [issue フォーム](https://github.com/yungSNAT/Laconic/issues/new?template=false-positive.yml)で報告してください。[docs/pattern-coverage.md](docs/pattern-coverage.md) は、同種のヒューマナイザースキルが挙げる 26 パターンそれぞれを、それを扱うルールと散文スキルの節に対応付けています。スキルは 26 すべてを扱い、`lint` はそのうち 8 つを何らかの形で指摘します。
 
 `lint` を CI や pre-commit フックのゲートとして使う場合、次のオプションで何を報告し何で失敗するかを決めます。
 

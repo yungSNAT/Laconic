@@ -193,7 +193,7 @@ scoop install https://github.com/yungSNAT/Laconic/releases/latest/download/lacon
 
 Homebrew 配方和 winget 清单是为 tap 和 winget 目录附上的，但 tap 和 winget 目录目前还没有收录 laconic-check。
 
-[docs/rules.md](docs/rules.md) 按名称介绍每条规则，附有示例、对应的 Style Manual 章节以及它标记人类文字的频率；它还列出检查器覆盖了 Style Manual 的哪些章节。误报请通过[问题表单](https://github.com/yungSNAT/Laconic/issues/new?template=false-positive.yml)报告。[docs/humanizer-coverage.md](docs/humanizer-coverage.md) 把 `humanizer` 4.0.0 中的 26 种模式逐一对应到涵盖它的规则和写作技能章节：技能涵盖全部 26 种，`lint` 能以某种形式标出其中 8 种。
+[docs/rules.md](docs/rules.md) 按名称介绍每条规则，附有示例、对应的 Style Manual 章节以及它标记人类文字的频率；它还列出检查器覆盖了 Style Manual 的哪些章节。误报请通过[问题表单](https://github.com/yungSNAT/Laconic/issues/new?template=false-positive.yml)报告。[docs/pattern-coverage.md](docs/pattern-coverage.md) 把同类人性化技能列出的 26 种模式逐一对应到涵盖它的规则和写作技能章节：技能涵盖全部 26 种，`lint` 能以某种形式标出其中 8 种。
 
 要在 CI 或 pre-commit 钩子中把 `lint` 用作门禁，以下选项决定它报告什么、何时失败：
 

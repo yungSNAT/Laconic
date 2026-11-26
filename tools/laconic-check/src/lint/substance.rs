@@ -22,10 +22,12 @@ struct ParagraphView<'a> {
     lower_chars: Vec<char>,
     raw: &'a [char],
     raw_lower: String,
+    /// `raw` with each space that joins 2 of the paragraph's lines read as a line break.
+    lined: &'a [char],
 }
 
 /// Runs all opt-in substance and chat-filler rules on a single masked paragraph.
-pub(super) fn check(masked: &[char], raw: &[char], findings: &mut Vec<Finding>) {
+pub(super) fn check(masked: &[char], raw: &[char], lined: &[char], findings: &mut Vec<Finding>) {
     let masked_str: String = masked.iter().collect();
     let lower = lower_exact(&masked_str);
     let lower_chars: Vec<char> = lower.chars().collect();
@@ -36,6 +38,7 @@ pub(super) fn check(masked: &[char], raw: &[char], findings: &mut Vec<Finding>) 
         lower_chars,
         raw,
         raw_lower: lower_exact(&raw_str),
+        lined,
     };
 
     check_magnitudes(&view, findings);
@@ -344,26 +347,71 @@ fn is_escaped(raw: &[char], at: usize) -> bool {
     raw[..at].iter().rev().take_while(|&&c| c == '\\').count() % 2 == 1
 }
 
+/// The deepest parentheses a bare destination may nest.
+const MAX_DEPTH: usize = 32;
+
 /// The index of the `)` ending an inline link destination that opens at `raw[close + 1]`, when
-/// `raw[close]` is an unescaped `]`. The destination has no space unless a quoted title
-/// follows it, so `[TODO](see below)` is no link.
+/// `raw[close]` is an unescaped `]`, read as CommonMark reads it: an angle-bracket destination
+/// may hold spaces, a bare one balanced parentheses, and an optional title after a space is
+/// quoted or parenthesised. So `[TODO](see below)` is no link.
 fn link_tail_end(raw: &[char], close: usize) -> Option<usize> {
     if raw.get(close) != Some(&']') || is_escaped(raw, close) || raw.get(close + 1) != Some(&'(') {
         return None;
     }
-    let end = close + 2 + raw[close + 2..].iter().position(|&c| c == ')')?;
-    let inner: String = raw[close + 2..end].iter().collect();
-    let inner = inner.trim();
-    let valid = match inner.split_once(char::is_whitespace) {
-        None => true,
-        Some((_, title)) => {
-            let title = title.trim_start();
-            title.len() >= 2
-                && ((title.starts_with('"') && title.ends_with('"'))
-                    || (title.starts_with('\'') && title.ends_with('\'')))
-        }
+    let skip_space = |from: usize| {
+        (from..raw.len())
+            .find(|&i| !raw[i].is_whitespace())
+            .unwrap_or(raw.len())
     };
-    valid.then_some(end)
+    let mut i = skip_space(close + 2);
+    if raw.get(i) == Some(&'<') {
+        i += 1;
+        while raw.get(i)? != &'>' || is_escaped(raw, i) {
+            if raw[i] == '\n' || (raw[i] == '<' && !is_escaped(raw, i)) {
+                return None;
+            }
+            i += 1;
+        }
+        i += 1;
+    } else {
+        let mut depth = 0usize;
+        while let Some(&c) = raw.get(i).filter(|c| !c.is_whitespace()) {
+            if c == '(' && !is_escaped(raw, i) {
+                // CommonMark lets a reader limit the nesting; the limit stops a scan within 32
+                // of the next links' openings, which keeps a paragraph of them linear.
+                if depth == MAX_DEPTH {
+                    return None;
+                }
+                depth += 1;
+            } else if c == ')' && !is_escaped(raw, i) {
+                if depth == 0 {
+                    break;
+                }
+                depth -= 1;
+            }
+            i += 1;
+        }
+        if depth > 0 {
+            return None;
+        }
+    }
+    let after_destination = i;
+    i = skip_space(i);
+    if let Some(&open) = raw
+        .get(i)
+        .filter(|&&c| i > after_destination && matches!(c, '"' | '\'' | '('))
+    {
+        let shut = if open == '(' { ')' } else { open };
+        i += 1;
+        while raw.get(i)? != &shut || is_escaped(raw, i) {
+            if open == '(' && raw[i] == '(' && !is_escaped(raw, i) {
+                return None;
+            }
+            i += 1;
+        }
+        i = skip_space(i + 1);
+    }
+    (raw.get(i) == Some(&')')).then_some(i)
 }
 
 fn is_markdown_link_tail(raw: &[char], close: usize) -> bool {
@@ -375,13 +423,11 @@ fn markdown_link_label_ranges(raw: &[char]) -> Vec<(usize, usize)> {
     let mut i = 0;
     while i < raw.len() {
         if let Some(end) = link_tail_end(raw, i) {
-            // The nearest unescaped bracket or line break before `]`; a `[` opens the label.
+            // The nearest unescaped bracket before `]`; a `[` opens the label, which may span
+            // lines.
             if let Some(open) = (0..i)
                 .rev()
-                .find(|&pos| {
-                    raw[pos] == '\n'
-                        || ((raw[pos] == '[' || raw[pos] == ']') && !is_escaped(raw, pos))
-                })
+                .find(|&pos| (raw[pos] == '[' || raw[pos] == ']') && !is_escaped(raw, pos))
                 .filter(|&pos| raw[pos] == '[')
             {
                 ranges.push((open, i));
@@ -405,14 +451,14 @@ fn check_ai_placeholders(view: &ParagraphView<'_>, findings: &mut Vec<Finding>) 
             format!("AI residue phrase '{p}' (advisory); remove self-reference from finished prose")
         },
     );
-    let mut skip_ranges = markdown_link_label_ranges(view.raw);
+    let mut skip_ranges = markdown_link_label_ranges(view.lined);
     for opener in PLACEHOLDER_OPENERS {
         let mut from = 0;
         while let Some(pos) = view.lower[from..].find(opener) {
             let col_idx = view.lower[..from + pos].chars().count();
             if let Some(close) = view.lower_chars[col_idx..].iter().position(|&c| c == ']') {
                 let end = col_idx + close;
-                if is_markdown_link_tail(view.raw, end) {
+                if is_markdown_link_tail(view.lined, end) {
                     from += pos + opener.len();
                     continue;
                 }

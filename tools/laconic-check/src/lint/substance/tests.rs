@@ -248,6 +248,88 @@ fn markdown_links_labelled_todo_or_tbd_do_not_trigger_ai_placeholder() {
     assert_eq!(count(r"See \\[TODO](https://example.com) later."), 0);
     // A destination with a space and no title is not a link.
     assert_eq!(count("See [TODO](see below) later."), 1);
+    // CommonMark's other link forms: a ')' in a quoted title, a parenthesised title, an
+    // angle-bracket destination holding a space, and balanced parentheses in a destination.
+    assert_eq!(count("See [TODO](url \"a (b)\") later."), 0);
+    assert_eq!(count("See [TODO](url 'a)') later."), 0);
+    assert_eq!(count("See [TODO](url (Title)) later."), 0);
+    assert_eq!(count("See [TBD](<my file.md>) later."), 0);
+    assert_eq!(count("See [TBD](<my file.md> \"Title\") later."), 0);
+    assert_eq!(count("See [TODO](https://example.com/a_(b)) later."), 0);
+    // An unclosed title, angle bracket or parenthesis leaves no link.
+    assert_eq!(count("See [TODO](url \"open) later."), 1);
+    assert_eq!(count("See [TODO](<my file.md) later."), 1);
+    assert_eq!(count("See [TODO](url (a (b)) later."), 1);
+    assert_eq!(count("See [TODO](<a<b>) later."), 1);
+    // A line break inside '<...>' leaves no link; one before a title or the destination does not.
+    assert_eq!(count("See [TODO](<a\nb>) later."), 1);
+    assert_eq!(count("See [TODO](a\n\"t\") later."), 0);
+    assert_eq!(count("See [TODO](\na) later."), 0);
+    // Link text may span lines.
+    assert_eq!(count("See [TODO\nlist](a) later."), 0);
+    // Escaped parentheses do not count towards the balance; an empty destination is a link.
+    assert_eq!(count(r"See [TODO](a\(b) later."), 0);
+    assert_eq!(count(r"See [TODO](<a\>b>) later."), 0);
+    assert_eq!(count("See [TODO]() later."), 0);
+}
+
+#[test]
+fn bracket_placeholders_read_line_breaks_in_link_syntax() {
+    // Lint's mask blanks every `[...](...)` before this rule runs, so the bracket path is
+    // driven here with unmasked text: a line break inside `<...>` leaves no link.
+    for text in ["Insert name", "your name", "placeholder"] {
+        let raw: Vec<char> = format!("See [{text}](<a b>) later.").chars().collect();
+        let mut lined = raw.clone();
+        let space = raw.iter().rposition(|&c| c == ' ').unwrap() - 4;
+        lined[space] = '\n';
+        let mut findings = Vec::new();
+        super::check(&raw, &raw, &lined, &mut findings);
+        let placeholders = findings
+            .iter()
+            .filter(|f| f.rule.house() == Some(RuleId::AiPlaceholder))
+            .count();
+        assert_eq!(placeholders, 1, "{text:?}");
+        findings.clear();
+        super::check(&raw, &raw, &raw, &mut findings);
+        assert!(
+            findings
+                .iter()
+                .all(|f| f.rule.house() != Some(RuleId::AiPlaceholder)),
+            "{text:?}: {findings:?}"
+        );
+    }
+}
+
+#[test]
+fn bare_link_destinations_are_read_in_linear_time() {
+    // A bare destination runs to the next space, and each `](` it passes adds a level of
+    // parentheses, so a paragraph of them was read again from every `]`. Quadrupling a shape must
+    // take well under the 16 times a square gives; the fastest of 5 runs decides.
+    let fastest = |text: &str| {
+        let chars: Vec<char> = text.chars().collect();
+        (0..5)
+            .map(|_| {
+                let start = std::time::Instant::now();
+                super::markdown_link_label_ranges(&chars);
+                start.elapsed()
+            })
+            .min()
+            .unwrap()
+    };
+    let slow: Vec<String> = ["](a", "](a(", "[TODO](a"]
+        .iter()
+        .filter_map(|unit| {
+            let text = |chars: usize| unit.repeat(chars / unit.len());
+            let (small, large) = (fastest(&text(16_000)), fastest(&text(64_000)));
+            (large >= small * 8).then(|| {
+                format!(
+                    "{unit:?}: 4 times the input took {:.1} times as long ({small:?} to {large:?})",
+                    large.as_secs_f64() / small.as_secs_f64()
+                )
+            })
+        })
+        .collect();
+    assert!(slow.is_empty(), "{slow:#?}");
 }
 
 #[test]

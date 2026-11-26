@@ -38,6 +38,7 @@ The manifests other than Claude Code's still declare plugin 0.5.0, so a build fr
 
 ### Plugin: removed
 
+- `laconic-evals record`, which only replayed the 3 dated runs withdrawn from `evals/runs/`; with their inputs gone it could run against nothing in the repository. Git history at `8c7fcd12` keeps it.
 - Withdraw pre-22 November 2026 README benchmark tables losing on output tokens or unit edits and non-benchmark rival links, and the humaniser table, fact-checker comparisons, public-set fact check and the 3 dated rival runs in `evals/runs/`, which do not win every row, keeping self-baseline wins; refresh the README, translations, CI workflows and tool help.
 
 ### Plugin: fixed
@@ -66,6 +67,7 @@ The manifests other than Claude Code's still declare plugin 0.5.0, so a build fr
 ### laconic-check: fixed
 
 - The opt-in rules take time in proportion to a paragraph's length: `ai-placeholder` compared each character with every link in its paragraph, so a single paragraph of 16,000 lines of links took about a minute in a release build.
+- `ai-placeholder` reads a link's destination and title as CommonMark does, so a `[TODO]` or `[TBD]` link label is no longer flagged when its title holds `)` or is parenthesised, its destination is in angle brackets with a space, or its destination holds balanced parentheses.
 
 ## [laconic-check 0.6.1] - 2026-11-25
 

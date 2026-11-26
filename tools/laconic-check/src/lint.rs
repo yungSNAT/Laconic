@@ -1419,7 +1419,14 @@ impl Paragraph {
         let mut joined = Vec::new();
         check_line(&masked, 0, &mut joined);
         if include_opt_in {
-            substance::check(&masked, &self.chars, &mut joined);
+            // The spaces lint joins lines with, read as line breaks for the link syntax.
+            let lined: Vec<char> = (0..self.chars.len())
+                .map(|k| match self.origin.get(k + 1) {
+                    Some(next) if self.chars[k] == ' ' && next.0 != self.origin[k].0 => '\n',
+                    _ => self.chars[k],
+                })
+                .collect();
+            substance::check(&masked, &self.chars, &lined, &mut joined);
         }
         project::check(&masked, project, &mut joined);
         found.extend(joined.into_iter().map(|f| self.place(f)));

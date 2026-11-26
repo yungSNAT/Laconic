@@ -1,3 +1,0 @@
-{"id": "103", "verified": true, "reason": null, "mps": 4, "fidelity": "high", "retried": false}
-{"id": "101", "verified": false, "reason": "drift", "mps": 2, "fidelity": "low", "retried": true, "attempts": 2}
-{"id": "102"}

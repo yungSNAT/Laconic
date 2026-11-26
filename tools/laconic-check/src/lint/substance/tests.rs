@@ -260,4 +260,10 @@ fn markdown_links_labelled_todo_or_tbd_do_not_trigger_ai_placeholder() {
     assert_eq!(count("See [TODO](url \"open) later."), 1);
     assert_eq!(count("See [TODO](<my file.md) later."), 1);
     assert_eq!(count("See [TODO](url (a (b)) later."), 1);
+    assert_eq!(count("See [TODO](<a<b>) later."), 1);
+    assert_eq!(count("See [TODO](<a\nb>) later."), 1);
+    // Escaped parentheses do not count towards the balance; an empty destination is a link.
+    assert_eq!(count(r"See [TODO](a\(b) later."), 0);
+    assert_eq!(count(r"See [TODO](<a\>b>) later."), 0);
+    assert_eq!(count("See [TODO]() later."), 0);
 }

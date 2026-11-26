@@ -345,25 +345,62 @@ fn is_escaped(raw: &[char], at: usize) -> bool {
 }
 
 /// The index of the `)` ending an inline link destination that opens at `raw[close + 1]`, when
-/// `raw[close]` is an unescaped `]`. The destination has no space unless a quoted title
-/// follows it, so `[TODO](see below)` is no link.
+/// `raw[close]` is an unescaped `]`, read as CommonMark reads it: an angle-bracket destination
+/// may hold spaces, a bare one balanced parentheses, and an optional title after a space is
+/// quoted or parenthesised. So `[TODO](see below)` is no link.
 fn link_tail_end(raw: &[char], close: usize) -> Option<usize> {
     if raw.get(close) != Some(&']') || is_escaped(raw, close) || raw.get(close + 1) != Some(&'(') {
         return None;
     }
-    let end = close + 2 + raw[close + 2..].iter().position(|&c| c == ')')?;
-    let inner: String = raw[close + 2..end].iter().collect();
-    let inner = inner.trim();
-    let valid = match inner.split_once(char::is_whitespace) {
-        None => true,
-        Some((_, title)) => {
-            let title = title.trim_start();
-            title.len() >= 2
-                && ((title.starts_with('"') && title.ends_with('"'))
-                    || (title.starts_with('\'') && title.ends_with('\'')))
-        }
+    let skip_space = |from: usize| {
+        (from..raw.len())
+            .find(|&i| !raw[i].is_whitespace())
+            .unwrap_or(raw.len())
     };
-    valid.then_some(end)
+    let mut i = skip_space(close + 2);
+    if raw.get(i) == Some(&'<') {
+        i += 1;
+        while raw.get(i)? != &'>' || is_escaped(raw, i) {
+            if raw[i] == '\n' || (raw[i] == '<' && !is_escaped(raw, i)) {
+                return None;
+            }
+            i += 1;
+        }
+        i += 1;
+    } else {
+        let mut depth = 0usize;
+        while let Some(&c) = raw.get(i).filter(|c| !c.is_whitespace()) {
+            if c == '(' && !is_escaped(raw, i) {
+                depth += 1;
+            } else if c == ')' && !is_escaped(raw, i) {
+                if depth == 0 {
+                    break;
+                }
+                depth -= 1;
+            }
+            i += 1;
+        }
+        if depth > 0 {
+            return None;
+        }
+    }
+    let after_destination = i;
+    i = skip_space(i);
+    if let Some(&open) = raw
+        .get(i)
+        .filter(|&&c| i > after_destination && matches!(c, '"' | '\'' | '('))
+    {
+        let shut = if open == '(' { ')' } else { open };
+        i += 1;
+        while raw.get(i)? != &shut || is_escaped(raw, i) {
+            if open == '(' && raw[i] == '(' && !is_escaped(raw, i) {
+                return None;
+            }
+            i += 1;
+        }
+        i = skip_space(i + 1);
+    }
+    (raw.get(i) == Some(&')')).then_some(i)
 }
 
 fn is_markdown_link_tail(raw: &[char], close: usize) -> bool {

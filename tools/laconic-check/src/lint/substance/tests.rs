@@ -248,4 +248,16 @@ fn markdown_links_labelled_todo_or_tbd_do_not_trigger_ai_placeholder() {
     assert_eq!(count(r"See \\[TODO](https://example.com) later."), 0);
     // A destination with a space and no title is not a link.
     assert_eq!(count("See [TODO](see below) later."), 1);
+    // CommonMark's other link forms: a ')' in a quoted title, a parenthesised title, an
+    // angle-bracket destination holding a space, and balanced parentheses in a destination.
+    assert_eq!(count("See [TODO](url \"a (b)\") later."), 0);
+    assert_eq!(count("See [TODO](url 'a)') later."), 0);
+    assert_eq!(count("See [TODO](url (Title)) later."), 0);
+    assert_eq!(count("See [TBD](<my file.md>) later."), 0);
+    assert_eq!(count("See [TBD](<my file.md> \"Title\") later."), 0);
+    assert_eq!(count("See [TODO](https://example.com/a_(b)) later."), 0);
+    // An unclosed title, angle bracket or parenthesis leaves no link.
+    assert_eq!(count("See [TODO](url \"open) later."), 1);
+    assert_eq!(count("See [TODO](<my file.md) later."), 1);
+    assert_eq!(count("See [TODO](url (a (b)) later."), 1);
 }

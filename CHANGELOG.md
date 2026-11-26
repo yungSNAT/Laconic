@@ -59,6 +59,10 @@ The manifests other than Claude Code's still declare plugin 0.5.0, so a build fr
 - `laconic-check instructions [config|rules]` prints what a coding agent needs to use the checker in a repository, the project file's keys or every rule with its kind; `laconic-check mcp` offers the same text as the prompt `instructions`, and the completions cover it.
 - A test that one `[protect]` phrase exempts every seeded fault from its rule, through the filter the CLI, MCP server, language server and Stop hook share.
 
+### laconic-check: fixed
+
+- `ai-placeholder` reads a link's destination and title as CommonMark does, so a `[TODO]` or `[TBD]` link label is no longer flagged when its title holds `)` or is parenthesised, its destination is in angle brackets with a space, or its destination holds balanced parentheses.
+
 ## [laconic-check 0.6.1] - 2026-11-25
 
 ### Added

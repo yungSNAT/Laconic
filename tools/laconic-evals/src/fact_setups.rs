@@ -322,27 +322,29 @@ pub fn preflight(here: &Path, exec: Exec, stdout: &mut dyn Write) -> Result<i32,
             Duration::from_secs(600),
         )
         .map_err(|e| e.message(&command[0]))?;
+        let mut bytes = done.stdout.as_slice();
         if done.code != 0 {
             writeln!(stdout, "{name}: runner exited with status {}", done.code)
                 .map_err(|e| e.to_string())?;
+            // A terminated runner may leave a partial JSON event, even part of a UTF-8 character.
+            let last = bytes
+                .iter()
+                .rposition(|b| matches!(b, b'\r' | b'\n'))
+                .map_or(0, |i| i + 1);
+            let tail = &bytes[last..];
+            if tail.trim_ascii_start().starts_with(b"{")
+                && serde_json::from_slice::<Value>(tail).is_err()
+            {
+                bytes = &bytes[..last];
+            }
         }
-        let out = proc::text(&done.stdout)?;
-        // A failed runner can stop halfway through its last JSON event.
-        let (complete, tail) = out.rsplit_once('\n').unwrap_or(("", &out));
-        let out = if done.code != 0
-            && tail.trim_start().starts_with('{')
-            && serde_json::from_str::<Value>(tail).is_err_and(|e| e.is_eof())
-        {
-            complete
-        } else {
-            &out
-        };
-        let used = skills_used(out)?;
+        let out = proc::text(bytes)?;
+        let used = skills_used(&out)?;
         failures += i32::from(done.code != 0 || !used.contains(wanted));
         // A result event is any JSON object whose `type` is "result", whatever its spacing or
         // key order.
         let mut results = Vec::new();
-        for line in py::split_lines(out) {
+        for line in py::split_lines(&out) {
             if !line.trim_start().starts_with('{') {
                 continue;
             }

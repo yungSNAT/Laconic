@@ -377,9 +377,12 @@ fn preflight_rejects_an_unsuccessful_runner_and_records_complete_costs() {
         "\n",
         r#"{"type":"result","total_cost_usd":0.75}"#
     );
-    for tail in ["", "\n{\"type\":"] {
-        let partial =
-            |_: &[String], _: &Input, _: Duration| done(3, &format!("{stream}{tail}"), "");
+    for tail in [b"".as_slice(), b"\n{\"type\":", b"\n{\"result\":\"\xc3"] {
+        let partial = |_: &[String], _: &Input, _: Duration| {
+            let mut output = done(3, stream, "")?;
+            output.stdout.extend_from_slice(tail);
+            Ok(output)
+        };
         let mut printed = Vec::new();
         assert_eq!(preflight(dir.path(), &partial, &mut printed), Ok(1));
         assert!(
@@ -389,7 +392,7 @@ fn preflight_rejects_an_unsuccessful_runner_and_records_complete_costs() {
         );
     }
     let overhead = fs::read_to_string(dir.path().join("overhead.jsonl")).unwrap();
-    assert_eq!(overhead.lines().count(), 2);
+    assert_eq!(overhead.lines().count(), 3);
     assert!(
         overhead
             .lines()

@@ -982,9 +982,13 @@ fn scan(
             paragraph.can_define = fresh;
         }
         paragraph.push(raw, line_no);
-        // A hard line break (two trailing spaces or a backslash) or the end of an HTML block
-        // also ends the run.
-        if single_line || html_ended || raw.ends_with("  ") || raw.trim_end().ends_with('\\') {
+        // A hard line break (two trailing spaces or a backslash) also ends the run, and so, for
+        // the opt-in link rules only, does the end of an HTML block.
+        if single_line
+            || (html_ended && include_opt_in)
+            || raw.ends_with("  ")
+            || raw.trim_end().ends_with('\\')
+        {
             paragraph.flush(
                 &mut findings,
                 &mut document,

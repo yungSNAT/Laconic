@@ -1,3 +1,0 @@
-{"runner": "laconic", "condition": "candidate", "case_id": "aihb-2026-10-103", "trial": 1, "response": "Three sites closed on 4 May. Revenue rose 12%.", "usage": {"output_tokens": 50}, "cost_usd": 0.031}
-{"runner": "laconic", "condition": "candidate", "case_id": "aihb-2026-10-101", "trial": 1, "response": "Ms Rossi said they would reopen in 2027.", "usage": {"output_tokens": 60}, "cost_usd": 0.062}
-{"runner": "laconic", "condition": "candidate", "case_id": "aihb-2026-10-102", "trial": 1, "response": "Short text.", "usage": {"output_tokens": 70}, "cost_usd": 0.093}

@@ -1,3 +1,0 @@
-{"runner": "plain", "condition": "candidate", "case_id": "aihb-2026-10-103", "trial": 1, "response": "The 3 sites closed on 4 May. Revenue rose 12 per cent.", "usage": {"output_tokens": 54}, "cost_usd": 0.059}
-{"runner": "plain", "condition": "candidate", "case_id": "aihb-2026-10-101", "trial": 1, "response": "Ms Rossi said \"we will reopen\" in 2027.", "usage": {"output_tokens": 64}, "cost_usd": 0.09}
-{"runner": "plain", "condition": "candidate", "case_id": "aihb-2026-10-102", "trial": 1, "response": "Short text with gaps.", "usage": null}

@@ -1,11 +1,12 @@
-# Codecov reports coverage for the README badge. CI holds line coverage at 100% in
-# the unittest job, so Codecov's statuses are informational and it posts no comments.
+# Codecov fails a PR whose patch is under 100% or whose project coverage falls.
 coverage:
   status:
     project:
       default:
-        informational: true
+        target: auto
+        threshold: 0%
     patch:
       default:
-        informational: true
+        target: 100%
+        threshold: 0%
 comment: false

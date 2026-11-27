@@ -62,9 +62,11 @@ The manifests other than Claude Code's still declare plugin 0.5.0, so a build fr
 
 - `laconic-check instructions [config|rules]` prints what a coding agent needs to use the checker in a repository, the project file's keys or every rule with its kind; `laconic-check mcp` offers the same text as the prompt `instructions`, and the completions cover it.
 - A test that one `[protect]` phrase exempts every seeded fault from its rule, through the filter the CLI, MCP server, language server and Stop hook share.
+- 2 opt-in failing rules for links that lead nowhere, checked offline: `broken-anchor`, a `#fragment` with no heading or HTML id in the same file or a reference link with no definition, which needs only the text; and `broken-link`, a relative target that names no file or folder (or one only in another letter case) or a `file.md#fragment` whose file has no such heading. `broken-link` reads only inside the folder `lint` runs in (the repository root for the Stop hook, the workspace folder for the language server), never through a symbolic link or junction, with caps on reads and file size. `--only`, a project file or the `docs` profile turns them on.
 
 ### laconic-check: fixed
 
+- The opt-in rules take time in proportion to a paragraph's length: `ai-placeholder` compared each character with every link in its paragraph, so a single paragraph of 16,000 lines of links took about a minute in a release build.
 - `ai-placeholder` reads a link's destination and title as CommonMark does, so a `[TODO]` or `[TBD]` link label is no longer flagged when its title holds `)` or is parenthesised, its destination is in angle brackets with a space, or its destination holds balanced parentheses.
 
 ## [laconic-check 0.6.1] - 2026-11-25

@@ -10,9 +10,9 @@
 use std::collections::HashMap;
 use std::fs;
 use std::io::{self, BufRead, Read, Write};
-use std::path::{Component, PathBuf};
+use std::path::{Component, Path, PathBuf};
 
-use crate::lint::{self, Finding, RuleRef};
+use crate::lint::{self, Finding, RuleId, RuleRef, Workspace};
 use crate::mcp::{self, Json, object, text};
 use crate::sarif;
 use crate::settings::{self, LineProtectCache, Settings};
@@ -288,7 +288,7 @@ impl Server {
             Ok(settings) => settings,
             Err(message) => return vec![diagnostic(0, 0, 0, 1, None, &message)],
         };
-        self.findings_with(&settings, body)
+        self.findings_with(&settings, uri, body)
             .iter()
             .map(|item| to_diagnostic(item, &settings))
             .collect()
@@ -296,10 +296,26 @@ impl Server {
 
     /// `lint`'s findings in `body` that the project file's settings keep, each with the start
     /// and end of its diagnostic in the client's code units.
-    fn findings_with(&self, settings: &Settings, body: &str) -> Vec<(Finding, usize, usize)> {
+    fn findings_with(
+        &self,
+        settings: &Settings,
+        uri: &str,
+        body: &str,
+    ) -> Vec<(Finding, usize, usize)> {
         let lines: Vec<&str> = body.lines().collect();
         let width = self.width();
-        let found = lint::lint_counting_with(body, &settings.rules, settings.needs_opt_in()).0;
+        // `broken-link` resolves the saved file's relative targets within its workspace folder.
+        let file = file_path(uri, cfg!(windows)).filter(|_| settings.enables(RuleId::BrokenLink));
+        let workspace = file
+            .as_ref()
+            .and_then(|file| self.folder_of(file))
+            .and_then(Workspace::new);
+        let folder = workspace
+            .as_ref()
+            .zip(file.as_ref())
+            .and_then(|(w, f)| w.folder_of(f));
+        let place = workspace.as_ref().zip(folder.as_deref());
+        let found = lint::lint_in(body, &settings.rules, settings.needs_opt_in(), place).0;
         let mut protect_cache = LineProtectCache::default();
         found
             .into_iter()
@@ -360,7 +376,7 @@ impl Server {
         let Ok(settings) = self.settings(uri) else {
             return Json::Array(Vec::new());
         };
-        let found = self.findings_with(&settings, &document.text);
+        let found = self.findings_with(&settings, uri, &document.text);
         let lines: Vec<&str> = document.text.lines().collect();
         let width = self.width();
         let actions = found
@@ -424,17 +440,23 @@ impl Server {
         let Some(path) = file_path(uri, cfg!(windows)) else {
             return Ok(Settings::default());
         };
-        let folder = self
-            .folders
-            .iter()
-            .filter(|folder| path.starts_with(folder))
-            .max_by_key(|folder| folder.components().count());
-        let Some(file) = folder.and_then(|folder| settings::find_in(folder)) else {
+        let Some(file) = self.folder_of(&path).and_then(settings::find_in) else {
             return Ok(Settings::default());
         };
         let shown = file.display().to_string();
         let body = fs::read_to_string(&file).map_err(|e| format!("{shown}: {e}"))?;
         Settings::parse(&shown, &body)
+    }
+}
+
+impl Server {
+    /// The deepest workspace folder holding `path`.
+    fn folder_of(&self, path: &Path) -> Option<&Path> {
+        self.folders
+            .iter()
+            .filter(|folder| path.starts_with(folder))
+            .max_by_key(|folder| folder.components().count())
+            .map(PathBuf::as_path)
     }
 }
 

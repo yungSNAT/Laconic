@@ -59,6 +59,8 @@ Not generated, and why:
 | `unnamed-evidence` | It checks the surrounding sentence for a named source or citation |
 | `ai-placeholder` | It is an opt-in prose rule that skips inline code and fenced blocks |
 | `chat-filler` | It is an opt-in chat-profile rule targeting architectural plan filler |
+| `broken-anchor` | It compares link fragments and reference labels with the whole document's headings and definitions |
+| `broken-link` | It reads the files a link names, which Vale cannot |
 | `unused-suppression` | Vale has its own comments for turning rules off |
 
 ## Tests

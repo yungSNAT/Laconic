@@ -9,12 +9,15 @@
 //! the body of a GitHub alert (`> [!NOTE]`), which is the author's prose.
 
 use std::collections::HashMap;
+use std::path::Path;
 use std::rc::Rc;
 use std::sync::OnceLock;
 
+mod links;
 mod project;
 mod substance;
 mod terms;
+pub use links::Workspace;
 pub use project::{Phrase, ProjectRule};
 
 /// Explicit scope statement emitted in JSON and SARIF output: `laconic-check` detects
@@ -88,6 +91,17 @@ const fn advisory(
         opt_in: false,
         confidence,
         section,
+        checks,
+    }
+}
+
+const fn opt_in(name: &'static str, confidence: Confidence, checks: &'static str) -> Rule {
+    Rule {
+        name,
+        advisory: false,
+        opt_in: true,
+        confidence,
+        section: None,
         checks,
     }
 }
@@ -293,6 +307,16 @@ rules! {
         Confidence::Medium,
         None,
         "Architectural riddle filler in chat plans ('gates and seams', 'natural seam', 'verification gate', 'load-bearing', 'moving pieces'). Enabled and tightened by the chat profile, or via --only and project files.",
+    ),
+    BrokenAnchor = opt_in(
+        "broken-anchor",
+        Confidence::High,
+        "A link to '#fragment' that matches no heading or HTML id in the same file (headings take GitHub's anchors), and a full or collapsed reference link (`[text][label]`, `[text][]`) with no `[label]: target` definition. It needs only the text, so it also runs on standard input and in the MCP server. Enabled by --only, a project file or the docs profile.",
+    ),
+    BrokenLink = opt_in(
+        "broken-link",
+        Confidence::High,
+        "A relative link, image, reference definition, or HTML href or src target that names no file or folder, or names one only in another letter case, which a case-sensitive host such as GitHub will not find; and a 'file.md#fragment' whose file has no such heading. Targets resolve from the linted file's folder and are checked only inside the folder lint runs in (the workspace folder for the language server, the repository for the Stop hook); URLs with a scheme and root-relative targets are not checked, and nothing goes over the network. Enabled by --only, a project file or the docs profile.",
     ),
     UnusedSuppression = advisory(
         "unused-suppression",
@@ -731,7 +755,7 @@ pub fn lint_counting(text: &str, project: &[Rc<ProjectRule>]) -> (Vec<Finding>, 
 /// Masked original prose paragraphs of `text`, using the same Markdown exclusions as `lint`.
 pub(crate) fn prose_paragraphs(text: &str) -> Vec<String> {
     let mut paragraphs = Vec::new();
-    let _ = scan(text, &[], false, Some(&mut paragraphs));
+    let _ = scan(text, &[], false, Some(&mut paragraphs), None);
     paragraphs
 }
 
@@ -742,7 +766,18 @@ pub fn lint_counting_with(
     project: &[Rc<ProjectRule>],
     include_opt_in: bool,
 ) -> (Vec<Finding>, usize) {
-    scan(text, project, include_opt_in, None)
+    scan(text, project, include_opt_in, None, None)
+}
+
+/// `lint_counting_with` for the text of a file in `folder`, a folder inside `workspace` (see
+/// [`Workspace::folder_of`]), so `broken-link` can check its relative targets.
+pub fn lint_in(
+    text: &str,
+    project: &[Rc<ProjectRule>],
+    include_opt_in: bool,
+    place: Option<(&Workspace, &Path)>,
+) -> (Vec<Finding>, usize) {
+    scan(text, project, include_opt_in, None, place)
 }
 
 fn scan(
@@ -750,6 +785,7 @@ fn scan(
     project: &[Rc<ProjectRule>],
     include_opt_in: bool,
     mut prose: Option<&mut Vec<String>>,
+    place: Option<(&Workspace, &Path)>,
 ) -> (Vec<Finding>, usize) {
     let mut findings = Vec::new();
     let mut suppressions: Vec<Suppression> = Vec::new();
@@ -757,6 +793,11 @@ fn scan(
     let mut document = Document::default();
     let mut code_lines = Vec::new();
     let mut fence: Option<&str> = None;
+    // Whether a definition may open the next paragraph. None can interrupt a paragraph, so
+    // only a line after a blank line or a block that has ended may hold one.
+    let mut fresh = true;
+    // The end markers of the HTML block of types 1 to 5 still open.
+    let mut html_end: Option<&[&str]> = None;
     let mut list_indent = None;
     // The indent and length of the current run of bold-label bullets.
     let mut labels = (0, 0);
@@ -810,9 +851,30 @@ fn scan(
         if let Some(marker) = fence {
             if trimmed.starts_with(marker) {
                 fence = None;
+                fresh = true;
             }
             continue;
         }
+        // An HTML block of types 1 to 5 runs, blank lines included, to the line that meets its
+        // end condition, whether it opened on that line or earlier. One opened inside an alert
+        // or a list item would end with it, so only a line outside both leaves one open.
+        let outside = !alert && (list_indent.is_none() || indent == 0);
+        let lower = if html_end.is_some() || (!code_line && trimmed.starts_with('<')) {
+            trimmed.to_ascii_lowercase()
+        } else {
+            String::new()
+        };
+        let html_ended = match html_end
+            .map(|ends| (ends, 0))
+            .or_else(|| html_block_end(&lower))
+        {
+            Some((ends, from)) => {
+                let met = ends.iter().any(|end| lower[from..].contains(end));
+                html_end = (!met && (outside || html_end.is_some())).then_some(ends);
+                met
+            }
+            None => false,
+        };
         if trimmed.starts_with("```") || trimmed.starts_with("~~~") {
             paragraph.flush(
                 &mut findings,
@@ -829,6 +891,11 @@ fn scan(
             continue;
         }
         if trimmed.is_empty() || is_tag_line(trimmed) || trimmed.starts_with('>') {
+            // A line of HTML or a quotation can still hold a link that leads nowhere.
+            if include_opt_in && !trimmed.is_empty() && prose.is_none() {
+                let chars: Vec<char> = raw.chars().collect();
+                document.links.collect(&chars, true, |k| (line_no, k + 1));
+            }
             // A blank line ends the paragraph; a line of HTML tags holds no prose, and other
             // block quotations and an alert's marker line are not original prose.
             if let Some(names) = names {
@@ -853,6 +920,9 @@ fn scan(
                 include_opt_in,
                 prose.as_deref_mut(),
             );
+            // A quotation's next line may continue it lazily, and an HTML block of types 6
+            // and 7 runs to a blank line.
+            fresh = html_ended || (html_end.is_none() && (trimmed.is_empty() || code_line));
             continue;
         }
         let marker_width = if is_break_line(trimmed) {
@@ -908,9 +978,17 @@ fn scan(
         } else if !list_item && (single_line || !in_list) {
             labels = (0, 0);
         }
+        if paragraph.lines.is_empty() {
+            paragraph.can_define = fresh;
+        }
         paragraph.push(raw, line_no);
-        // A hard line break (two trailing spaces or a backslash) also ends the run.
-        if single_line || raw.ends_with("  ") || raw.trim_end().ends_with('\\') {
+        // A hard line break (two trailing spaces or a backslash) also ends the run, and so, for
+        // the opt-in link rules only, does the end of an HTML block.
+        if single_line
+            || (html_ended && include_opt_in)
+            || raw.ends_with("  ")
+            || raw.trim_end().ends_with('\\')
+        {
             paragraph.flush(
                 &mut findings,
                 &mut document,
@@ -919,6 +997,11 @@ fn scan(
                 prose.as_deref_mut(),
             );
         }
+        // A heading, thematic break, setext underline, indented code or a closed HTML block
+        // ends here; a table row or paragraph line, hard break included, runs on.
+        fresh = html_ended
+            || (html_end.is_none()
+                && (indented_code || is_break_line(trimmed) || is_atx_heading(trimmed)));
     }
     paragraph.flush(
         &mut findings,
@@ -932,8 +1015,15 @@ fn scan(
     }
     // Rules that compare paragraphs report once the whole document is read.
     findings.extend(document.findings(include_opt_in));
+    if include_opt_in {
+        findings.extend(document.links.findings(text, place));
+    }
     // An indented code line is read as prose, as it may be a paragraph indented by mistake;
-    // its code is not for an editor to change.
+    // its code is not for an editor to change, and its links are not links.
+    findings.retain(|f| {
+        !(code_lines.contains(&f.line)
+            && (f.rule == RuleId::BrokenAnchor || f.rule == RuleId::BrokenLink))
+    });
     for finding in &mut findings {
         if code_lines.contains(&finding.line) {
             finding.fix = None;
@@ -1038,6 +1128,49 @@ fn is_alert_marker(rest: &str) -> bool {
     ]
     .iter()
     .any(|kind| marker.eq_ignore_ascii_case(kind))
+}
+
+/// An ATX heading: 1 to 6 `#`, then a space, a tab or the end of the line.
+fn is_atx_heading(trimmed: &str) -> bool {
+    let hashes = trimmed.chars().take_while(|&c| c == '#').count();
+    (1..=6).contains(&hashes)
+        && trimmed[hashes..]
+            .chars()
+            .next()
+            .is_none_or(|c| c == ' ' || c == '\t')
+}
+
+/// The end markers of the HTML block of CommonMark types 1 to 5 that a lower-cased line
+/// opens, with the byte from which the opening line itself is searched for them. Types 6
+/// and 7 run to a blank line.
+fn html_block_end(lower: &str) -> Option<(&'static [&'static str], usize)> {
+    let raw_text = ["pre", "script", "style", "textarea"].iter().any(|name| {
+        lower
+            .strip_prefix('<')
+            .and_then(|rest| rest.strip_prefix(name))
+            .is_some_and(|rest| {
+                rest.chars()
+                    .next()
+                    .is_none_or(|c| c == ' ' || c == '\t' || c == '>')
+            })
+    });
+    if raw_text {
+        return Some((&["</pre>", "</script>", "</style>", "</textarea>"], 0));
+    }
+    if lower.starts_with("<![cdata[") {
+        return Some((&["]]>"], 9));
+    }
+    if lower.starts_with("<!--") {
+        // `<!-->` and `<!--->` close at once.
+        return Some((&["-->"], 2));
+    }
+    if lower.starts_with("<?") {
+        return Some((&["?>"], 2));
+    }
+    match lower.strip_prefix("<!") {
+        Some(rest) if rest.starts_with(|c: char| c.is_ascii_alphabetic()) => Some((&[">"], 2)),
+        _ => None,
+    }
 }
 
 /// A line of HTML tags and comments only, such as `<p align="center">` or `</details>`. A tag
@@ -1218,6 +1351,8 @@ struct Paragraph {
     chars: Vec<char>,
     origin: Vec<(usize, usize)>,
     lines: Vec<(usize, Vec<char>)>,
+    /// Whether a link reference definition may open the first line.
+    can_define: bool,
 }
 
 impl Paragraph {
@@ -1257,6 +1392,11 @@ impl Paragraph {
         }
         let (masked, doubles) = mask(&self.chars, true);
         document.collect(&masked, |column| self.at(column));
+        if include_opt_in {
+            document
+                .links
+                .collect(&self.chars, self.can_define, |k| self.at(k + 1));
+        }
         let mut found = Vec::new();
         // Once a span holds code, an HTML tag or a link, its marks may belong to them, and so
         // may the pairing of every later mark in the paragraph: none of those gets a fix.
@@ -1381,6 +1521,8 @@ struct Document {
     glossed: HashMap<String, (usize, usize)>,
     /// Each unfamiliar 3-to-8-capital acronym's first unglossed use outside all-caps runs.
     term_used: HashMap<String, (usize, usize)>,
+    /// Link targets and reference links, for `broken-anchor` and `broken-link`.
+    links: links::Links,
 }
 
 impl Document {

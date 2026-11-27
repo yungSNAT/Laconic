@@ -64,6 +64,14 @@ pub const NOT_GENERATED: &[(&str, &str)] = &[
         "opt-in chat-profile rule targeting architectural plan filler",
     ),
     (
+        "broken-anchor",
+        "it compares link fragments and reference labels with the whole document's headings and definitions",
+    ),
+    (
+        "broken-link",
+        "it reads the files a link names, which Vale cannot",
+    ),
+    (
         "unused-suppression",
         "Vale has its own comments for turning rules off",
     ),

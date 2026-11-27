@@ -1135,3 +1135,39 @@ fn project_rule_with_literal_advisory_keeps_its_message_and_fix() {
         "use (advisory)"
     );
 }
+
+#[test]
+fn link_targets_resolve_within_the_documents_workspace_folder() {
+    let root = std::env::temp_dir().join(format!("laconic-check-lsp-links-{}", std::process::id()));
+    fs::create_dir_all(root.join("docs")).unwrap();
+    fs::write(root.join(PROJECT_FILE), "only = broken-link\n").unwrap();
+    fs::write(root.join("docs/x.md"), "# X\n").unwrap();
+    let body = "See [x](docs/x.md#x) and [y](docs/y.md).";
+    fs::write(root.join("a.md"), body).unwrap();
+    let init = mcp::to_string(&object(vec![
+        ("jsonrpc", text("2.0")),
+        ("id", number(1)),
+        ("method", text("initialize")),
+        (
+            "params",
+            object(vec![
+                ("capabilities", object(vec![])),
+                ("rootUri", text(&file_uri(&root))),
+            ]),
+        ),
+    ]));
+    let (replies, _) = session(&[
+        &init,
+        &open(&file_uri(&root.join("a.md")), "markdown", body),
+        // A buffer never saved has no folder to resolve from.
+        &open(&file_uri(&root.join("unsaved.md")), "markdown", body),
+    ]);
+    fs::remove_dir_all(&root).unwrap();
+    let found = published(&replies[1]);
+    assert_eq!(found.len(), 1, "{found:?}");
+    assert_eq!(
+        (found[0].0.as_str(), found[0].2.as_str()),
+        ("broken-link", "29")
+    );
+    assert_eq!(published(&replies[2]), []);
+}

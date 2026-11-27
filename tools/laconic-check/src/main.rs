@@ -209,6 +209,10 @@ fn run_lint(options: &Options) -> ExitCode {
     let (mut findings, mut failing, mut suppressed, mut unread) = (Vec::new(), 0, 0, false);
     let (mut file_metrics, mut overall) = (Vec::new(), ProseMetrics::default());
     let include_opt_in = options.settings.needs_opt_in();
+    // `broken-link` resolves targets within the current folder, and only when it is on.
+    let workspace = (options.settings.enables(lint::RuleId::BrokenLink) && !options.commit_msg)
+        .then(|| lint::Workspace::new(std::path::Path::new(".")))
+        .flatten();
     for file in &options.files {
         // `read` reports an unreadable file; the rest are still linted, and lint exits 2.
         let text = match read(file) {
@@ -238,8 +242,13 @@ fn run_lint(options: &Options) -> ExitCode {
         } else {
             String::new()
         };
+        let folder = workspace
+            .as_ref()
+            .filter(|_| file != "-")
+            .and_then(|w| w.folder_of(std::path::Path::new(file)));
+        let place = workspace.as_ref().zip(folder.as_deref());
         let (found, silenced) =
-            lint::lint_counting_with(&text, &options.settings.rules, include_opt_in);
+            lint::lint_in(&text, &options.settings.rules, include_opt_in, place);
         suppressed += silenced;
         let mut protect_cache = LineProtectCache::default();
         for mut f in found {

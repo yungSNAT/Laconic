@@ -21,7 +21,7 @@ struct ParagraphView<'a> {
     lower: String,
     lower_chars: Vec<char>,
     raw: &'a [char],
-    raw_lower: String,
+    raw_lower: Vec<char>,
     /// `raw` with each space that joins 2 of the paragraph's lines read as a line break.
     lined: &'a [char],
 }
@@ -37,7 +37,7 @@ pub(super) fn check(masked: &[char], raw: &[char], lined: &[char], findings: &mu
         lower,
         lower_chars,
         raw,
-        raw_lower: lower_exact(&raw_str),
+        raw_lower: lower_exact(&raw_str).chars().collect(),
         lined,
     };
 
@@ -127,12 +127,7 @@ fn sentence_bounds(raw: &[char], col_idx: usize) -> (usize, usize) {
 fn sentence_slice(view: &ParagraphView<'_>, col_idx: usize) -> (String, String) {
     let (s, e) = sentence_bounds(view.raw, col_idx);
     let orig: String = view.raw[s..e].iter().collect();
-    let low: String = view
-        .raw_lower
-        .chars()
-        .skip(s)
-        .take(e.saturating_sub(s))
-        .collect();
+    let low: String = view.raw_lower[s..e.max(s)].iter().collect();
     (orig, low)
 }
 
@@ -321,8 +316,10 @@ fn check_phrases(
     for &phrase in phrases {
         let plen = phrase.chars().count();
         let mut from = 0;
+        // Counted from the last match on, so a paragraph is read once per phrase.
+        let mut col_idx = 0;
         while let Some(pos) = view.lower[from..].find(phrase) {
-            let col_idx = view.lower[..from + pos].chars().count();
+            col_idx += view.lower[from..from + pos].chars().count();
             if whole_word_at(&view.lower_chars, col_idx, plen)
                 && anchor.is_none_or(|f| {
                     let (orig, low) = sentence_slice(view, col_idx);
@@ -338,6 +335,7 @@ fn check_phrases(
                 });
             }
             from += pos + phrase.len();
+            col_idx += plen;
         }
     }
 }
@@ -453,9 +451,10 @@ fn check_ai_placeholders(view: &ParagraphView<'_>, findings: &mut Vec<Finding>) 
     );
     let mut skip_ranges = markdown_link_label_ranges(view.lined);
     for opener in PLACEHOLDER_OPENERS {
-        let mut from = 0;
+        let (mut from, mut counted, mut col_idx) = (0, 0, 0);
         while let Some(pos) = view.lower[from..].find(opener) {
-            let col_idx = view.lower[..from + pos].chars().count();
+            col_idx += view.lower[counted..from + pos].chars().count();
+            counted = from + pos;
             if let Some(close) = view.lower_chars[col_idx..].iter().position(|&c| c == ']') {
                 let end = col_idx + close;
                 if is_markdown_link_tail(view.lined, end) {
@@ -477,13 +476,14 @@ fn check_ai_placeholders(view: &ParagraphView<'_>, findings: &mut Vec<Finding>) 
             from += pos + opener.len();
         }
     }
+    // Sorted, the ranges are passed once: a long paragraph of links stays linear.
+    skip_ranges.sort_unstable();
+    let mut ranges = skip_ranges.iter().peekable();
     let mut i = 0;
     while i < view.masked.len() {
-        if skip_ranges
-            .iter()
-            .any(|&(start, end)| i >= start && i <= end)
-        {
-            i += 1;
+        while ranges.next_if(|&&(_, end)| end < i).is_some() {}
+        if let Some(&&(_, end)) = ranges.peek().filter(|&&&(start, _)| start <= i) {
+            i = end + 1;
             continue;
         }
         if view.masked[i] == 'T' && (i == 0 || !is_word_char(view.masked[i - 1])) {

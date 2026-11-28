@@ -61,6 +61,7 @@ Not generated, and why:
 | `chat-filler` | It is an opt-in chat-profile rule targeting architectural plan filler |
 | `broken-anchor` | It compares link fragments and reference labels with the whole document's headings and definitions |
 | `broken-link` | It reads the files a link names, which Vale cannot |
+| `reference-shape` | It computes ISBN-10 and ISBN-13 checksums and validates arXiv epochs and digit counts |
 | `unused-suppression` | Vale has its own comments for turning rules off |
 
 ## Tests

@@ -203,6 +203,16 @@ const SEEDS: &[(&str, &str, &str)] = &[
         "Each member gets a [healthcare plan](plans.md).",
     ),
     (
+        "reference-shape",
+        "Each member gets a healthcare plan.",
+        "Each member gets a healthcare plan (ISBN 978-0-306-40615-8).",
+    ),
+    (
+        "reference-shape",
+        "Each member gets a healthcare plan.",
+        "Each member gets a healthcare plan (arXiv:2313.12345).",
+    ),
+    (
         "unused-suppression",
         "Each member gets a healthcare plan.",
         "<!-- laconic-check-disable-next-line em-dash -->",

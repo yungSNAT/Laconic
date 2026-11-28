@@ -183,7 +183,7 @@ cargo run --manifest-path tools/laconic-tools/Cargo.toml -- web-page tools/lacon
 
 Linux(x86_64, 정적), Windows(x86_64), macOS(Apple silicon)용 사전 빌드 바이너리가 SHA-256 체크섬과 함께 각 `laconic-check-v*` 릴리스에 첨부됩니다. 바이너리를 PATH에 두세요. 소스에서 빌드하려면 Rust만 있으면 됩니다.
 
-이미 [Vale](https://vale.sh)을 쓰는 프로젝트를 위해, `vale/Laconic`은 `lint`의 규칙 표에서 생성한 Vale 스타일이며 각 릴리스에 `Laconic.zip` 패키지로 첨부됩니다(0.6.0부터). 정규 표현식으로 나타낼 수 있는 규칙을 다룹니다. 나타낼 수 없는 7개와 나머지가 `lint`와 어떻게 다른지는 [vale/README.md](vale/README.md)에 있습니다.
+이미 [Vale](https://vale.sh)을 쓰는 프로젝트를 위해, `vale/Laconic`은 `lint`의 규칙 표에서 생성한 Vale 스타일이며 각 릴리스에 `Laconic.zip` 패키지로 첨부됩니다(0.6.0부터). 정규 표현식으로 나타낼 수 있는 규칙을 다룹니다. 나타낼 수 없는 16개와 나머지가 `lint`와 어떻게 다른지는 [vale/README.md](vale/README.md)에 있습니다.
 
 0.4.0부터의 릴리스에는 각 아카이브의 빌드 출처 증명과 Scoop, Homebrew, winget, MCP Registry용 매니페스트도 있습니다. MCP 번들 `laconic-check.mcpb`는 Claude Desktop에 한 번에 설치됩니다. 내려받은 아카이브는 `gh attestation verify <archive> --repo yungSNAT/Laconic`으로 확인하세요. Scoop은 릴리스에서 바로 설치합니다.
 

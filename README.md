@@ -175,7 +175,7 @@ cargo run --manifest-path tools/laconic-tools/Cargo.toml -- web-page tools/lacon
 
 Prebuilt binaries for Linux (x86_64, static), Windows (x86_64) and macOS (Apple silicon) are attached to each `laconic-check-v*` release, with SHA-256 checksums; put the binary on the PATH. Building from source needs only Rust.
 
-For a project that already runs [Vale](https://vale.sh), `vale/Laconic` is a Vale style generated from `lint`'s rule table and attached to each release as the package `Laconic.zip` (from 0.6.0). It covers the rules a regular expression can express; [vale/README.md](vale/README.md) lists the 7 it cannot and how the rest differ from `lint`.
+For a project that already runs [Vale](https://vale.sh), `vale/Laconic` is a Vale style generated from `lint`'s rule table and attached to each release as the package `Laconic.zip` (from 0.6.0). It covers the rules a regular expression can express; [vale/README.md](vale/README.md) lists the 16 it cannot and how the rest differ from `lint`.
 
 Releases from 0.4.0 also carry a build provenance attestation for each archive and manifests for Scoop, Homebrew, winget and the MCP Registry. Their MCP bundle, `laconic-check.mcpb`, installs in Claude Desktop in one step. Check a downloaded archive with `gh attestation verify <archive> --repo yungSNAT/Laconic`. Scoop installs straight from the release:
 

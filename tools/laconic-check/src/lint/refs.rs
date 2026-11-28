@@ -21,7 +21,7 @@ pub(super) fn check(raw: &[char], findings: &mut Vec<Finding>) {
 fn scan_segment(raw: &[char], start: usize, limit: usize, findings: &mut Vec<Finding>) {
     let mut i = start;
     while i < limit {
-        let boundary = i == 0 || !raw[i - 1].is_ascii_alphanumeric();
+        let boundary = i == 0 || !raw[i - 1].is_alphanumeric();
         if boundary {
             if let Some(next) = scan_isbn(raw, i, limit, findings) {
                 i = next;
@@ -102,7 +102,7 @@ fn scan_isbn(
     if j >= limit || !raw[j].is_ascii_digit() {
         return Some(j);
     }
-    let (digits, end) = read_isbn_digits(raw, j, limit);
+    let (digits, end) = read_isbn_digits(&raw[..limit], j, declared);
     if digits.len() >= 8
         && let Some(reason) = validate_isbn(&digits, declared)
     {
@@ -112,41 +112,81 @@ fn scan_isbn(
     Some(end)
 }
 
-fn can_bridge_isbn(raw: &[char], k: usize, limit: usize, has_hyphen: bool, digits: &[u8]) -> bool {
-    let sep = raw[k] == '-' || (raw[k] == ' ' && !has_hyphen && !is_valid_isbn(digits));
-    sep && k + 1 < limit && (raw[k + 1].is_ascii_digit() || is_standalone_x(raw, k + 1, limit))
+fn next_is_isbn_char(seg: &[char], i: usize) -> bool {
+    i < seg.len() && (seg[i].is_ascii_digit() || is_standalone_x(seg, i, seg.len()))
 }
 
-fn read_isbn_digits(raw: &[char], start: usize, limit: usize) -> (Vec<u8>, usize) {
+fn take_isbn_group(seg: &[char], mut i: usize) -> usize {
+    while next_is_isbn_char(seg, i) {
+        i += 1;
+    }
+    i
+}
+
+fn continues_to_13(seg: &[char], mut k: usize) -> bool {
+    let mut more = 0;
+    while k < seg.len() && seg[k] == ' ' {
+        let start = k + 1;
+        let end = take_isbn_group(seg, start);
+        if end == start {
+            break;
+        }
+        more += end - start;
+        k = end;
+        if more >= 3 {
+            return more == 3;
+        }
+    }
+    false
+}
+
+fn is_valid_isbn13(digits: &[u8]) -> bool {
+    digits.len() == 13
+        && (digits.starts_with(b"978") || digits.starts_with(b"979"))
+        && isbn13_ok(digits)
+}
+
+fn should_stop_at_space(seg: &[char], k: usize, digits: &[u8], declared: Option<usize>) -> bool {
+    if is_valid_isbn13(digits) {
+        return true;
+    }
+    if digits.len() == 10 && declared != Some(13) && isbn10_ok(digits) {
+        let maybe_13 = declared.is_none()
+            && (digits.starts_with(b"978") || digits.starts_with(b"979"))
+            && continues_to_13(seg, k);
+        return !maybe_13;
+    }
+    false
+}
+
+fn read_isbn_digits(seg: &[char], start: usize, declared: Option<usize>) -> (Vec<u8>, usize) {
     let mut digits = Vec::new();
     let mut has_hyphen = false;
     let mut k = start;
     let mut end = start;
-    while k < limit {
-        if raw[k].is_ascii_digit() {
-            digits.push(raw[k] as u8);
+    while k < seg.len() {
+        if seg[k].is_ascii_digit() {
+            digits.push(seg[k] as u8);
             k += 1;
             end = k;
-        } else if is_standalone_x(raw, k, limit) {
+        } else if is_standalone_x(seg, k, seg.len()) {
             digits.push(b'X');
             k += 1;
             end = k;
-        } else if can_bridge_isbn(raw, k, limit, has_hyphen, &digits) {
-            has_hyphen |= raw[k] == '-';
+        } else if seg[k] == '-' && next_is_isbn_char(seg, k + 1) {
+            has_hyphen = true;
+            k += 1;
+        } else if seg[k] == ' '
+            && !has_hyphen
+            && next_is_isbn_char(seg, k + 1)
+            && !should_stop_at_space(seg, k, &digits, declared)
+        {
             k += 1;
         } else {
             break;
         }
     }
     (digits, end)
-}
-
-fn is_valid_isbn(digits: &[u8]) -> bool {
-    match digits.len() {
-        10 => isbn10_ok(digits),
-        13 => (digits.starts_with(b"978") || digits.starts_with(b"979")) && isbn13_ok(digits),
-        _ => false,
-    }
 }
 
 fn isbn10_ok(digits: &[u8]) -> bool {
@@ -203,13 +243,13 @@ fn validate_isbn13(digits: &[u8], declared: Option<usize>) -> Option<String> {
     }
 }
 
-fn parse_arxiv_prefix(raw: &[char], j: usize, limit: usize) -> Option<usize> {
+fn parse_arxiv_prefix(raw: &[char], j: usize, limit: usize) -> Option<(usize, bool)> {
     if eq_ascii_ci(raw, j, limit, b".org/abs/") || eq_ascii_ci(raw, j, limit, b".org/pdf/") {
-        Some(j + 9)
+        Some((j + 9, true))
     } else if j < limit && raw[j] == ':' {
-        Some(skip_spaces(raw, j + 1, limit))
+        Some((skip_spaces(raw, j + 1, limit), false))
     } else if j < limit && matches!(raw[j], ' ' | '\t') {
-        Some(skip_spaces(raw, j, limit))
+        Some((skip_spaces(raw, j, limit), false))
     } else {
         None
     }
@@ -233,7 +273,7 @@ fn scan_arxiv(
     if !eq_ascii_ci(raw, start, limit, b"arxiv") {
         return None;
     }
-    let Some(cand_start) = parse_arxiv_prefix(raw, start + 5, limit) else {
+    let Some((cand_start, is_url)) = parse_arxiv_prefix(raw, start + 5, limit) else {
         return Some(start + 5);
     };
     let yymm_end = take_digits(raw, cand_start, limit);
@@ -246,7 +286,7 @@ fn scan_arxiv(
     }
     let seq_start = yymm_end + 1;
     let seq_end = take_digits(raw, seq_start, limit);
-    if yymm_end - cand_start < 3 && seq_end - seq_start < 3 {
+    if !is_url && yymm_end - cand_start < 3 && seq_end - seq_start < 3 {
         return Some(seq_end);
     }
     let (ver, end) = read_arxiv_version(raw, seq_end, limit);

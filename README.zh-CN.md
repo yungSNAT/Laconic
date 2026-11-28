@@ -183,7 +183,7 @@ cargo run --manifest-path tools/laconic-tools/Cargo.toml -- web-page tools/lacon
 
 每个 `laconic-check-v*` 发布版都附有 Linux（x86_64，静态链接）、Windows（x86_64）和 macOS（Apple silicon）的预编译二进制文件及 SHA-256 校验和；把二进制文件放到 PATH 中即可。从源码构建只需要 Rust。
 
-对已经使用 [Vale](https://vale.sh) 的项目，`vale/Laconic` 是根据 `lint` 规则表生成的 Vale 样式，作为 `Laconic.zip` 包附在每个发布版中（自 0.6.0 起）。它涵盖可用正则表达式表达的规则；[vale/README.md](vale/README.md) 列出了无法表达的 7 条规则，以及其余规则与 `lint` 的不同之处。
+对已经使用 [Vale](https://vale.sh) 的项目，`vale/Laconic` 是根据 `lint` 规则表生成的 Vale 样式，作为 `Laconic.zip` 包附在每个发布版中（自 0.6.0 起）。它涵盖可用正则表达式表达的规则；[vale/README.md](vale/README.md) 列出了无法表达的 16 条规则，以及其余规则与 `lint` 的不同之处。
 
 自 0.4.0 起的发布版还为每个归档附带构建来源证明，以及 Scoop、Homebrew、winget 和 MCP Registry 的清单。其 MCP 包 `laconic-check.mcpb` 可一步安装到 Claude Desktop。用 `gh attestation verify <archive> --repo yungSNAT/Laconic` 校验下载的归档。Scoop 可直接从发布版安装：
 

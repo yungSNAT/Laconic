@@ -18,10 +18,12 @@ fn valid_isbns_and_non_isbn_prose_pass() {
         "Valid ISBN-13: 978-0-306-40615-7 and ISBN 13: 979-10-325-0123-8 and ISBN:9780306406157.\n\n",
         "Productivity Commission: ISBN 978-1-74037-738-6 and ISBN 978-1-74037-739-3.\n\n",
         "Space separated with year: ISBN 978 0 306 40615 7 2026, ISBN 979 10 325 0123 8 2026 and ISBN 0 306 40615 2 2026.\n\n",
+        "Space separated with 10-digit mod-11 prefix: ISBN-13: 978 0 131108 62 2, ISBN 978 0 131108 62 2 2026 and ISBN 979 1 032505 12 0.\n\n",
+        "Space separated ISBN-10 starting with 978 before prose/year: ISBN 978 0 131108 2026, ISBN-10: 0 306 40615 2 2026, ISBN 978 0 131108 62. and ISBN 978 0 131108 62 text.\n\n",
         "Hyphenated with trailing text: ISBN 978-0-306-40615-7 Xerox and ISBN 0-306-40615-2-.\n\n",
         "Space separated with word starting in X: ISBN 978 0 306 40615 7 Xerox.\n\n",
         "Bare numbers: 978-0-306-40615-8 and 0-306-40615-3 without a label.\n\n",
-        "Not identifiers: ISBN 10 format, ISBN 13, ISBNs, myISBN: 978-0-306-40615-8, ISBN 2026, café.\n\n",
+        "Not identifiers: ISBN 10 format, ISBN 13, ISBNs, myISBN: 978-0-306-40615-8, caféISBN 978-0-306-40615-8, ISBN 2026, café.\n\n",
         "Ends with ISBN 10\n\n",
         "Ends with ISBN:\n",
     );
@@ -37,6 +39,9 @@ fn invalid_isbns_report_specific_reasons() {
         ("See ISBN 1000000000.", "ISBN-10 checksum fails"),
         ("See ISBN 978-0-306-40615-8.", "ISBN-13 checksum fails"),
         ("See ISBN 978-0-306-40615-X.", "ISBN-13 checksum fails"),
+        ("See ISBN 978 0 131108 62 3.", "ISBN-13 checksum fails"),
+        ("See ISBN 978 0 131108 62 X.", "ISBN-13 checksum fails"),
+        ("See ISBN-13: 978 0 131108 62 3.", "ISBN-13 checksum fails"),
         (
             "See ISBN 977-0-306-40615-0.",
             "ISBN-13 must start with 978 or 979",
@@ -80,7 +85,7 @@ fn valid_arxiv_and_non_arxiv_prose_pass() {
         "Valid modern: arXiv:0704.0001, arXiv 1412.9999v1, arXiv: 1501.00001V12.\n\n",
         "Valid URLs: https://arxiv.org/abs/2301.12345 and https://www.arxiv.org/pdf/2301.12345v2.pdf.\n\n",
         "Old style untouched: arXiv:hep-th/9901001 and https://arxiv.org/abs/math.GT/0309136.\n\n",
-        "Ordinary prose: arXiv 2.0, arXiv 2024, arxiv.org/list/cs.CL/recent, arXivs, myarXiv:2313.12345.\n\n",
+        "Ordinary prose: arXiv 2.0, arXiv 2024, arxiv.org/list/cs.CL/recent, arXivs, myarXiv:2313.12345, caféarXiv:2313.12345.\n\n",
         "Bare number without label: 2313.12345 and 0612.1234.\n",
     );
     assert_eq!(ref_findings(text), []);
@@ -91,6 +96,14 @@ fn invalid_arxiv_identifiers_report_specific_reasons() {
     let cases = [
         (
             "See arXiv:23.12345.",
+            "arXiv YYMM prefix must have 4 digits",
+        ),
+        (
+            "See https://arxiv.org/abs/23.12.",
+            "arXiv YYMM prefix must have 4 digits",
+        ),
+        (
+            "See https://arxiv.org/pdf/23.12.pdf.",
             "arXiv YYMM prefix must have 4 digits",
         ),
         (

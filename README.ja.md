@@ -183,7 +183,7 @@ cargo run --manifest-path tools/laconic-tools/Cargo.toml -- web-page tools/lacon
 
 Linux（x86_64、静的リンク）、Windows（x86_64）、macOS（Apple silicon）向けのビルド済みバイナリが、SHA-256 チェックサムとともに各 `laconic-check-v*` リリースに添付されています。バイナリを PATH に置いてください。ソースからのビルドに必要なのは Rust だけです。
 
-すでに [Vale](https://vale.sh) を使っているプロジェクト向けに、`vale/Laconic` は `lint` のルール表から生成した Vale のスタイルで、各リリースに `Laconic.zip` パッケージとして添付されます（0.6.0 から）。正規表現で表せるルールを扱います。表せない 7 つと、残りが `lint` とどう違うかは [vale/README.md](vale/README.md) にあります。
+すでに [Vale](https://vale.sh) を使っているプロジェクト向けに、`vale/Laconic` は `lint` のルール表から生成した Vale のスタイルで、各リリースに `Laconic.zip` パッケージとして添付されます（0.6.0 から）。正規表現で表せるルールを扱います。表せない 16 個と、残りが `lint` とどう違うかは [vale/README.md](vale/README.md) にあります。
 
 0.4.0 以降のリリースには、各アーカイブのビルド来歴の証明と、Scoop、Homebrew、winget、MCP Registry 用のマニフェストも付いています。MCP バンドル `laconic-check.mcpb` は Claude Desktop に 1 ステップでインストールできます。ダウンロードしたアーカイブは `gh attestation verify <archive> --repo yungSNAT/Laconic` で確認してください。Scoop はリリースから直接インストールします。
 

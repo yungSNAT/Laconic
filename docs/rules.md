@@ -42,6 +42,7 @@ To report a finding that should not have been flagged, use the [false-positive f
 | [`chat-filler`](#chat-filler) | no (advisory, opt-in) | none | 0.00 | 0 of 75 |
 | [`broken-anchor`](#broken-anchor) | yes | none | 0.34 | 0 of 75 |
 | [`broken-link`](#broken-link) | yes | none | 0.00 | 0 of 75 |
+| [`reference-shape`](#reference-shape) | no (advisory, opt-in) | none | 0.00 | 0 of 75 |
 | [`unused-suppression`](#unused-suppression) | no (advisory) | none | 0.00 | 0 of 75 |
 
 ## Style Manual coverage
@@ -60,7 +61,7 @@ To report a finding that should not have been flagged, use the [false-positive f
 | [Dates and time](../skills/laconic-prose/references/style-manual-rules.md#dates-and-time) | `date`, `weekday`, `time` |
 | [Shortened forms](../skills/laconic-prose/references/style-manual-rules.md#shortened-forms) | `latin`, `acronym-before-definition`, `unglossed-term` |
 
-The rules with no Style Manual section flag writing patterns from [patterns.md](../skills/laconic-prose/references/patterns.md), chat-tool residue or suppression comments: `closer`, `stock-phrase`, `stacked-hedge`, `bold-label`, `staged-contrast`, `reveal-question`, `residue`, `unanchored-magnitude`, `unattributed-superlative`, `unnamed-evidence`, `ai-placeholder`, `chat-filler`, `broken-anchor`, `broken-link`, `unused-suppression`.
+The rules with no Style Manual section flag writing patterns from [patterns.md](../skills/laconic-prose/references/patterns.md), chat-tool residue or suppression comments: `closer`, `stock-phrase`, `stacked-hedge`, `bold-label`, `staged-contrast`, `reveal-question`, `residue`, `unanchored-magnitude`, `unattributed-superlative`, `unnamed-evidence`, `ai-placeholder`, `chat-filler`, `broken-anchor`, `broken-link`, `reference-shape`, `unused-suppression`.
 
 ## Rules
 
@@ -311,6 +312,14 @@ A relative link, image, reference definition, or HTML href or src target that na
 Fails `lint`: yes. Not a Style Manual rule. Human prose: 0 findings, 0.00 per 1,000 words. Outside articles: flags 0 of 75 held out (0 findings) and 0 of 75 for calibration.
 
 Example: `Each member gets a [healthcare plan](plans.md).`.
+
+### reference-shape
+
+Labelled ISBNs with an invalid length, prefix or checksum (ISBN-10 and ISBN-13), and labelled modern arXiv identifiers with an invalid YYMM prefix, month, pre-0704 epoch, sequence digit count or version. Skips inline code, fenced code and HTML comments; checks offline without fetching. Enabled by --only, a project file or the report, essay and docs profiles.
+
+Fails `lint`: no (advisory, opt-in). Not a Style Manual rule. Human prose: 0 findings, 0.00 per 1,000 words. Outside articles: flags 0 of 75 held out (0 findings) and 0 of 75 for calibration.
+
+Examples: `Each member gets a healthcare plan (ISBN 978-0-306-40615-8).`, `Each member gets a healthcare plan (arXiv:2313.12345).`.
 
 ### unused-suppression
 

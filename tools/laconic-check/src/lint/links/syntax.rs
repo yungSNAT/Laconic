@@ -20,7 +20,7 @@ pub(super) fn is_escaped(chars: &[char], i: usize) -> bool {
 
 /// The `[start, end)` ranges of inline code spans: a run of backticks to the next run of the
 /// same length.
-pub(super) fn code_spans(chars: &[char]) -> Vec<(usize, usize)> {
+pub(in crate::lint) fn code_spans(chars: &[char]) -> Vec<(usize, usize)> {
     let mut spans = Vec::new();
     let mut i = 0;
     while i < chars.len() {
@@ -250,11 +250,11 @@ pub(super) fn decode(text: &str) -> Option<String> {
 }
 
 /// Where a place in the text sits: 1-based line and character column.
-pub(super) type Place = (usize, usize);
+pub(in crate::lint) type Place = (usize, usize);
 
 /// The HTML comments in `text` outside fenced code, from `<!--` to the end of `-->`. A `<!--`
 /// inside a code span opens nothing; a comment left open runs to the end of the text.
-pub(super) fn comment_spans(text: &str) -> Vec<(Place, Place)> {
+pub(in crate::lint) fn comment_spans(text: &str) -> Vec<(Place, Place)> {
     let mut spans = Vec::new();
     let mut open: Option<Place> = None;
     let mut fence: Option<&str> = None;

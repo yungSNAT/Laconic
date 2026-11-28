@@ -23,6 +23,7 @@ const BLOB: &str = "eb4030e4591de8fd687089b15bf86d6688b128eb";
 /// The sources whose changes can change the counts: the rules, their word list and this file.
 const SOURCES: &[&str] = &[
     "tools/laconic-check/src/lint.rs",
+    "tools/laconic-check/src/lint/refs.rs",
     "tools/laconic-check/src/lint/substance.rs",
     "tools/laconic-check/src/lint/substance/lists.rs",
     "tools/laconic-check/src/lint/terms.rs",

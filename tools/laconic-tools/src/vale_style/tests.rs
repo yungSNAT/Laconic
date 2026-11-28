@@ -8,6 +8,68 @@ use laconic_check::lint::lint;
 
 use crate::root;
 
+/// `lint` rules with no Vale rule, and why; `vale/README.md` gives each reason.
+const NOT_GENERATED: &[(&str, &str)] = &[
+    (
+        "serial-comma",
+        "telling a list from joined clauses needs lint's clause analysis",
+    ),
+    (
+        "clause-dashes",
+        "counts dashes across the sentences of a paragraph",
+    ),
+    (
+        "hyphen-consistency",
+        "compares every compound in the document",
+    ),
+    ("weekday", "needs the calendar"),
+    (
+        "acronym-before-definition",
+        "compares uses and definitions across the document",
+    ),
+    (
+        "unglossed-term",
+        "checks whether each unfamiliar acronym is glossed earlier in the document",
+    ),
+    ("bold-label", "counts consecutive list items"),
+    (
+        "unanchored-magnitude",
+        "checks the surrounding sentence for citations, denominators, links or timeframes",
+    ),
+    (
+        "unattributed-superlative",
+        "checks the surrounding sentence for a baseline or named source",
+    ),
+    (
+        "unnamed-evidence",
+        "checks the surrounding sentence for a named source or citation",
+    ),
+    (
+        "ai-placeholder",
+        "opt-in prose rule that skips inline code and fenced blocks",
+    ),
+    (
+        "chat-filler",
+        "opt-in chat-profile rule targeting architectural plan filler",
+    ),
+    (
+        "broken-anchor",
+        "it compares link fragments and reference labels with the whole document's headings and definitions",
+    ),
+    (
+        "broken-link",
+        "it reads the files a link names, which Vale cannot",
+    ),
+    (
+        "reference-shape",
+        "computes ISBN-10 and ISBN-13 checksums and validates arXiv epochs and digit counts",
+    ),
+    (
+        "unused-suppression",
+        "Vale has its own comments for turning rules off",
+    ),
+];
+
 fn fixture(name: &str) -> String {
     let path = root().join("vale/tests").join(name);
     fs::read_to_string(&path)

@@ -183,7 +183,7 @@ cargo run --manifest-path tools/laconic-tools/Cargo.toml -- web-page tools/lacon
 
 每个 `laconic-check-v*` 发布版都附有 Linux（x86_64，静态链接）、Windows（x86_64）和 macOS（Apple silicon）的预编译二进制文件及 SHA-256 校验和；把二进制文件放到 PATH 中即可。从源码构建只需要 Rust。
 
-对已经使用 [Vale](https://vale.sh) 的项目，`vale/Laconic` 是根据 `lint` 规则表生成的 Vale 样式，作为 `Laconic.zip` 包附在每个发布版中（自 0.6.0 起）。它涵盖可用正则表达式表达的规则；[vale/README.md](vale/README.md) 列出了无法表达的 7 条规则，以及其余规则与 `lint` 的不同之处。
+对已经使用 [Vale](https://vale.sh) 的项目，`vale/Laconic` 是根据 `lint` 规则表生成的 Vale 样式，作为 `Laconic.zip` 包附在每个发布版中（自 0.6.0 起）。它涵盖可用正则表达式表达的规则；[vale/README.md](vale/README.md) 列出了无法表达的 16 条规则，以及其余规则与 `lint` 的不同之处。
 
 自 0.4.0 起的发布版还为每个归档附带构建来源证明，以及 Scoop、Homebrew、winget 和 MCP Registry 的清单。其 MCP 包 `laconic-check.mcpb` 可一步安装到 Claude Desktop。用 `gh attestation verify <archive> --repo yungSNAT/Laconic` 校验下载的归档。Scoop 可直接从发布版安装：
 
@@ -211,7 +211,7 @@ Homebrew 配方和 winget 清单是为 tap 和 winget 目录附上的，但 tap 
 | `--commit-msg` | 把每个文件当作 Git 提交信息读取，忽略注释行和剪刀线以下的内容。 |
 | `--config <file>` | 从此文件而不是 `laconic.toml` 或 `.laconic-check` 读取设置。 |
 
-预设决定运行哪些规则、哪些规则会导致失败；不指定时，`lint` 不变。`email`、`report` 和 `essay` 会启用 [`unglossed-term`](docs/rules.md#unglossed-term)，这是一条建议性规则，针对前文没有 'Full Name (ACR)' 或 'ACR stands for' 之类说明、由 3 到 8 个大写字母组成的缩写；'BHP' 之类广为人知的形式和用于强调的大写词会通过。每个预设还会启用其他一些可选规则；[docs/rules.md](docs/rules.md) 在各条规则下注明是哪些。`--only unglossed-term` 可在不用预设时启用它。这 3 个预设会因 `stacked-hedge` 失败，`email` 和 `essay` 还会因 `bold-label`，`essay` 还会因 `clause-dashes`，`report` 还会因 `hyphen-consistency` 和 `acronym-before-definition` 失败。`chat` 会因 `stacked-hedge`、`bold-label` 和 `clause-dashes` 失败，并去掉 `acronym-before-definition` 和 `hyphen-consistency`；`docs` 去掉 `bold-label` 和 `acronym-before-definition`，并把 `number-word` 改为建议性。预设还会启用 5 条可选的实质启发式和聊天套话规则（自 0.6.0 起，默认均为建议性）：`email` 启用 `ai-placeholder`；`report` 和 `essay` 启用 `unanchored-magnitude`、`unattributed-superlative`、`unnamed-evidence` 和 `ai-placeholder`；`docs` 启用 `unattributed-superlative` 和 `ai-placeholder`；`chat` 启用 `ai-placeholder` 并因 `chat-filler` 失败。`docs` 还启用 [`broken-anchor`](docs/rules.md#broken-anchor) 和 [`broken-link`](docs/rules.md#broken-link)，链接的目标文件、标题或引用定义不存在时失败。因预设而导致失败的问题，其消息中不再有 '(advisory)'：
+预设决定运行哪些规则、哪些规则会导致失败；不指定时，`lint` 不变。`email`、`report` 和 `essay` 会启用 [`unglossed-term`](docs/rules.md#unglossed-term)，这是一条建议性规则，针对前文没有 'Full Name (ACR)' 或 'ACR stands for' 之类说明、由 3 到 8 个大写字母组成的缩写；'BHP' 之类广为人知的形式和用于强调的大写词会通过。每个预设还会启用其他一些可选规则；[docs/rules.md](docs/rules.md) 在各条规则下注明是哪些。`--only unglossed-term` 可在不用预设时启用它。这 3 个预设会因 `stacked-hedge` 失败，`email` 和 `essay` 还会因 `bold-label`，`essay` 还会因 `clause-dashes`，`report` 还会因 `hyphen-consistency` 和 `acronym-before-definition` 失败。`chat` 会因 `stacked-hedge`、`bold-label` 和 `clause-dashes` 失败，并去掉 `acronym-before-definition` 和 `hyphen-consistency`；`docs` 去掉 `bold-label` 和 `acronym-before-definition`，并把 `number-word` 改为建议性。预设还会启用 5 条可选的实质启发式和聊天套话规则（自 0.6.0 起，默认均为建议性）：`email` 启用 `ai-placeholder`；`report` 和 `essay` 启用 `unanchored-magnitude`、`unattributed-superlative`、`unnamed-evidence` 和 `ai-placeholder`；`docs` 启用 `unattributed-superlative` 和 `ai-placeholder`；`chat` 启用 `ai-placeholder` 并因 `chat-filler` 失败。`docs` 还启用 [`broken-anchor`](docs/rules.md#broken-anchor) 和 [`broken-link`](docs/rules.md#broken-link)，链接的目标文件、标题或引用定义不存在时失败。`report`、`essay` 和 `docs` 还启用 [`reference-shape`](docs/rules.md#reference-shape)，这是一条检查格式错误的 ISBN 和 arXiv 标识符的建议性规则。因预设而导致失败的问题，其消息中不再有 '(advisory)'：
 
 ```text
 $ printf 'Each member gets a QBR plan. This could potentially slip a week.\n' > memo.md

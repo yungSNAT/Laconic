@@ -22,6 +22,13 @@ mod anchors;
 mod syntax;
 use anchors::*;
 use syntax::*;
+pub(super) use syntax::{Place, code_spans, comment_spans};
+
+/// True when `at` lies inside one of the non-overlapping, ordered HTML `comments`.
+pub(super) fn in_comment(comments: &[(Place, Place)], at: Place) -> bool {
+    let before = comments.partition_point(|&(start, _)| start <= at);
+    before > 0 && comments[before - 1].1 >= at
+}
 
 /// The largest Markdown file whose headings `broken-link` reads.
 const MAX_TARGET_BYTES: u64 = 1 << 20;
@@ -297,18 +304,16 @@ impl Links {
 
     /// The findings for `text`, the whole document: `broken-anchor` always, and `broken-link`
     /// when `place` gives the workspace and the folder of the file `text` came from.
-    pub(super) fn findings(&self, text: &str, place: Option<(&Workspace, &Path)>) -> Vec<Finding> {
+    pub(super) fn findings(
+        &self,
+        text: &str,
+        place: Option<(&Workspace, &Path)>,
+        comments: &[(Place, Place)],
+    ) -> Vec<Finding> {
         let mut found = Vec::new();
         let own = anchors(text);
         // A link inside an HTML comment renders nothing, so it leads nowhere and is not read.
-        // The comments come in order without overlapping, so only the last one starting at or
-        // before a link can hold it.
-        let comments = comment_spans(text);
-        let live = |t: &&Target| {
-            let at = (t.line, t.column);
-            let before = comments.partition_point(|&(start, _)| start <= at);
-            before == 0 || comments[before - 1].1 < at
-        };
+        let live = |t: &&Target| !in_comment(comments, (t.line, t.column));
         for r in self.references.iter().filter(live) {
             if !self.defined.contains(&normalise(&r.text)) {
                 found.push(finding(

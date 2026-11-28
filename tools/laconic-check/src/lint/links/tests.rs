@@ -407,7 +407,7 @@ fn unclosed_links_and_definitions_are_read_in_linear_time() {
         links.collect(&chars, true, |k| {
             (lines.get(k).copied().unwrap_or(line), k + 1)
         });
-        links.findings(text, None)
+        links.findings(text, None, &comment_spans(text))
     };
     let fastest = |text: &str| {
         (0..5)
@@ -483,11 +483,12 @@ fn a_large_folder_is_searched_once_per_target() {
         let mut links = Links::default();
         links.collect(&chars, true, |k| (1, k + 1));
         // The first run lists the folder; the fastest of 3 more times the lookups alone.
-        links.findings(&text, Some((&workspace, &folder)));
+        let comments = comment_spans(&text);
+        links.findings(&text, Some((&workspace, &folder)), &comments);
         let fastest = (0..3)
             .map(|_| {
                 let start = std::time::Instant::now();
-                links.findings(&text, Some((&workspace, &folder)));
+                links.findings(&text, Some((&workspace, &folder)), &comments);
                 start.elapsed()
             })
             .min()

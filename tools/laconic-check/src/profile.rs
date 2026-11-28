@@ -57,6 +57,7 @@ impl Profile {
                     | RuleId::UnattributedSuperlative
                     | RuleId::UnnamedEvidence
                     | RuleId::AiPlaceholder
+                    | RuleId::ReferenceShape
             ),
             Self::Docs => matches!(
                 id,
@@ -64,6 +65,7 @@ impl Profile {
                     | RuleId::AiPlaceholder
                     | RuleId::BrokenAnchor
                     | RuleId::BrokenLink
+                    | RuleId::ReferenceShape
             ),
             Self::Chat => matches!(id, RuleId::ChatFiller | RuleId::AiPlaceholder),
         }
@@ -142,12 +144,17 @@ mod tests {
         assert!(Profile::Report.enables(RuleId::UnattributedSuperlative));
         assert!(Profile::Report.enables(RuleId::UnnamedEvidence));
         assert!(Profile::Report.enables(RuleId::AiPlaceholder));
+        assert!(Profile::Report.enables(RuleId::ReferenceShape));
         assert!(!Profile::Report.enables(RuleId::ChatFiller));
         assert!(Profile::Essay.enables(RuleId::UnglossedTerm));
         assert!(Profile::Essay.enables(RuleId::UnanchoredMagnitude));
+        assert!(Profile::Essay.enables(RuleId::ReferenceShape));
         assert!(!Profile::Docs.enables(RuleId::UnglossedTerm));
         assert!(Profile::Docs.enables(RuleId::UnattributedSuperlative));
         assert!(Profile::Docs.enables(RuleId::AiPlaceholder));
+        assert!(Profile::Docs.enables(RuleId::ReferenceShape));
+        assert!(!Profile::Email.enables(RuleId::ReferenceShape));
+        assert!(!Profile::Chat.enables(RuleId::ReferenceShape));
         assert!(!Profile::Chat.enables(RuleId::UnglossedTerm));
         assert!(Profile::Chat.enables(RuleId::ChatFiller));
         assert!(Profile::Chat.enables(RuleId::AiPlaceholder));

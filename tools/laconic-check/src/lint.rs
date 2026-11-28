@@ -15,6 +15,7 @@ use std::sync::OnceLock;
 
 mod links;
 mod project;
+mod refs;
 mod substance;
 mod terms;
 pub use links::Workspace;
@@ -317,6 +318,12 @@ rules! {
         "broken-link",
         Confidence::High,
         "A relative link, image, reference definition, or HTML href or src target that names no file or folder, or names one only in another letter case, which a case-sensitive host such as GitHub will not find; and a 'file.md#fragment' whose file has no such heading. Targets resolve from the linted file's folder and are checked only inside the folder lint runs in (the workspace folder for the language server, the repository for the Stop hook); URLs with a scheme and root-relative targets are not checked, and nothing goes over the network. Enabled by --only, a project file or the docs profile.",
+    ),
+    ReferenceShape = opt_in_advisory(
+        "reference-shape",
+        Confidence::High,
+        None,
+        "Labelled ISBNs with an invalid length, prefix or checksum (ISBN-10 and ISBN-13), and labelled modern arXiv identifiers with an invalid YYMM prefix, month, pre-0704 epoch, sequence digit count or version. Skips inline code, fenced code and HTML comments; checks offline without fetching. Enabled by --only, a project file or the report, essay and docs profiles.",
     ),
     UnusedSuppression = advisory(
         "unused-suppression",
@@ -1016,13 +1023,19 @@ fn scan(
     // Rules that compare paragraphs report once the whole document is read.
     findings.extend(document.findings(include_opt_in));
     if include_opt_in {
-        findings.extend(document.links.findings(text, place));
+        let comments = links::comment_spans(text);
+        findings.retain(|f| {
+            f.rule != RuleId::ReferenceShape || !links::in_comment(&comments, (f.line, f.column))
+        });
+        findings.extend(document.links.findings(text, place, &comments));
     }
     // An indented code line is read as prose, as it may be a paragraph indented by mistake;
-    // its code is not for an editor to change, and its links are not links.
+    // its code is not for an editor to change, and its links and references are not prose.
     findings.retain(|f| {
         !(code_lines.contains(&f.line)
-            && (f.rule == RuleId::BrokenAnchor || f.rule == RuleId::BrokenLink))
+            && (f.rule == RuleId::BrokenAnchor
+                || f.rule == RuleId::BrokenLink
+                || f.rule == RuleId::ReferenceShape))
     });
     for finding in &mut findings {
         if code_lines.contains(&finding.line) {
@@ -1431,6 +1444,7 @@ impl Paragraph {
                 })
                 .collect();
             substance::check(&masked, &self.chars, &lined, &mut joined);
+            refs::check(&self.chars, &mut joined);
         }
         project::check(&masked, project, &mut joined);
         found.extend(joined.into_iter().map(|f| self.place(f)));
